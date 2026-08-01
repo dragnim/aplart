@@ -7,6 +7,8 @@
      controls must stay reachable whichever is open. */
   z-index: 30;
   display: flex;
+  /* So the fullscreen refusal can take a line of its own beneath the row. */
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
@@ -100,6 +102,30 @@
 .exit {
   border-color: rgb(255 255 255 / 45%);
   font-weight: 600;
+}
+
+/*
+ * A line of its own beneath the bar's row, so nothing is pushed about, and
+ * aligned to the actions rather than the title — the drawer occupies the left
+ * of the screen, and a message there is unreadable.
+ */
+.refusal {
+  flex-basis: 100%;
+  margin: 0;
+  text-align: right;
+  pointer-events: auto;
+}
+
+.refusal span {
+  display: inline-block;
+  max-width: 30rem;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-md);
+  /* Opaque enough to be legible over any artwork underneath. */
+  background: rgb(0 0 0 / 90%);
+  color: #ff9d94;
+  font-size: var(--text-xs);
+  text-align: left;
 }
 
 @media (max-width: 48rem) {

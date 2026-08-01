@@ -242,6 +242,90 @@ test.describe('Focus mode', () => {
   });
 });
 
+test.describe('browser fullscreen', () => {
+  test.use({ viewport: WIDE });
+
+  /** What the browser under test will actually allow. */
+  async function fullscreenAllowed(page: Page) {
+    return page.evaluate(() => document.fullscreenEnabled === true);
+  }
+
+  test('is offered exactly when the browser allows it', async ({ page }) => {
+    await stubTryApl(page);
+    await open(page, 'modular-bloom', 'Modular Bloom');
+    await page.getByRole('button', { name: 'Focus mode' }).click();
+
+    const button = page.getByRole('button', { name: 'Fullscreen' });
+    if (await fullscreenAllowed(page)) {
+      await expect(button).toBeVisible();
+    } else {
+      // Focus mode is the fallback and already fills the window; nothing is
+      // offered and nothing is apologised for.
+      await expect(button).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Exit focus' })).toBeVisible();
+    }
+  });
+
+  test('goes fullscreen and comes back', async ({ page }) => {
+    await stubTryApl(page);
+    await open(page, 'modular-bloom', 'Modular Bloom');
+    test.skip(!(await fullscreenAllowed(page)), 'this browser does not offer fullscreen');
+
+    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await page.getByRole('button', { name: 'Fullscreen' }).click();
+
+    // Asserted from the browser's own state, not from our label alone.
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(true);
+    // The whole shell, so the toolbar and drawer came too.
+    expect(await page.evaluate(() => document.fullscreenElement?.getAttribute('data-focus'))).toBe('true');
+    await expect(page.getByRole('button', { name: 'Controls', exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Leave fullscreen' }).click();
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(false);
+    // Still in Focus mode: fullscreen is a layer on top of it.
+    await expect(page.getByRole('button', { name: 'Exit focus' })).toBeVisible();
+  });
+
+  test('leaving Focus mode leaves fullscreen too', async ({ page }) => {
+    await stubTryApl(page);
+    await open(page, 'modular-bloom', 'Modular Bloom');
+    test.skip(!(await fullscreenAllowed(page)), 'this browser does not offer fullscreen');
+
+    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await page.getByRole('button', { name: 'Fullscreen' }).click();
+    await expect(page.getByRole('button', { name: 'Leave fullscreen' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Exit focus' }).click();
+
+    // Otherwise the ordinary workspace is left on a screen with no browser
+    // chrome and no obvious way back.
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement !== null)).toBe(false);
+    // Back in the ordinary workspace. Asserted on the button rather than the
+    // Gallery link, of which there are two once the site nav is on screen.
+    await expect(page.getByRole('button', { name: 'Focus mode' })).toBeVisible();
+  });
+
+  test('what would be exported does not change on going fullscreen', async ({ page }, testInfo) => {
+    await stubTryApl(page);
+    await open(page, 'truchet-grid', 'Truchet Grid');
+    await runAndWait(page);
+    test.skip(!(await fullscreenAllowed(page)), 'this browser does not offer fullscreen');
+
+    const before = await exportOriginal(page, testInfo.outputPath('before-fullscreen.png'));
+
+    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await page.getByRole('button', { name: 'Fullscreen' }).click();
+    await expect(page.getByRole('button', { name: 'Leave fullscreen' })).toBeVisible();
+    await settled(page);
+
+    // Going fullscreen resizes the canvas, which repaints the tiling. What
+    // would be saved is still decided by the matrix.
+    expect(await colourCount(page)).toBeGreaterThan(2);
+    const after = await exportOriginal(page, testInfo.outputPath('after-fullscreen.png'));
+    expect(after).toEqual(before);
+  });
+});
+
 test.describe('Focus mode on a phone', () => {
   test.use({ viewport: PHONE });
 

@@ -13,6 +13,7 @@
 import { useCallback, useState } from 'react';
 import { ExportMenu } from './ExportMenu';
 import { type ArtworkActions } from './useArtworkActions';
+import { type Fullscreen } from './useFullscreen';
 import { useIdleVisibility } from './useIdleVisibility';
 import { describeStatus, type WorkspaceState } from './workspaceState';
 import styles from './FocusToolbar.module.css';
@@ -24,8 +25,8 @@ interface Props {
   readonly drawerOpen: boolean;
   readonly onToggleDrawer: () => void;
   readonly onExitFocus: () => void;
-  /** Rendered between Share and Exit; browser fullscreen lands here later. */
-  readonly extraActions?: React.ReactNode;
+  /** Absent when the browser will not do fullscreen; then nothing is offered. */
+  readonly fullscreen: Fullscreen | null;
 }
 
 export function FocusToolbar({
@@ -35,7 +36,7 @@ export function FocusToolbar({
   drawerOpen,
   onToggleDrawer,
   onExitFocus,
-  extraActions,
+  fullscreen,
 }: Props) {
   const [holdingFocus, setHoldingFocus] = useState(false);
 
@@ -87,11 +88,37 @@ export function FocusToolbar({
           Share
         </button>
         <ExportMenu actions={actions} triggerClassName={styles.action} />
-        {extraActions}
+        {fullscreen !== null && (
+          <button type="button" className={styles.action} onClick={fullscreen.toggle}>
+            {/*
+              The label states what pressing it will do, rather than the
+              current state with aria-pressed. Both are correct; a changing
+              label is the one people read without being told to.
+            */}
+            {fullscreen.active ? 'Leave fullscreen' : 'Fullscreen'}
+          </button>
+        )}
         <button type="button" className={styles.exit} onClick={onExitFocus}>
           Exit focus
         </button>
       </div>
+
+      {/*
+        Only ever a refusal, and only for a few seconds. An alert rather than a
+        status: it is the answer to something just pressed, and nothing else on
+        screen would otherwise show that the press did nothing.
+      */}
+      {fullscreen?.error != null && (
+        <p className={styles.refusal} role="alert">
+          {/*
+            Right-aligned on a line of its own, in an opaque pill. Left-aligned
+            and unbacked it landed over the drawer, where salmon text on a white
+            panel was close to invisible — a message about a failure that cannot
+            be read is worse than none.
+          */}
+          <span>{fullscreen.error}</span>
+        </p>
+      )}
     </div>
   );
 }

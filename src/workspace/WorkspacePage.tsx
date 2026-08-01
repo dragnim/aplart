@@ -31,6 +31,7 @@ import { randomiseParameters } from './randomise';
 import { readSavedProjectImmediate, useLocalProject } from './useLocalProject';
 import { FocusToolbar } from './FocusToolbar';
 import { useArtworkActions } from './useArtworkActions';
+import { isFullscreen, useFullscreen } from './useFullscreen';
 import { RenderControls } from './RenderControls';
 import { RunPanel } from './RunPanel';
 import { WorkspaceToolbar } from './WorkspaceToolbar';
@@ -145,6 +146,15 @@ function Workspace({
   const focusTrigger = useRef<HTMLButtonElement>(null);
   const restoreTrigger = useRef(false);
 
+  /*
+   * Browser fullscreen wraps the whole shell, so the overlay bar and the
+   * drawer come with it — going fullscreen must not leave the controls behind
+   * on a screen nobody can see.
+   */
+  const pageRef = useRef<HTMLDivElement>(null);
+  const fullscreen = useFullscreen(pageRef);
+  const exitFullscreen = fullscreen?.exit;
+
   const actions = useArtworkActions({ preset, state, seed });
 
   useLocalProject(preset, state);
@@ -233,7 +243,10 @@ function Workspace({
     setFocus(false);
     setDrawerOpen(false);
     restoreTrigger.current = true;
-  }, []);
+    // Leaving Focus mode while still fullscreen would put the ordinary
+    // workspace on a screen with no browser chrome and no obvious way back.
+    exitFullscreen?.();
+  }, [exitFullscreen]);
 
   // Focus lands back on the button that leads into Focus mode, so leaving by
   // keyboard does not drop the caret at the top of the document.
@@ -247,8 +260,7 @@ function Workspace({
    * Escape unwinds one layer at a time, innermost first.
    *
    * The drawer closes before Focus mode exits, so a single press never throws
-   * away more than the person asked for. Browser fullscreen will insert itself
-   * between the two when it arrives.
+   * away more than the person asked for.
    */
   useEffect(() => {
     if (!focus) return;
@@ -258,6 +270,14 @@ function Workspace({
 
       // A dialog handles its own Escape; do not unwind past it.
       if (confirmingReset) return;
+
+      /*
+       * Fullscreen is the browser's layer and Escape is how it is left,
+       * whether or not the keystroke ever reaches us — most browsers swallow
+       * it. Unwinding a layer of our own as well would mean one press did two
+       * things, and which two would differ between browsers.
+       */
+      if (isFullscreen()) return;
 
       event.preventDefault();
       if (drawerOpen) closeDrawer();
@@ -386,7 +406,7 @@ function Workspace({
    * parameters and unsaved edits are necessarily the same in both.
    */
   const shell = (
-    <div className={styles.page} data-focus={focus ? 'true' : undefined}>
+    <div className={styles.page} ref={pageRef} data-focus={focus ? 'true' : undefined}>
       {focus ? (
         <FocusToolbar
           title={preset.title}
@@ -395,6 +415,7 @@ function Workspace({
           drawerOpen={drawerOpen}
           onToggleDrawer={toggleDrawer}
           onExitFocus={exitFocus}
+          fullscreen={fullscreen}
         />
       ) : (
         <WorkspaceToolbar
