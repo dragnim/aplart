@@ -19,6 +19,7 @@ import { Dialog } from '@/components/Dialog/Dialog';
 import { WIDE_LAYOUT_QUERY, useMediaQuery } from '@/app/useMediaQuery';
 import { type AplExecutionService } from '@/execution/AplExecutionService';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import { migratePresetCode } from '@/presets/codeMigrations';
 import { getPreset } from '@/presets/presets';
 import { type ArtworkParameter, type ArtworkPreset } from '@/presets/schema';
 import { ArtworkCanvas } from '@/renderer/ArtworkCanvas';
@@ -101,11 +102,19 @@ function Workspace({
   const initialState = useMemo(() => {
     if (shared !== null) {
       if (!shared.ok) return undefined;
+      /*
+       * Both routes bring code in from outside this version of the preset, so
+       * both pass it through the same rename table. Applied here rather than in
+       * the decoder and the storage reader separately: this is the point where
+       * code becomes *this preset's* code, and it is the only place that has to
+       * be got right.
+       */
+      const code = migratePresetCode(preset.id, shared.state.code);
       return {
         ...initialWorkspaceState(preset),
-        code: shared.state.code,
+        code,
         renderOptions: toRenderOptions(shared.state),
-        modified: shared.state.code !== preset.code,
+        modified: code !== preset.code,
       };
     }
 
@@ -115,11 +124,12 @@ function Workspace({
     const saved = readSavedProjectImmediate(preset.id);
     if (saved === null) return undefined;
 
+    const code = migratePresetCode(preset.id, saved.code);
     return {
       ...initialWorkspaceState(preset),
-      code: saved.code,
+      code,
       renderOptions: saved.renderOptions,
-      modified: saved.code !== preset.code,
+      modified: code !== preset.code,
     };
   }, [shared, preset]);
 

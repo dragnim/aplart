@@ -24,23 +24,23 @@ import { truchetGrid } from '@/presets/truchet-grid';
 const MOTIF_COUNT = 4;
 
 /** The tile class the preset's expression gives for a cell, one-based. */
-function tileAt(row: number, column: number, seed: number, density: number): number {
+function tileAt(row: number, column: number, seed: number, classes: number): number {
   const angle = 12.9898 * row + 78.233 * column + seed * 0.618_033_988_7;
   const hashed = 43_758.5453 * Math.sin(angle);
-  return Math.floor(density * (hashed - Math.floor(hashed))) % density;
+  return Math.floor(classes * (hashed - Math.floor(hashed))) % classes;
 }
 
 /** The generator that was replaced, kept so the improvement can be measured. */
-function previousTileAt(row: number, column: number, seed: number, density: number): number {
+function previousTileAt(row: number, column: number, seed: number, classes: number): number {
   const value = seed * 0.618_033_988_7 + row * (column * 0.754_877_666_2);
-  return Math.floor(10_000 * (value - Math.floor(value))) % density;
+  return Math.floor(10_000 * (value - Math.floor(value))) % classes;
 }
 
-type Generator = (row: number, column: number, seed: number, density: number) => number;
+type Generator = (row: number, column: number, seed: number, classes: number) => number;
 
-function grid(size: number, seed: number, density: number, generator: Generator): number[][] {
+function grid(size: number, seed: number, classes: number, generator: Generator): number[][] {
   return Array.from({ length: size }, (_unusedRow, row) =>
-    Array.from({ length: size }, (_unusedColumn, column) => generator(row + 1, column + 1, seed, density)),
+    Array.from({ length: size }, (_unusedColumn, column) => generator(row + 1, column + 1, seed, classes)),
   );
 }
 
@@ -175,12 +175,12 @@ describe('the tile hash', () => {
   });
 
   it('stays in range for every tile-shape count offered', () => {
-    for (const density of [2, 3, 4]) {
-      const flat = grid(SIZE, 7, density, tileAt).flat();
+    for (const classes of [2, 3, 4]) {
+      const flat = grid(SIZE, 7, classes, tileAt).flat();
       expect(Math.min(...flat)).toBeGreaterThanOrEqual(0);
-      expect(Math.max(...flat)).toBeLessThan(density);
+      expect(Math.max(...flat)).toBeLessThan(classes);
       // All of them actually used, or the control would be a lie.
-      expect(new Set(flat).size).toBe(density);
+      expect(new Set(flat).size).toBe(classes);
     }
   });
 
@@ -229,8 +229,8 @@ describe('the tile-shape control', () => {
      * squares over the tiling. Whatever the range is, it cannot exceed what can
      * actually be drawn.
      */
-    const density = truchetGrid.parameters.find((parameter) => parameter.variable === 'density');
-    expect(density?.max).toBe(MOTIF_COUNT);
+    const classes = truchetGrid.parameters.find((parameter) => parameter.variable === 'classes');
+    expect(classes?.max).toBe(MOTIF_COUNT);
   });
 
   it('does not describe the tiling as random', () => {

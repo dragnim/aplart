@@ -106,21 +106,21 @@ function evaluate(expression: string): NumericMatrix | { readonly error: readonl
    * Truchet Grid.
    *
    *   angle←(12.9898×⍳size)∘.+(78.233×⍳size)+seed×0.6180339887
-   *   density|⌊density×1|43758.5453×1○angle
+   *   classes|⌊classes×1|43758.5453×1○angle
    *
    * The last bits of `sin` need not match the interpreter's for these tests,
    * which check shapes and dimensions rather than individual tiles.
    */
-  const density = read('density');
+  const classes = read('classes');
   const seed = read('seed');
-  if (size !== null && density !== null && density !== 0 && seed !== null) {
+  if (size !== null && classes !== null && classes !== 0 && seed !== null) {
     const offset = seed * 0.618_033_988_7;
     const rows: number[][] = [];
     for (let row = 1; row <= size; row += 1) {
       const values: number[] = [];
       for (let column = 1; column <= size; column += 1) {
         const hashed = 43_758.5453 * Math.sin(12.9898 * row + 78.233 * column + offset);
-        values.push(Math.floor(density * (hashed - Math.floor(hashed))) % density);
+        values.push(Math.floor(classes * (hashed - Math.floor(hashed))) % classes);
       }
       rows.push(values);
     }

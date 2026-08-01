@@ -24,7 +24,7 @@ export const truchetGrid: ArtworkPreset = {
     '⍝ Controls',
     'size←20',
     'seed←7',
-    'density←2',
+    'classes←2',
     '',
     '⍝ Hash each cell position into a tile class.',
     '⍝ Sine of a large angle is what does the scrambling. Multiplying the row',
@@ -32,7 +32,7 @@ export const truchetGrid: ArtworkPreset = {
     '⍝ row is fixed, so whenever it lands near a whole number the whole row',
     '⍝ comes out almost constant and a band appears across the tiling.',
     'angle←(12.9898×⍳size)∘.+(78.233×⍳size)+seed×0.6180339887',
-    'density|⌊density×1|43758.5453×1○angle',
+    'classes|⌊classes×1|43758.5453×1○angle',
   ].join('\n'),
 
   parameters: [
@@ -64,8 +64,8 @@ export const truchetGrid: ArtworkPreset = {
       randomisable: true,
     },
     {
-      id: 'density',
-      variable: 'density',
+      id: 'classes',
+      variable: 'classes',
       label: 'Tile shapes',
       description: 'Two gives the classic flowing curves. Three and four add diagonals that cut across them.',
       type: 'integer',
