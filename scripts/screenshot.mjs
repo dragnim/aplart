@@ -1,7 +1,8 @@
 /**
  * Drives the built site in a real browser and captures screenshots.
  *
- *     npm run build && npm run preview &
+ *     npm run build
+ *     npm run preview -- --port 4173 --strictPort &
  *     npm run screenshot
  *     npm run screenshot -- https://dragnim.github.io/aplart/
  *

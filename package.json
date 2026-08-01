@@ -15,7 +15,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run typecheck && vite build",
-    "preview": "tsx scripts/preview-variants.ts",
+    "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -27,11 +27,12 @@
     "test:e2e": "playwright test",
     "validate:presets": "tsx scripts/validate-presets.ts",
     "verify:cors": "node scripts/verify-live-cors.mjs",
-    "generate:thumbnails": "tsx scripts/generate-thumbnails.ts",
-    "refresh:fixtures": "tsx scripts/refresh-fixtures.ts",
     "screenshot": "node scripts/screenshot.mjs",
-    "contact-sheet": "tsx scripts/contact-sheet.ts",
-    "debug:preset": "tsx scripts/debug-preset.ts"
+    "refresh:fixtures": "tsx scripts/refresh-fixtures.ts",
+    "generate:thumbnails": "tsx scripts/generate-thumbnails.ts",
+    "preset:variants": "tsx scripts/preview-variants.ts",
+    "preset:sheet": "tsx scripts/contact-sheet.ts",
+    "preset:debug": "tsx scripts/debug-preset.ts"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",

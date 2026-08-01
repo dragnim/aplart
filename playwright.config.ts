@@ -34,7 +34,16 @@ export default defineConfig({
   webServer: {
     command: `npm run build && npm run preview -- --port ${PORT} --strictPort`,
     url: BASE_URL,
-    reuseExistingServer: !process.env.CI,
+    /*
+     * Never reuse a server that happens to be running.
+     *
+     * Reusing one made local runs pass while CI failed, because the command
+     * above was broken and locally it was never executed — a hand-started
+     * preview server was answering instead. The point of these tests is to
+     * exercise a fresh production build, and the build takes under a second,
+     * so there is nothing to gain by short-cutting it.
+     */
+    reuseExistingServer: false,
     timeout: 180_000,
   },
 });

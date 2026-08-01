@@ -2,7 +2,7 @@
  * Runs one preset at a chosen parameter value and prints exactly what came
  * back, including the generated expression.
  *
- *     npm run debug:preset -- mandelbrot-field size 200
+ *     npm run preset:debug -- mandelbrot-field size 200
  *
  * For when a preset fails at a particular setting and the friendly error is
  * not enough to say why.
@@ -21,7 +21,7 @@ async function main(): Promise<number> {
   const [presetId, variable, rawValue] = process.argv.slice(2);
 
   if (presetId === undefined) {
-    console.error('Usage: npm run debug:preset -- <presetId> [variable] [value]');
+    console.error('Usage: npm run preset:debug -- <presetId> [variable] [value]');
     return 1;
   }
 

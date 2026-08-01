@@ -1,7 +1,7 @@
 /**
  * Renders every preset's fixture into one contact sheet.
  *
- *     npm run contact-sheet
+ *     npm run preset:sheet
  *
  * Judging a gallery means seeing the pieces together — whether they read as
  * one collection, whether two of them are too similar, whether one is dull

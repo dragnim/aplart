@@ -1,8 +1,8 @@
 /**
  * Renders a preset at several parameter settings into one montage image.
  *
- *     npm run preview -- modular-bloom modulus 5 7 9 11 13 17
- *     npm run preview -- modular-bloom size 24 48 72 88
+ *     npm run preset:variants -- modular-bloom modulus 5 7 9 11 13 17
+ *     npm run preset:variants -- modular-bloom size 24 48 72 88
  *
  * Choosing good defaults for a generative piece means looking at it, and
  * looking at six variants side by side is far more useful than opening six
@@ -35,7 +35,7 @@ async function main(): Promise<number> {
   const [presetId, variable, ...rawValues] = process.argv.slice(2);
 
   if (presetId === undefined || variable === undefined || rawValues.length === 0) {
-    console.error('Usage: npm run preview -- <presetId> <variable> <value> [value...]');
+    console.error('Usage: npm run preset:variants -- <presetId> <variable> <value> [value...]');
     return 1;
   }
 

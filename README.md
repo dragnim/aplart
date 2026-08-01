@@ -69,16 +69,24 @@ No API keys, accounts or secrets are needed.
 
 Asset and authoring tools:
 
-| Command                                            | What it does                                                                 |
-| -------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `npm run refresh:fixtures`                         | Re-run every preset against the live service and rewrite its fixture.        |
-| `npm run generate:thumbnails`                      | Render gallery thumbnails from the committed fixtures. No network.           |
-| `npm run preview -- <preset> <variable> <values…>` | Render one preset at several settings into a montage, for choosing defaults. |
-| `npm run screenshot`                               | Drive the built site in a real browser and capture screenshots.              |
+| Command                                                    | What it does                                                                 |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `npm run refresh:fixtures`                                 | Re-run every preset against the live service and rewrite its fixture.        |
+| `npm run generate:thumbnails`                              | Render gallery thumbnails from the committed fixtures. No network.           |
+| `npm run preset:variants -- <preset> <variable> <values…>` | Render one preset at several settings into a montage, for choosing defaults. |
+| `npm run preset:sheet`                                     | Render every preset's fixture into one contact sheet.                        |
+| `npm run preset:debug -- <preset> [variable] [value]`      | Run one preset and print the generated expression and the raw reply.         |
+| `npm run screenshot`                                       | Drive the built site in a real browser and capture screenshots.              |
 
 `refresh:fixtures` and `generate:thumbnails` are deliberately separate steps, and neither runs during
 a build. A build that silently refreshed fixtures would destroy the thing they exist for: noticing
 when a preset's output changes without anyone meaning it to.
+
+The preset tools are namespaced under `preset:` for a reason. An earlier version of this project named
+the variants tool `preview`, which silently replaced Vite's own `preview` script — the one the
+end-to-end tests use to serve the built site. Local runs kept passing because Playwright was reusing a
+preview server that had been left running by hand, so only CI noticed. `reuseExistingServer` is now
+off, so a broken server command fails locally too.
 
 `npm run test:live` is deliberately excluded from `npm test` and from the required CI checks. It calls
 a shared public service, and a pull request must not fail because that service is momentarily busy.
