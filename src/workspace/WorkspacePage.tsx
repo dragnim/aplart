@@ -206,13 +206,20 @@ function Workspace({
     </div>
   );
 
+  /*
+   * Order matters more here than it looks.
+   *
+   * The controls come first because they are what lets someone change the
+   * artwork within seconds of arriving, which is the whole point. The prompts
+   * only suggest what to change; having them above the sliders pushed the
+   * sliders below the fold and put the advice before the means of taking it.
+   *
+   * Appearance stays next to Code controls so the contrast between "changes
+   * the APL" and "changes only the picture" is visible at a glance — that
+   * distinction is one of the things this application is trying to teach.
+   */
   const controlsPanel = (
     <div className={styles.controlsPanel}>
-      <TryChangingThis
-        prompts={preset.tryChangingThis ?? []}
-        openByDefault={preset.difficulty === 'beginner'}
-      />
-
       <section aria-labelledby="code-controls-heading">
         <h2 className={styles.sectionHeading} id="code-controls-heading">
           Code controls
@@ -245,6 +252,11 @@ function Workspace({
           onChange={setRenderOptions}
         />
       </section>
+
+      <TryChangingThis
+        prompts={preset.tryChangingThis ?? []}
+        openByDefault={preset.difficulty === 'beginner'}
+      />
 
       <PrimitivePanel primitives={preset.primitives} />
     </div>
