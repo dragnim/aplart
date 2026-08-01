@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { ErrorBoundary } from '@/components/ErrorBoundary/ErrorBoundary';
 import { SiteFooter } from '@/components/SiteFooter/SiteFooter';
 import { SiteHeader } from '@/components/SiteHeader/SiteHeader';
@@ -6,9 +6,18 @@ import { GalleryPage } from '@/gallery/GalleryPage';
 import { AboutPage } from '@/pages/AboutPage';
 import { HelpPage } from '@/pages/HelpPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
-import { WorkspacePage } from '@/workspace/WorkspacePage';
 import { useRoute, type Route } from './router';
 import styles from './App.module.css';
+
+/*
+ * The workspace pulls in CodeMirror, which is by far the largest thing this
+ * application depends on. Loading it lazily keeps it out of the gallery — the
+ * page most visitors see first, and often on a phone — at the cost of a brief
+ * placeholder when a piece is opened.
+ */
+const WorkspacePage = lazy(async () => ({
+  default: (await import('@/workspace/WorkspacePage')).WorkspacePage,
+}));
 
 const SITE_NAME = 'APL Art';
 
@@ -74,7 +83,11 @@ function RouteView({ route }: { readonly route: Route }) {
     case 'gallery':
       return <GalleryPage />;
     case 'artwork':
-      return <WorkspacePage presetId={route.presetId} sharedState={route.sharedState} />;
+      return (
+        <Suspense fallback={<p className={styles.loading}>Loading the workspace…</p>}>
+          <WorkspacePage presetId={route.presetId} sharedState={route.sharedState} />
+        </Suspense>
+      );
     case 'about':
       return <AboutPage />;
     case 'help':

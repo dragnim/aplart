@@ -4,8 +4,13 @@
   padding: var(--space-7) var(--space-5) var(--space-8);
 }
 
+/*
+ * Sized in rem, not ch: a ch unit here resolves against the inherited body
+ * size rather than the display size of the heading inside it, which made the
+ * strapline wrap after its first word.
+ */
 .hero {
-  max-width: 34ch;
+  max-width: 46rem;
   margin-bottom: var(--space-7);
 }
 

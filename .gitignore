@@ -25,6 +25,9 @@ Thumbs.db
 # Claude Code local settings
 .claude/settings.local.json
 
+# Preset preview sheets from scripts/preview-variants.ts
+.preview/
+
 # Scratch
 *.log
 npm-debug.log*

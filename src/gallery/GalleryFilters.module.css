@@ -1,0 +1,39 @@
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease),
+    border-color var(--motion-fast) var(--ease);
+}
+
+.filter:hover {
+  background: var(--surface-sunken);
+}
+
+/* Selection is weight plus a ring, so it does not depend on colour alone. */
+.filter[data-selected='true'] {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--surface);
+  font-weight: 650;
+}
+
+.count {
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}

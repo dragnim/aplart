@@ -1,0 +1,117 @@
+.panel {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.group {
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.legend {
+  padding: 0;
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+.palettes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  gap: var(--space-2);
+}
+
+.palette {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  min-height: var(--tap-target);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--motion-fast) var(--ease);
+}
+
+.palette:hover {
+  border-color: var(--border-strong);
+}
+
+/* Selection is shown by a ring and a bold label, not by colour alone. */
+.palette[data-selected='true'] {
+  border-color: var(--dyalog-orange);
+  box-shadow: inset 0 0 0 1px var(--dyalog-orange);
+}
+
+.palette[data-selected='true'] .paletteName {
+  font-weight: 700;
+}
+
+.swatch {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  height: 1.1rem;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.paletteName {
+  font-size: var(--text-xs);
+}
+
+.rotations {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.rotation {
+  min-width: var(--tap-target);
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.rotation[data-selected='true'] {
+  border-color: var(--dyalog-orange);
+  box-shadow: inset 0 0 0 1px var(--dyalog-orange);
+  font-weight: 700;
+}
+
+.checks {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.check input {
+  margin-top: 0.72rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--dyalog-orange);
+  flex: none;
+}
+
+.check > span {
+  align-self: center;
+}
+
+.hint {
+  color: var(--text-muted);
+}

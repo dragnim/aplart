@@ -58,6 +58,16 @@ function positiveNumber(raw: string | undefined, fallback: number): number {
   return value;
 }
 
+/**
+ * The build-time environment, or an empty one.
+ *
+ * Vite replaces `import.meta.env` with a literal object, so the check folds
+ * away in the browser bundle. Under Node — the fixture and thumbnail scripts
+ * import this module — there is no such object, and reading through it would
+ * throw before anything could run.
+ */
+const env: Partial<ImportMetaEnv> = typeof import.meta.env === 'undefined' ? {} : import.meta.env;
+
 function endpoint(raw: string | undefined, fallback: string): string {
   if (raw === undefined || raw.trim() === '') return fallback;
   try {
@@ -76,18 +86,27 @@ function endpoint(raw: string | undefined, fallback: string): string {
 }
 
 export const config: AppConfig = Object.freeze({
-  aplExecEndpoint: endpoint(import.meta.env.VITE_APL_EXEC_ENDPOINT, DEFAULTS.aplExecEndpoint),
-  requestTimeoutMs: positiveNumber(import.meta.env.VITE_APL_REQUEST_TIMEOUT_MS, DEFAULTS.requestTimeoutMs),
-  maxMatrixRows: positiveNumber(import.meta.env.VITE_MAX_MATRIX_ROWS, DEFAULTS.maxMatrixRows),
-  maxMatrixColumns: positiveNumber(import.meta.env.VITE_MAX_MATRIX_COLUMNS, DEFAULTS.maxMatrixColumns),
-  maxMatrixCells: positiveNumber(import.meta.env.VITE_MAX_MATRIX_CELLS, DEFAULTS.maxMatrixCells),
-  singleRequestMaxRows: positiveNumber(
-    import.meta.env.VITE_SINGLE_REQUEST_MAX_ROWS,
-    DEFAULTS.singleRequestMaxRows,
-  ),
-  maxCodeLength: positiveNumber(import.meta.env.VITE_MAX_CODE_LENGTH, DEFAULTS.maxCodeLength),
-  maxResponseBytes: positiveNumber(import.meta.env.VITE_MAX_RESPONSE_BYTES, DEFAULTS.maxResponseBytes),
+  aplExecEndpoint: endpoint(env.VITE_APL_EXEC_ENDPOINT, DEFAULTS.aplExecEndpoint),
+  requestTimeoutMs: positiveNumber(env.VITE_APL_REQUEST_TIMEOUT_MS, DEFAULTS.requestTimeoutMs),
+  maxMatrixRows: positiveNumber(env.VITE_MAX_MATRIX_ROWS, DEFAULTS.maxMatrixRows),
+  maxMatrixColumns: positiveNumber(env.VITE_MAX_MATRIX_COLUMNS, DEFAULTS.maxMatrixColumns),
+  maxMatrixCells: positiveNumber(env.VITE_MAX_MATRIX_CELLS, DEFAULTS.maxMatrixCells),
+  singleRequestMaxRows: positiveNumber(env.VITE_SINGLE_REQUEST_MAX_ROWS, DEFAULTS.singleRequestMaxRows),
+  maxCodeLength: positiveNumber(env.VITE_MAX_CODE_LENGTH, DEFAULTS.maxCodeLength),
+  maxResponseBytes: positiveNumber(env.VITE_MAX_RESPONSE_BYTES, DEFAULTS.maxResponseBytes),
 });
 
 /** Exposed for tests that need to assert against the shipped defaults. */
 export const configDefaults: AppConfig = DEFAULTS;
+
+/**
+ * Resolves a path inside `public/` against the deployment base.
+ *
+ * The site is served from a subpath on GitHub Pages, so a bare `/thumbnails/x`
+ * would resolve to the domain root and 404. Vite knows the base it built with.
+ */
+export function assetUrl(path: string): string {
+  const base = env.BASE_URL ?? '/';
+  const withSlash = base.endsWith('/') ? base : `${base}/`;
+  return `${withSlash}${path.replace(/^\//u, '')}`;
+}

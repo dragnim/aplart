@@ -1,0 +1,92 @@
+.list {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.control {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.control[data-detached='true'] {
+  padding: var(--space-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--warning-surface);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.label {
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+.value {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  padding: 0.1em 0.45em;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+  min-width: 2.5rem;
+  text-align: center;
+}
+
+.description {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.detached {
+  font-size: var(--text-sm);
+  color: var(--warning);
+}
+
+.slider {
+  width: 100%;
+  /* Comfortable to hit on a touch screen without a bulky visual. */
+  min-height: var(--tap-target);
+  accent-color: var(--dyalog-orange);
+  cursor: pointer;
+}
+
+.select {
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  cursor: pointer;
+}
+
+.toggle input {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--dyalog-orange);
+}
+
+.restore {
+  justify-self: start;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.restore:hover {
+  background: var(--surface-sunken);
+}

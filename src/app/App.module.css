@@ -15,3 +15,9 @@
 .main:focus {
   outline: none;
 }
+
+.loading {
+  padding: var(--space-8) var(--space-5);
+  text-align: center;
+  color: var(--text-muted);
+}

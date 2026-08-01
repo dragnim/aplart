@@ -1,0 +1,19 @@
+.editor {
+  height: 100%;
+  min-height: 12rem;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--surface-dark);
+}
+
+.editor :global(.cm-editor) {
+  height: 100%;
+}
+
+.editor :global(.cm-scroller) {
+  overflow: auto;
+  /* The APL font is the point of this editor; do not let CodeMirror's default
+     monospace stack win for the parts it styles itself. */
+  font-family: var(--font-apl);
+  line-height: 1.6;
+}

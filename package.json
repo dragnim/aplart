@@ -15,7 +15,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run typecheck && vite build",
-    "preview": "vite preview",
+    "preview": "tsx scripts/preview-variants.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -26,7 +26,10 @@
     "test:live": "vitest run --config vitest.live.config.ts",
     "test:e2e": "playwright test",
     "validate:presets": "tsx scripts/validate-presets.ts",
-    "verify:cors": "node scripts/verify-live-cors.mjs"
+    "verify:cors": "node scripts/verify-live-cors.mjs",
+    "generate:thumbnails": "tsx scripts/generate-thumbnails.ts",
+    "refresh:fixtures": "tsx scripts/refresh-fixtures.ts",
+    "screenshot": "node scripts/screenshot.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",

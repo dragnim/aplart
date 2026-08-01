@@ -67,6 +67,19 @@ No API keys, accounts or secrets are needed.
 | `npm run validate:presets` | Validate every preset and fail if any is malformed.                |
 | `npm run verify:cors`      | Check that the **deployed** site can reach the APL endpoint.       |
 
+Asset and authoring tools:
+
+| Command                                            | What it does                                                                 |
+| -------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `npm run refresh:fixtures`                         | Re-run every preset against the live service and rewrite its fixture.        |
+| `npm run generate:thumbnails`                      | Render gallery thumbnails from the committed fixtures. No network.           |
+| `npm run preview -- <preset> <variable> <values…>` | Render one preset at several settings into a montage, for choosing defaults. |
+| `npm run screenshot`                               | Drive the built site in a real browser and capture screenshots.              |
+
+`refresh:fixtures` and `generate:thumbnails` are deliberately separate steps, and neither runs during
+a build. A build that silently refreshed fixtures would destroy the thing they exist for: noticing
+when a preset's output changes without anyone meaning it to.
+
 `npm run test:live` is deliberately excluded from `npm test` and from the required CI checks. It calls
 a shared public service, and a pull request must not fail because that service is momentarily busy.
 

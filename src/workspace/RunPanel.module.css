@@ -1,0 +1,130 @@
+.panel {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.run,
+.stop {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--tap-target);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease),
+    transform var(--motion-fast) var(--ease);
+}
+
+.run {
+  background: var(--dyalog-orange);
+  border-color: var(--dyalog-orange);
+  /* Near-black on orange: 8.6:1, comfortably above AA. White would be 2.9:1. */
+  color: #1a0d02;
+}
+
+.run:hover {
+  background: #ff7d31;
+}
+
+.run:active {
+  transform: translateY(1px);
+}
+
+.stop {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.stop:hover {
+  background: var(--surface-sunken);
+}
+
+.shortcut {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: 0.15em 0.4em;
+  border-radius: var(--radius-sm);
+  background: rgb(0 0 0 / 14%);
+}
+
+.status {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  min-height: 1.4em;
+}
+
+.status[data-status='success'] {
+  color: var(--success);
+}
+
+.status[data-status='running'] {
+  color: var(--text);
+}
+
+.status[data-status='error'] {
+  color: var(--error);
+}
+
+.error {
+  padding: var(--space-3);
+  border: 1px solid var(--error);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  background: var(--error-surface);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.errorMessage {
+  font-size: var(--text-sm);
+  color: var(--error);
+}
+
+.errorActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.link {
+  min-height: var(--tap-target);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--error);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+
+.detail {
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--surface-dark);
+  color: var(--text-on-dark);
+  border-radius: var(--radius-md);
+  font-family: var(--font-apl);
+  font-size: var(--text-xs);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.warnings {
+  margin: 0;
+  padding-left: var(--space-5);
+  font-size: var(--text-xs);
+  color: var(--warning);
+  display: grid;
+  gap: var(--space-1);
+}

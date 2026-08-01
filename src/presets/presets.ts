@@ -7,11 +7,12 @@
  * preset fails the build long before it can reach a visitor.
  */
 
+import { modularBloom } from './modular-bloom';
 import { validatePreset, type ArtworkPreset, type PresetValidationIssue } from './schema';
 
 // Presets are registered here as they are authored. Each lives in its own
 // module so that its APL, parameters and prose stay together.
-const authored: readonly ArtworkPreset[] = [];
+const authored: readonly ArtworkPreset[] = [modularBloom];
 
 const issues: PresetValidationIssue[] = [];
 const valid: ArtworkPreset[] = [];
