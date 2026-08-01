@@ -114,6 +114,44 @@ describe('migratePresetCode', () => {
       expect(migrated).toBe("label←'⍝ not a comment'⋄classes←2");
     });
 
+    it('gets every kind of non-code right at once', () => {
+      /*
+       * All the ways `density` and `classes` can appear without being a name,
+       * in one artwork: a whole-line comment, the old name as character data,
+       * the *new* name as character data, and a comment marker inside a string.
+       *
+       * The middle two are the ones that matter most. If either counted as a
+       * use, the real assignment on the first line would be left behind — the
+       * control detached because of a word in a caption.
+       */
+      const code = [
+        'density←2',
+        '⍝ density controls the old version',
+        "label←'density'",
+        "text←'four tile classes look best'",
+        "quotedComment←'not ⍝ a comment'",
+        'density|⍳4',
+      ].join('\n');
+
+      expect(migratePresetCode('truchet-grid', code)).toBe(
+        [
+          'classes←2',
+          '⍝ density controls the old version',
+          "label←'density'",
+          "text←'four tile classes look best'",
+          "quotedComment←'not ⍝ a comment'",
+          'classes|⍳4',
+        ].join('\n'),
+      );
+    });
+
+    it('steps over doubled quotes around the old name itself', () => {
+      // The inner `'density'` must not be read as a literal of its own, which
+      // would leave the surrounding text looking executable.
+      const code = "text←'the word ''density'' is data'\ndensity←2";
+      expect(migratePresetCode('truchet-grid', code)).toBe("text←'the word ''density'' is data'\nclasses←2");
+    });
+
     it('does not count a mention in a comment as already using the new name', () => {
       /*
        * The stand-aside rule asks whether the code *uses* the new name. A
