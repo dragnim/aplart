@@ -5,7 +5,8 @@
  * right — and stacked tabs on a narrow one, with the artwork first.
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { analytics } from '@/analytics/Analytics';
 import { AplEditor, type AplEditorHandle } from '@/editor/AplEditor';
 import {
   restoreControlLine,
@@ -123,6 +124,10 @@ function Workspace({
 
   useLocalProject(preset, state);
 
+  useEffect(() => {
+    analytics.track({ name: 'preset_opened', presetId: preset.id });
+  }, [preset.id]);
+
   // Shared code is never run on arrival; the visitor is told what they have
   // been given and presses Run themselves.
   const shareNotice =
@@ -177,12 +182,13 @@ function Workspace({
   }, [state.modified, handleResetArtwork]);
 
   const handleRandomise = useCallback(() => {
+    analytics.track({ name: 'randomise_used', presetId: preset.id });
     const { values, seed } = randomiseParameters(preset.parameters);
     setSeed(seed);
     // One code change for all of them, so undo treats it as a single action
     // and only one run follows.
     setCode(setParameterValues(state.code, values));
-  }, [preset.parameters, state.code, setCode]);
+  }, [preset.id, preset.parameters, state.code, setCode]);
 
   const editorPanel = (
     <div className={styles.editorPanel}>

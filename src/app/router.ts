@@ -7,8 +7,8 @@
  *
  * Links are ordinary anchors with `href="#/..."`, which keeps middle-click,
  * open-in-new-tab and screen reader link semantics working for free. This
- * module only needs to report the current route and let code navigate
- * programmatically, which is not enough to justify a routing dependency.
+ * module only needs to report the current route and build hrefs, which is not
+ * enough to justify a routing dependency.
  */
 
 import { useSyncExternalStore } from 'react';
@@ -59,24 +59,9 @@ function safeDecode(value: string): string {
   }
 }
 
-export function hrefForGallery(): string {
-  return '#/';
-}
-
 export function hrefForArtwork(presetId: string, sharedState?: string): string {
   const base = `#/art/${encodeURIComponent(presetId)}`;
   return sharedState === undefined ? base : `${base}?s=${encodeURIComponent(sharedState)}`;
-}
-
-export function navigate(href: string): void {
-  window.location.hash = href.startsWith('#') ? href.slice(1) : href;
-}
-
-/** Replace the current entry rather than pushing, e.g. when tidying a URL. */
-export function replaceRoute(href: string): void {
-  const hash = href.startsWith('#') ? href : `#${href}`;
-  window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${hash}`);
-  window.dispatchEvent(new HashChangeEvent('hashchange'));
 }
 
 function subscribe(onChange: () => void): () => void {

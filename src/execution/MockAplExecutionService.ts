@@ -20,11 +20,6 @@ import {
 import { executionError } from './errors';
 import { PROBE_MARKER, BAND_MARKER, formatProbeReply, formatBandReply } from './transport';
 
-export interface MockScript {
-  /** Returned for any expression carrying this marker. */
-  readonly matrix: NumericMatrix;
-}
-
 export interface MockAplExecutionServiceOptions {
   /** Milliseconds of simulated latency, so loading states are exercised. */
   readonly latencyMs?: number;

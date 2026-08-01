@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { analytics } from '@/analytics/Analytics';
 import { config } from '@/app/config';
 import { AplExecutionError } from '@/execution/errors';
 import { runArtwork } from '@/execution/runArtwork';
@@ -96,6 +97,8 @@ export function useWorkspace({ preset, service, initialState }: UseWorkspaceOpti
         // A stale result must never replace a newer artwork.
         if (!mounted.current || token !== runToken.current) return;
 
+        analytics.track({ name: 'code_run', presetId: preset.id, durationMs: outcome.durationMs });
+
         dispatch({
           type: 'runSucceeded',
           matrix: outcome.matrix,
@@ -112,6 +115,7 @@ export function useWorkspace({ preset, service, initialState }: UseWorkspaceOpti
             dispatch({ type: 'runCancelled' });
             return;
           }
+          analytics.track({ name: 'execution_failed', presetId: preset.id, kind: error.kind });
           dispatch({
             type: 'runFailed',
             error: { kind: error.kind, message: error.message, detail: error.detail },

@@ -96,9 +96,6 @@ export const config: AppConfig = Object.freeze({
   maxResponseBytes: positiveNumber(env.VITE_MAX_RESPONSE_BYTES, DEFAULTS.maxResponseBytes),
 });
 
-/** Exposed for tests that need to assert against the shipped defaults. */
-export const configDefaults: AppConfig = DEFAULTS;
-
 /**
  * Resolves a path inside `public/` against the deployment base.
  *
