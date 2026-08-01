@@ -1,0 +1,124 @@
+/**
+ * Share, copy and export, in one place.
+ *
+ * Both the ordinary workspace toolbar and the Focus-mode overlay offer these
+ * actions. Implementing them twice would guarantee they drift — a caption
+ * toggle honoured in one and ignored in the other, or a seed included in one
+ * share link and not the other. The hook is called once, high up, and the
+ * result is handed to whichever toolbar is on screen, so there is a single
+ * source of truth for the caption choice as well as the behaviour.
+ */
+
+import { useCallback, useState } from 'react';
+import { captionLinesFor } from '@/presets/codeMetrics';
+import { type ArtworkPreset } from '@/presets/schema';
+import { downloadBlob, exportArtworkPng, exportFilename, type ExportSize } from '@/renderer/exportPng';
+import { fromRenderOptions } from '@/sharing/decodeShareState';
+import { buildShareUrl, encodeShareState } from '@/sharing/encodeShareState';
+import { SHARE_SCHEMA_VERSION, SHARE_URL_WARNING_LENGTH } from '@/sharing/shareState';
+import { type WorkspaceState } from './workspaceState';
+
+export const EXPORT_SIZES: readonly ExportSize[] = [512, 1024, 2048, 'original'];
+
+export interface ArtworkActions {
+  /** The most recent outcome, for a polite live region. */
+  readonly notice: string | null;
+  readonly withCaption: boolean;
+  readonly setWithCaption: (on: boolean) => void;
+  /** The wording that would be written into the image, shown before it is. */
+  readonly captionPreview: string;
+  readonly copyApl: () => void;
+  readonly share: () => void;
+  readonly exportAt: (size: ExportSize) => void;
+}
+
+export function useArtworkActions(options: {
+  readonly preset: ArtworkPreset;
+  readonly state: WorkspaceState;
+  readonly seed?: number | undefined;
+}): ArtworkActions {
+  const { preset, state, seed } = options;
+
+  const [notice, setNotice] = useState<string | null>(null);
+  const [withCaption, setWithCaption] = useState(false);
+
+  const announce = useCallback((message: string) => {
+    setNotice(message);
+    // Cleared so the same message can be announced again next time.
+    setTimeout(() => setNotice(null), 4000);
+  }, []);
+
+  const share = useCallback(() => {
+    const encoded = encodeShareState({
+      v: SHARE_SCHEMA_VERSION,
+      preset: preset.id,
+      code: state.code,
+      params: {},
+      palette: state.renderOptions.paletteId,
+      render: fromRenderOptions(state.renderOptions),
+      title: preset.title,
+      ...(seed === undefined ? {} : { seed }),
+    });
+
+    const url = buildShareUrl(window.location.href, preset.id, encoded);
+
+    if (url.length > SHARE_URL_WARNING_LENGTH) {
+      announce(
+        `The link is ${url.length} characters, which some apps will not accept. It has still been copied.`,
+      );
+    }
+
+    void navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        if (url.length <= SHARE_URL_WARNING_LENGTH) announce('Link copied.');
+      })
+      .catch(() => announce('The link could not be copied. Your browser blocked clipboard access.'));
+  }, [preset, state.code, state.renderOptions, seed, announce]);
+
+  const copyApl = useCallback(() => {
+    void navigator.clipboard
+      .writeText(state.code)
+      .then(() => announce('APL copied.'))
+      .catch(() => announce('The code could not be copied. Your browser blocked clipboard access.'));
+  }, [state.code, announce]);
+
+  const exportAt = useCallback(
+    (size: ExportSize) => {
+      if (state.matrix === null || state.stats === null) {
+        announce('Run the artwork before exporting it.');
+        return;
+      }
+
+      void exportArtworkPng({
+        matrix: state.matrix,
+        stats: state.stats,
+        mode: preset.renderMode,
+        options: state.renderOptions,
+        size,
+        title: preset.title,
+        // Off unless asked for. The caption counts the expression that ran, so
+        // the claim it makes is checkable.
+        ...(withCaption ? { caption: captionLinesFor(preset.title, state.code) } : {}),
+      })
+        .then((blob) => {
+          downloadBlob(blob, exportFilename(preset.title, size));
+          announce(withCaption ? 'Image exported with its caption.' : 'Image exported.');
+        })
+        .catch((error: unknown) => {
+          announce(error instanceof Error ? error.message : 'The image could not be exported.');
+        });
+    },
+    [state.matrix, state.stats, state.renderOptions, state.code, preset, withCaption, announce],
+  );
+
+  return {
+    notice,
+    withCaption,
+    setWithCaption,
+    captionPreview: captionLinesFor(preset.title, state.code)[1] ?? '',
+    copyApl,
+    share,
+    exportAt,
+  };
+}

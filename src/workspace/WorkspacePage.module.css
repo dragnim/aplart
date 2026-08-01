@@ -169,3 +169,189 @@
 .destructive:hover {
   background: #9c1e15;
 }
+
+/* ── Focus mode ───────────────────────────────────────────────────────────
+ *
+ * A restyling of the ordinary workspace, not a second one. The same elements
+ * are in the same tree; only their positioning changes, so nothing is
+ * remounted and the studio state is necessarily shared.
+ */
+
+.page[data-focus='true'] {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: var(--surface-dark);
+  /* Contains the absolutely positioned toolbar and drawer. */
+  overflow: hidden;
+}
+
+/* The artwork takes the whole viewport and the drawer sits on top of it. */
+.page[data-focus='true'] .columns,
+.page[data-focus='true'] .stacked {
+  display: block;
+  height: 100%;
+  gap: 0;
+}
+
+.page[data-focus='true'] .artworkPanel {
+  position: absolute;
+  inset: 0;
+  max-height: none;
+  aspect-ratio: auto;
+  padding: 0;
+}
+
+.page[data-focus='true'] .artworkPanel > * {
+  border-radius: 0;
+}
+
+/*
+ * The drawer overlays; it never becomes a column.
+ *
+ * Sliding it with transform rather than changing its width means the artwork
+ * beneath is never resized by opening or closing it — so the canvas is not
+ * asked to redraw, and the picture does not jump.
+ */
+.page[data-focus='true'] .leftColumn {
+  position: absolute;
+  /* Below the overlay bar, so the title and status are never covered. */
+  top: var(--focus-bar);
+  bottom: 0;
+  left: 0;
+  z-index: 25;
+  width: clamp(21rem, 30vw, 26rem);
+  max-height: none;
+  padding: var(--space-4);
+  /*
+   * Opaque. An earlier version let the artwork show through at 96%, which
+   * looked considered and made the APL genuinely hard to read — the drawer is
+   * where you work, so it has to win over the picture behind it.
+   */
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  border-top-right-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow-y: auto;
+  transition: transform var(--motion-slow) var(--ease);
+}
+
+.page[data-focus='true'] .leftColumn[data-drawer='closed'] {
+  /* Just off screen, plus a little, so no shadow edge shows. */
+  transform: translateX(calc(-100% - 2rem));
+}
+
+.page[data-focus='true'] .leftColumn[data-drawer='open'] {
+  transform: translateX(0);
+}
+
+/* The drawer's own heading and close button; hidden outside Focus mode. */
+.drawerHeader {
+  display: none;
+}
+
+.page[data-focus='true'] .drawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.drawerTitle {
+  font-size: var(--text-lg);
+}
+
+/* ── Narrow Focus mode: a bottom sheet ──────────────────────────────────── */
+
+.sheet {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.focusBackdrop {
+  display: none;
+}
+
+.page[data-focus='true'] .focusBackdrop {
+  display: block;
+  position: absolute;
+  inset: 0;
+}
+
+.sheetHandle {
+  display: none;
+}
+
+.page[data-focus='true'] .sheetHandle {
+  display: block;
+  position: absolute;
+  bottom: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 26;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-5);
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: 999px;
+  background: rgb(0 0 0 / 60%);
+  color: var(--text-on-dark);
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
+.page[data-focus='true'] .sheetHandle[data-drawer='open'] {
+  display: none;
+}
+
+.page[data-focus='true'] .sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 27;
+  /* Partial by default, leaving the artwork visible above it. */
+  max-height: 72dvh;
+  padding: var(--space-4);
+  /* Opaque, for the same reason as the desktop drawer. */
+  background: var(--surface);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow-y: auto;
+  transition: transform var(--motion-slow) var(--ease);
+}
+
+.page[data-focus='true'] .sheet[data-drawer='closed'] {
+  transform: translateY(calc(100% + 2rem));
+}
+
+.page[data-focus='true'] .sheet[data-drawer='open'] {
+  transform: translateY(0);
+}
+
+/* The sheet is already the scroll container; its panels must not fight it. */
+.page[data-focus='true'] .tabPanel,
+.page[data-focus='true'] .controlsPanel {
+  max-height: none;
+  overflow: visible;
+}
+
+.actionNotice {
+  min-height: 1.3em;
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.page[data-focus='true'] .actionNotice {
+  /* Announced but not drawn over the artwork; the overlay bar reports status. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}

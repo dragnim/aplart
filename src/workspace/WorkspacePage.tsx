@@ -29,6 +29,8 @@ import { PrimitivePanel } from './PrimitivePanel';
 import { TryChangingThis } from './TryChangingThis';
 import { randomiseParameters } from './randomise';
 import { readSavedProjectImmediate, useLocalProject } from './useLocalProject';
+import { FocusToolbar } from './FocusToolbar';
+import { useArtworkActions } from './useArtworkActions';
 import { RenderControls } from './RenderControls';
 import { RunPanel } from './RunPanel';
 import { WorkspaceToolbar } from './WorkspaceToolbar';
@@ -122,6 +124,29 @@ function Workspace({
   // Carried into the share link so a randomised piece can be reproduced.
   const [seed, setSeed] = useState<number | undefined>(undefined);
 
+  /*
+   * Focus mode is session state and nothing more.
+   *
+   * It is deliberately not in the shared link or the saved project: it is how
+   * someone is looking at the artwork right now, not part of the artwork. It
+   * lives here rather than in the workspace reducer for the same reason — the
+   * reducer holds what makes the picture.
+   */
+  const [focus, setFocus] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  /** The control that opened the drawer, so focus can go back to it. */
+  const drawerOpener = useRef<HTMLElement | null>(null);
+  /*
+   * Exiting Focus mode cannot restore focus by remembering the element that
+   * entered it: the two toolbars are different components, so the button that
+   * was pressed no longer exists by then. The replacement is found instead.
+   */
+  const focusTrigger = useRef<HTMLButtonElement>(null);
+  const restoreTrigger = useRef(false);
+
+  const actions = useArtworkActions({ preset, state, seed });
+
   useLocalProject(preset, state);
 
   useEffect(() => {
@@ -180,6 +205,81 @@ function Workspace({
     if (state.modified) setConfirmingReset(true);
     else handleResetArtwork();
   }, [state.modified, handleResetArtwork]);
+
+  const openDrawer = useCallback(() => {
+    drawerOpener.current = document.activeElement as HTMLElement | null;
+    setDrawerOpen(true);
+  }, []);
+
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    // Back to whatever opened it, rather than to the top of the document.
+    drawerOpener.current?.focus();
+  }, []);
+
+  const toggleDrawer = useCallback(() => {
+    if (drawerOpen) closeDrawer();
+    else openDrawer();
+  }, [drawerOpen, closeDrawer, openDrawer]);
+
+  const enterFocus = useCallback(() => {
+    setFocus(true);
+    // Opened straight away: arriving in Focus mode with no visible controls
+    // leaves someone looking at a picture with no obvious way in.
+    setDrawerOpen(true);
+  }, []);
+
+  const exitFocus = useCallback(() => {
+    setFocus(false);
+    setDrawerOpen(false);
+    restoreTrigger.current = true;
+  }, []);
+
+  // Focus lands back on the button that leads into Focus mode, so leaving by
+  // keyboard does not drop the caret at the top of the document.
+  useEffect(() => {
+    if (focus || !restoreTrigger.current) return;
+    restoreTrigger.current = false;
+    focusTrigger.current?.focus();
+  }, [focus]);
+
+  /*
+   * Escape unwinds one layer at a time, innermost first.
+   *
+   * The drawer closes before Focus mode exits, so a single press never throws
+   * away more than the person asked for. Browser fullscreen will insert itself
+   * between the two when it arrives.
+   */
+  useEffect(() => {
+    if (!focus) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+
+      // A dialog handles its own Escape; do not unwind past it.
+      if (confirmingReset) return;
+
+      event.preventDefault();
+      if (drawerOpen) closeDrawer();
+      else exitFocus();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [focus, drawerOpen, confirmingReset, closeDrawer, exitFocus]);
+
+  /*
+   * On a narrow screen the artwork is the backdrop, so it is not also a tab.
+   * If it was the selected tab when Focus mode started, move off it.
+   */
+  const visibleTabs: readonly MobileTab[] = focus ? ['code', 'controls'] : ['artwork', 'code', 'controls'];
+  /*
+   * Derived rather than written back into `tab`. Correcting the stored choice
+   * in an effect would both cascade a second render and overwrite what the
+   * person had actually picked — this way their choice is remembered, and
+   * leaving Focus mode returns them to the artwork they were on.
+   */
+  const shownTab: MobileTab = focus && tab === 'artwork' ? 'code' : tab;
 
   const handleRandomise = useCallback(() => {
     analytics.track({ name: 'randomise_used', presetId: preset.id });
@@ -275,15 +375,37 @@ function Workspace({
     </div>
   );
 
-  return (
-    <div className={styles.page}>
-      <WorkspaceToolbar
-        preset={preset}
-        state={state}
-        seed={seed}
-        canvasRef={canvasRef}
-        onResetArtwork={requestResetArtwork}
-      />
+  /*
+   * Focus mode is a change of layout, not a second workspace.
+   *
+   * The same elements are rendered either way and CSS moves them, so entering
+   * or leaving does not remount anything. That matters for more than tidiness:
+   * remounting the editor would silently discard the undo history, and
+   * remounting the canvas would throw away the artwork until the next run. It
+   * also means there is exactly one copy of the studio state, so the code,
+   * parameters and unsaved edits are necessarily the same in both.
+   */
+  const shell = (
+    <div className={styles.page} data-focus={focus ? 'true' : undefined}>
+      {focus ? (
+        <FocusToolbar
+          title={preset.title}
+          state={state}
+          actions={actions}
+          drawerOpen={drawerOpen}
+          onToggleDrawer={toggleDrawer}
+          onExitFocus={exitFocus}
+        />
+      ) : (
+        <WorkspaceToolbar
+          preset={preset}
+          state={state}
+          actions={actions}
+          onEnterFocus={enterFocus}
+          focusButtonRef={focusTrigger}
+          onResetArtwork={requestResetArtwork}
+        />
+      )}
 
       <Dialog
         open={confirmingReset}
@@ -304,19 +426,49 @@ function Workspace({
         cannot be undone.
       </Dialog>
 
-      {shareNotice !== null && (
+      {shareNotice !== null && !focus && (
         <p className={styles.shareNotice} role="status">
           {shareNotice}
         </p>
       )}
 
+      {/* The outcome of a share, copy or export, announced from either toolbar. */}
+      <p className={styles.actionNotice} role="status" aria-live="polite">
+        {actions.notice}
+      </p>
+
       {/*
-        Exactly one layout is rendered. Rendering both and hiding one would
-        mount two editors and duplicate every control id on the page.
+        One layout tree, restyled.
+        
+        Chrome that only Focus mode needs is always rendered and hidden with
+        CSS rather than added and removed. Inserting an element ahead of the
+        editor would shift its position among its siblings, and React matches
+        unkeyed children by position — so the editor would be torn down and
+        rebuilt, losing its undo history, every time Focus mode was toggled.
+        display: none also keeps the hidden chrome out of the tab order.
       */}
       {wide ? (
         <div className={styles.columns}>
-          <div className={styles.leftColumn}>
+          {/*
+            In Focus mode this becomes an overlay drawer rather than a grid
+            column: positioned over the artwork, so opening it never shrinks
+            the piece.
+          */}
+          <div
+            className={styles.leftColumn}
+            id="focus-drawer"
+            ref={drawerRef}
+            data-drawer={focus ? (drawerOpen ? 'open' : 'closed') : undefined}
+            // Closed drawer in Focus mode: inert removes its controls from the
+            // tab order, so nothing hidden stays reachable behind the overlay.
+            inert={focus && !drawerOpen}
+          >
+            <div className={styles.drawerHeader}>
+              <h2 className={styles.drawerTitle}>Controls</h2>
+              <button type="button" className={styles.secondary} onClick={closeDrawer}>
+                Close
+              </button>
+            </div>
             {editorPanel}
             {controlsPanel}
           </div>
@@ -324,37 +476,74 @@ function Workspace({
         </div>
       ) : (
         <div className={styles.stacked}>
-          <div className={styles.tabs} role="tablist" aria-label="Workspace">
-            {(['artwork', 'code', 'controls'] as const).map((name) => (
-              <button
-                key={name}
-                type="button"
-                role="tab"
-                id={`tab-${name}`}
-                aria-selected={tab === name}
-                aria-controls={`panel-${name}`}
-                className={styles.tab}
-                data-selected={tab === name ? 'true' : undefined}
-                onClick={() => setTab(name)}
-              >
-                {name === 'artwork' ? 'Artwork' : name === 'code' ? 'Code' : 'Controls'}
-              </button>
-            ))}
-          </div>
+          {/* The artwork sits behind the sheet in Focus mode, always visible. */}
+          <div className={styles.focusBackdrop}>{focus ? artworkPanel : null}</div>
+
+          <button
+            type="button"
+            className={styles.sheetHandle}
+            aria-expanded={drawerOpen}
+            aria-controls="focus-drawer"
+            // Hidden while the sheet covers it: a control sitting invisibly
+            // behind an opaque panel should not still be tabbable. The sheet
+            // has its own Close.
+            data-drawer={drawerOpen ? 'open' : 'closed'}
+            onClick={toggleDrawer}
+          >
+            Controls
+          </button>
 
           <div
-            className={styles.tabPanel}
-            role="tabpanel"
-            id={`panel-${tab}`}
-            aria-labelledby={`tab-${tab}`}
-            tabIndex={0}
+            className={styles.sheet}
+            id="focus-drawer"
+            ref={drawerRef}
+            data-drawer={focus ? (drawerOpen ? 'open' : 'closed') : undefined}
+            // Closed drawer in Focus mode: inert removes its controls from the
+            // tab order, so nothing hidden stays reachable behind the overlay.
+            inert={focus && !drawerOpen}
           >
-            {tab === 'artwork' && artworkPanel}
-            {tab === 'code' && editorPanel}
-            {tab === 'controls' && controlsPanel}
+            <div className={styles.drawerHeader}>
+              <h2 className={styles.drawerTitle}>Controls</h2>
+              <button type="button" className={styles.secondary} onClick={closeDrawer}>
+                Close
+              </button>
+            </div>
+
+            <div className={styles.tabs} role="tablist" aria-label="Workspace">
+              {visibleTabs.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  role="tab"
+                  id={`tab-${name}`}
+                  aria-selected={shownTab === name}
+                  aria-controls={`panel-${name}`}
+                  className={styles.tab}
+                  data-selected={shownTab === name ? 'true' : undefined}
+                  onClick={() => setTab(name)}
+                >
+                  {name === 'artwork' ? 'Artwork' : name === 'code' ? 'Code' : 'Controls'}
+                </button>
+              ))}
+            </div>
+
+            <div
+              className={styles.tabPanel}
+              role="tabpanel"
+              id={`panel-${shownTab}`}
+              aria-labelledby={`tab-${shownTab}`}
+              tabIndex={0}
+            >
+              {/* Never both: in Focus mode the artwork lives in the backdrop. */}
+              {shownTab === 'artwork' && !focus ? artworkPanel : null}
+              {shownTab === 'code' ? editorPanel : null}
+              {shownTab === 'controls' ? controlsPanel : null}
+            </div>
           </div>
         </div>
       )}
     </div>
   );
+
+  return shell;
 }

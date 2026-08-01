@@ -81,6 +81,10 @@
   --tap-target: 44px;
 
   --layout-max: 1440px;
+
+  /* Height reserved for the Focus-mode overlay bar, so the drawer can start
+     below it rather than covering the title. */
+  --focus-bar: 4.5rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

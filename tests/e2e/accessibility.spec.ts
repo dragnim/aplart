@@ -113,6 +113,31 @@ test.describe('accessibility of the workspace', () => {
     await audit(page);
   });
 
+  test('has no violations in Focus mode, drawer open or closed', async ({ page }) => {
+    await stubTryApl(page);
+    await page.goto('./#/art/modular-bloom');
+    await page.waitForSelector('.cm-content');
+
+    await page.getByRole('button', { name: /^Run/ }).click();
+    await expect(page.locator('[role="status"][data-status]')).toHaveText(/Finished in/, {
+      timeout: 20_000,
+    });
+
+    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await expect(page.locator('#focus-drawer')).toHaveAttribute('data-drawer', 'open');
+    await audit(page);
+
+    await page.getByRole('button', { name: 'Controls', exact: true }).click();
+    await expect(page.locator('#focus-drawer')).toHaveAttribute('data-drawer', 'closed');
+    /*
+     * Worth auditing separately: the closed drawer is off screen but still in
+     * the document, and axe checks contrast and naming on what it can reach.
+     * The overlay bar's controls sit on the artwork rather than on a surface,
+     * which is exactly the kind of thing that quietly fails contrast.
+     */
+    await audit(page);
+  });
+
   test('has no violations with a primitive explanation expanded', async ({ page }) => {
     await stubTryApl(page);
     await page.goto('./#/art/modular-bloom');
@@ -146,6 +171,20 @@ test.describe('accessibility on a narrow viewport', () => {
       await page.getByRole('tab', { name }).click();
       await audit(page);
     }
+  });
+
+  test('the Focus-mode bottom sheet has no violations', async ({ page }) => {
+    await stubTryApl(page);
+    await page.goto('./#/art/modular-bloom');
+    await page.getByRole('tab', { name: 'Code' }).click();
+
+    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await expect(page.locator('#focus-drawer')).toHaveAttribute('data-drawer', 'open');
+    await audit(page);
+
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(page.locator('#focus-drawer')).toHaveAttribute('data-drawer', 'closed');
+    await audit(page);
   });
 });
 

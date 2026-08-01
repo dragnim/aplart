@@ -26,9 +26,10 @@ export interface StubHandle {
 /**
  * Evaluates the small subset of APL the presets actually use.
  *
- * Only `modulus|multiplier×∘.×⍨⍳size` with its three assignments, which is
- * enough to drive the whole interface and to prove that a changed parameter
- * reaches the backend and changes the picture.
+ * `modulus|multiplier×∘.×⍨⍳size`, and the Truchet hash — between them enough to
+ * drive the whole interface, to prove a changed parameter reaches the backend
+ * and changes the picture, and to exercise the tile renderer, which sizes its
+ * output from the matrix rather than one pixel per cell.
  */
 function evaluate(expression: string): string[] {
   const read = (name: string): number | null => {
@@ -39,6 +40,23 @@ function evaluate(expression: string): string[] {
   const size = read('size');
   const modulus = read('modulus');
   const multiplier = read('multiplier') ?? 1;
+
+  // Truchet Grid: density|⌊10000×1|(seed×0.6180339887)+(⍳size)∘.×(⍳size)×0.7548776662
+  const density = read('density');
+  const seed = read('seed');
+  if (size !== null && density !== null && density !== 0 && seed !== null) {
+    const offset = seed * 0.618_033_988_7;
+    const lines: string[] = [];
+    for (let row = 1; row <= size; row += 1) {
+      const values: number[] = [];
+      for (let column = 1; column <= size; column += 1) {
+        const product = offset + row * (column * 0.754_877_666_2);
+        values.push(Math.floor(10_000 * (product - Math.floor(product))) % density);
+      }
+      lines.push(values.join(' '));
+    }
+    return lines;
+  }
 
   if (size === null || modulus === null) {
     return ['VALUE ERROR: Undefined name: size', ` ${expression}`, '  ∧'];

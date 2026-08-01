@@ -1,0 +1,114 @@
+.bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* Above the drawer: the drawer starts below the bar, and the bar's own
+     controls must stay reachable whichever is open. */
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  /* Matches --focus-bar, which the drawer uses as its top inset. */
+  min-height: var(--focus-bar);
+  box-sizing: border-box;
+  padding: var(--space-2) var(--space-4);
+  color: var(--text-on-dark);
+  /* A gradient rather than a bar, so the artwork is never squarely covered. */
+  background: linear-gradient(to bottom, rgb(0 0 0 / 72%), rgb(0 0 0 / 0%));
+  /*
+   * The bar spans the full width, so as a solid hit area it would swallow
+   * presses on the top of the artwork — including, later, a drag that starts
+   * there. Only its controls take pointer events.
+   */
+  pointer-events: none;
+  transition:
+    opacity var(--motion-base) var(--ease),
+    transform var(--motion-base) var(--ease);
+}
+
+.bar[data-visible='false'] {
+  opacity: 0;
+  transform: translateY(-0.5rem);
+}
+
+/* Never fade out from under someone who is using it. */
+.bar:focus-within {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+.identity {
+  min-width: 0;
+  /* Selectable, so the title can be read out or copied. */
+  pointer-events: auto;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: var(--text-xs);
+  color: var(--text-on-dark-muted);
+}
+
+.status[data-state='error'] {
+  /* Lighter than the light-surface error colour, which would fail on black. */
+  color: #ff9d94;
+}
+
+.status[data-state='success'] {
+  color: #8ee0ac;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  pointer-events: auto;
+}
+
+.action,
+.exit {
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid rgb(255 255 255 / 28%);
+  background: rgb(0 0 0 / 45%);
+  color: var(--text-on-dark);
+  cursor: pointer;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+}
+
+.action:hover,
+.exit:hover {
+  background: rgb(255 255 255 / 16%);
+}
+
+.exit {
+  border-color: rgb(255 255 255 / 45%);
+  font-weight: 600;
+}
+
+@media (max-width: 48rem) {
+  .bar {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .title {
+    font-size: var(--text-base);
+  }
+}

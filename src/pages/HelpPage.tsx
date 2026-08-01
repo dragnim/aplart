@@ -49,6 +49,24 @@ export function HelpPage() {
       </section>
 
       <section className={styles.section}>
+        <h2 className={styles.heading}>Seeing the artwork larger</h2>
+        <p className={styles.paragraph}>
+          <strong>Focus mode</strong> gives the artwork the whole window. The code and the controls slide in
+          over it from the side — from the bottom on a phone — so you can keep editing without leaving.
+        </p>
+        <ul className={styles.list}>
+          <li>
+            <span className={styles.keys}>Esc</span> puts the controls away. Pressing it again leaves Focus
+            mode.
+          </li>
+          <li>
+            Nothing is recalculated on the way in or out. It is the same code, the same parameters and the
+            same artwork, shown differently.
+          </li>
+        </ul>
+      </section>
+
+      <section className={styles.section}>
         <h2 className={styles.heading}>Why did my code not run?</h2>
         <ul className={styles.list}>
           <li>

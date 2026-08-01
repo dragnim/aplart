@@ -1,121 +1,46 @@
 /**
  * The workspace header: where you came from, what this is, and what you can
  * do with it.
+ *
+ * The share, copy and export behaviour is not implemented here. It arrives as
+ * `actions`, shared with the Focus-mode overlay, so the two cannot drift apart
+ * or disagree about whether a caption was requested.
  */
 
 import { useCallback, useRef, useState } from 'react';
-import { useDismissable } from '@/components/useDismissable';
 import { useMediaQuery } from '@/app/useMediaQuery';
-import { fromRenderOptions } from '@/sharing/decodeShareState';
-import { buildShareUrl, encodeShareState } from '@/sharing/encodeShareState';
-import { SHARE_SCHEMA_VERSION, SHARE_URL_WARNING_LENGTH } from '@/sharing/shareState';
-import { captionLinesFor } from '@/presets/codeMetrics';
+import { useDismissable } from '@/components/useDismissable';
 import { type ArtworkPreset } from '@/presets/schema';
-import { downloadBlob, exportArtworkPng, exportFilename, type ExportSize } from '@/renderer/exportPng';
+import { ExportMenu } from './ExportMenu';
+import { EXPORT_SIZES, type ArtworkActions } from './useArtworkActions';
 import { type WorkspaceState } from './workspaceState';
 import styles from './WorkspaceToolbar.module.css';
 
 interface Props {
   readonly preset: ArtworkPreset;
   readonly state: WorkspaceState;
-  /** Set once Randomise has run, so a shared link reproduces the same values. */
-  readonly seed?: number | undefined;
-  readonly canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  readonly actions: ArtworkActions;
+  readonly onEnterFocus: () => void;
+  /** Focus returns here when Focus mode is left. */
+  readonly focusButtonRef?: React.Ref<HTMLButtonElement>;
   readonly onResetArtwork: () => void;
 }
 
-const EXPORT_SIZES: readonly ExportSize[] = [512, 1024, 2048, 'original'];
-
-export function WorkspaceToolbar({ preset, state, seed, onResetArtwork }: Props) {
-  const [notice, setNotice] = useState<string | null>(null);
-  const [exportOpen, setExportOpen] = useState(false);
+export function WorkspaceToolbar({
+  preset,
+  state,
+  actions,
+  onEnterFocus,
+  focusButtonRef,
+  onResetArtwork,
+}: Props) {
   const [actionsOpen, setActionsOpen] = useState(false);
-  // Off by default, as the specification requires.
-  const [withCaption, setWithCaption] = useState(false);
-  // Enough width for the four controls to sit on one line beside the title.
-  const roomForRow = useMediaQuery('(min-width: 48rem)');
-
-  const exportGroup = useRef<HTMLDivElement>(null);
   const actionsGroup = useRef<HTMLDivElement>(null);
-  const closeExport = useCallback(() => setExportOpen(false), []);
   const closeActions = useCallback(() => setActionsOpen(false), []);
-  useDismissable(exportOpen, exportGroup, closeExport);
   useDismissable(actionsOpen, actionsGroup, closeActions);
 
-  const announce = useCallback((message: string) => {
-    setNotice(message);
-    // Cleared so the same message can be announced again next time.
-    setTimeout(() => setNotice(null), 4000);
-  }, []);
-
-  const handleShare = useCallback(async () => {
-    const encoded = encodeShareState({
-      v: SHARE_SCHEMA_VERSION,
-      preset: preset.id,
-      code: state.code,
-      params: {},
-      palette: state.renderOptions.paletteId,
-      render: fromRenderOptions(state.renderOptions),
-      title: preset.title,
-      ...(seed === undefined ? {} : { seed }),
-    });
-
-    const url = buildShareUrl(window.location.href, preset.id, encoded);
-
-    if (url.length > SHARE_URL_WARNING_LENGTH) {
-      announce(
-        `The link is ${url.length} characters, which some apps will not accept. It has still been copied.`,
-      );
-    }
-
-    try {
-      await navigator.clipboard.writeText(url);
-      if (url.length <= SHARE_URL_WARNING_LENGTH) announce('Link copied.');
-    } catch {
-      announce('The link could not be copied. Your browser blocked clipboard access.');
-    }
-  }, [preset, state.code, state.renderOptions, seed, announce]);
-
-  const handleCopyApl = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(state.code);
-      announce('APL copied.');
-    } catch {
-      announce('The code could not be copied. Your browser blocked clipboard access.');
-    }
-  }, [state.code, announce]);
-
-  const handleExport = useCallback(
-    async (size: ExportSize) => {
-      setExportOpen(false);
-      if (state.matrix === null || state.stats === null) {
-        announce('Run the artwork before exporting it.');
-        return;
-      }
-
-      try {
-        const blob = await exportArtworkPng({
-          matrix: state.matrix,
-          stats: state.stats,
-          mode: preset.renderMode,
-          options: state.renderOptions,
-          size,
-          title: preset.title,
-          // Off unless asked for. The caption counts the expression that ran,
-          // not the editor contents, so the claim it makes is checkable.
-          ...(withCaption ? { caption: captionLinesFor(preset.title, state.code) } : {}),
-        });
-        downloadBlob(blob, exportFilename(preset.title, size));
-        announce(withCaption ? 'Image exported with its caption.' : 'Image exported.');
-      } catch (error) {
-        announce(error instanceof Error ? error.message : 'The image could not be exported.');
-      }
-    },
-    [state.matrix, state.stats, state.renderOptions, state.code, preset, withCaption, announce],
-  );
-
-  /** Shown on the toggle so the caption is known before it is committed to. */
-  const captionPreview = captionLinesFor(preset.title, state.code)[1] ?? '';
+  // Enough width for the controls to sit on one line beside the title.
+  const roomForRow = useMediaQuery('(min-width: 48rem)');
 
   return (
     <div className={styles.toolbar}>
@@ -133,71 +58,32 @@ export function WorkspaceToolbar({ preset, state, seed, onResetArtwork }: Props)
       </div>
 
       {/*
-        On a narrow screen these four controls wrapped onto three rows, pushing
-        the artwork itself below the fold on a phone. Collapsed into one menu
-        instead: none of them is what someone came here to do.
+        Focus mode stays out of the overflow menu at every width. It is the one
+        action here that changes how the artwork is seen rather than what is
+        done with it, and burying it would defeat the point.
       */}
       {roomForRow ? (
         <div className={styles.actions}>
-          <button type="button" className={styles.action} onClick={() => void handleCopyApl()}>
+          <button type="button" className={styles.action} ref={focusButtonRef} onClick={onEnterFocus}>
+            Focus mode
+          </button>
+          <button type="button" className={styles.action} onClick={actions.copyApl}>
             Copy APL
           </button>
-          <button type="button" className={styles.action} onClick={() => void handleShare()}>
+          <button type="button" className={styles.action} onClick={actions.share}>
             Share
           </button>
-
-          <div className={styles.menuGroup} ref={exportGroup}>
-            <button
-              type="button"
-              className={styles.action}
-              aria-expanded={exportOpen}
-              aria-haspopup="menu"
-              onClick={() => setExportOpen((open) => !open)}
-            >
-              Export
-            </button>
-            {exportOpen && (
-              <ul className={styles.menu} role="menu">
-                <li role="none">
-                  <button
-                    type="button"
-                    role="menuitemcheckbox"
-                    aria-checked={withCaption}
-                    className={styles.menuToggle}
-                    onClick={() => setWithCaption((on) => !on)}
-                  >
-                    <span aria-hidden="true" className={styles.tick}>
-                      {withCaption ? '✓' : ''}
-                    </span>
-                    <span>
-                      Include caption
-                      <span className={styles.captionPreview}>{captionPreview}</span>
-                    </span>
-                  </button>
-                </li>
-                <li role="separator" className={styles.separator} />
-                {EXPORT_SIZES.map((size) => (
-                  <li key={String(size)} role="none">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className={styles.menuItem}
-                      onClick={() => void handleExport(size)}
-                    >
-                      {size === 'original' ? 'Original size' : `${size} × ${size}`}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
+          <ExportMenu actions={actions} triggerClassName={styles.action} />
           <button type="button" className={styles.action} onClick={onResetArtwork} disabled={!state.modified}>
             Reset
           </button>
         </div>
       ) : (
         <div className={styles.actions}>
+          <button type="button" className={styles.action} ref={focusButtonRef} onClick={onEnterFocus}>
+            Focus mode
+          </button>
+
           <div className={styles.menuGroup} ref={actionsGroup}>
             <button
               type="button"
@@ -217,7 +103,7 @@ export function WorkspaceToolbar({ preset, state, seed, onResetArtwork }: Props)
                     className={styles.menuItem}
                     onClick={() => {
                       setActionsOpen(false);
-                      void handleCopyApl();
+                      actions.copyApl();
                     }}
                   >
                     Copy APL
@@ -230,31 +116,29 @@ export function WorkspaceToolbar({ preset, state, seed, onResetArtwork }: Props)
                     className={styles.menuItem}
                     onClick={() => {
                       setActionsOpen(false);
-                      void handleShare();
+                      actions.share();
                     }}
                   >
                     Share
                   </button>
                 </li>
-                <li role="separator" className={styles.separator} />
                 <li role="none">
                   <button
                     type="button"
                     role="menuitemcheckbox"
-                    aria-checked={withCaption}
+                    aria-checked={actions.withCaption}
                     className={styles.menuToggle}
-                    onClick={() => setWithCaption((on) => !on)}
+                    onClick={() => actions.setWithCaption(!actions.withCaption)}
                   >
                     <span aria-hidden="true" className={styles.tick}>
-                      {withCaption ? '✓' : ''}
+                      {actions.withCaption ? '✓' : ''}
                     </span>
                     <span>
                       Include caption
-                      <span className={styles.captionPreview}>{captionPreview}</span>
+                      <span className={styles.captionPreview}>{actions.captionPreview}</span>
                     </span>
                   </button>
                 </li>
-                <li role="separator" className={styles.separator} />
                 {EXPORT_SIZES.map((size) => (
                   <li key={String(size)} role="none">
                     <button
@@ -263,7 +147,7 @@ export function WorkspaceToolbar({ preset, state, seed, onResetArtwork }: Props)
                       className={styles.menuItem}
                       onClick={() => {
                         setActionsOpen(false);
-                        void handleExport(size);
+                        actions.exportAt(size);
                       }}
                     >
                       {size === 'original' ? 'Export at original size' : `Export ${size} × ${size}`}
@@ -289,10 +173,6 @@ export function WorkspaceToolbar({ preset, state, seed, onResetArtwork }: Props)
           </div>
         </div>
       )}
-
-      <p className={styles.notice} role="status" aria-live="polite">
-        {notice}
-      </p>
     </div>
   );
 }
