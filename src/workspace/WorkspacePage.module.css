@@ -142,6 +142,22 @@
   margin-top: var(--space-4);
 }
 
+.viewActions {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.viewHint {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.viewActions .parameterActions {
+  margin-top: 0;
+}
+
 .secondary {
   min-height: var(--tap-target);
   padding: 0 var(--space-4);

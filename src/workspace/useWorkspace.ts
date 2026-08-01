@@ -34,6 +34,15 @@ export interface Workspace {
   readonly setCode: (code: string) => void;
   readonly setRenderOptions: (options: Partial<RenderOptions>) => void;
   readonly run: () => void;
+  /**
+   * Runs code that has only just been decided on.
+   *
+   * `run` reads the current code through a ref that is written in an effect
+   * after render, so `setCode(next); run()` in one handler would execute the
+   * previous code. A caller that already holds the new source passes it here
+   * instead of relying on that ordering.
+   */
+  readonly runCode: (source: string) => void;
   readonly stop: () => void;
   readonly restore: (state: WorkspaceState) => void;
 }
@@ -70,73 +79,78 @@ export function useWorkspace({ preset, service, initialState }: UseWorkspaceOpti
     };
   }, [executionService]);
 
-  const run = useCallback(() => {
-    const token = (runToken.current += 1);
+  const runCode = useCallback(
+    (source: string) => {
+      const token = (runToken.current += 1);
 
-    abortController.current?.abort();
-    const controller = new AbortController();
-    abortController.current = controller;
+      abortController.current?.abort();
+      const controller = new AbortController();
+      abortController.current = controller;
 
-    dispatch({ type: 'runStarted' });
+      dispatch({ type: 'runStarted' });
 
-    void (async () => {
-      try {
-        const outcome = await runArtwork({
-          service: executionService,
-          source: codeRef.current,
-          highResolution: preset.outputLimits?.highResolution ?? false,
-          limits: {
-            maxRows: preset.outputLimits?.maxRows ?? config.maxMatrixRows,
-            maxColumns: preset.outputLimits?.maxColumns ?? config.maxMatrixColumns,
-            maxCells: preset.outputLimits?.maxCells ?? config.maxMatrixCells,
-          },
-          timeoutMs: config.requestTimeoutMs,
-          signal: controller.signal,
-        });
+      void (async () => {
+        try {
+          const outcome = await runArtwork({
+            service: executionService,
+            source,
+            highResolution: preset.outputLimits?.highResolution ?? false,
+            limits: {
+              maxRows: preset.outputLimits?.maxRows ?? config.maxMatrixRows,
+              maxColumns: preset.outputLimits?.maxColumns ?? config.maxMatrixColumns,
+              maxCells: preset.outputLimits?.maxCells ?? config.maxMatrixCells,
+            },
+            timeoutMs: config.requestTimeoutMs,
+            signal: controller.signal,
+          });
 
-        // A stale result must never replace a newer artwork.
-        if (!mounted.current || token !== runToken.current) return;
+          // A stale result must never replace a newer artwork.
+          if (!mounted.current || token !== runToken.current) return;
 
-        analytics.track({ name: 'code_run', presetId: preset.id, durationMs: outcome.durationMs });
+          analytics.track({ name: 'code_run', presetId: preset.id, durationMs: outcome.durationMs });
 
-        dispatch({
-          type: 'runSucceeded',
-          matrix: outcome.matrix,
-          stats: outcome.stats,
-          warnings: outcome.warnings,
-          durationMs: outcome.durationMs,
-          requestCount: outcome.requestCount,
-        });
-      } catch (error) {
-        if (!mounted.current || token !== runToken.current) return;
+          dispatch({
+            type: 'runSucceeded',
+            matrix: outcome.matrix,
+            stats: outcome.stats,
+            warnings: outcome.warnings,
+            durationMs: outcome.durationMs,
+            requestCount: outcome.requestCount,
+          });
+        } catch (error) {
+          if (!mounted.current || token !== runToken.current) return;
 
-        if (error instanceof AplExecutionError) {
-          if (error.kind === 'cancelled') {
-            dispatch({ type: 'runCancelled' });
+          if (error instanceof AplExecutionError) {
+            if (error.kind === 'cancelled') {
+              dispatch({ type: 'runCancelled' });
+              return;
+            }
+            analytics.track({ name: 'execution_failed', presetId: preset.id, kind: error.kind });
+            dispatch({
+              type: 'runFailed',
+              error: { kind: error.kind, message: error.message, detail: error.detail },
+            });
             return;
           }
-          analytics.track({ name: 'execution_failed', presetId: preset.id, kind: error.kind });
+
+          // Anything else is a fault in our own code rather than in the APL, so
+          // it is logged for development and reported plainly to the user.
+          if (import.meta.env.DEV) console.error('[workspace] unexpected failure', error);
           dispatch({
             type: 'runFailed',
-            error: { kind: error.kind, message: error.message, detail: error.detail },
+            error: {
+              kind: 'badResponse',
+              message: 'Something went wrong while running your code. Please try again.',
+              detail: error instanceof Error ? error.message : String(error),
+            },
           });
-          return;
         }
+      })();
+    },
+    [executionService, preset],
+  );
 
-        // Anything else is a fault in our own code rather than in the APL, so
-        // it is logged for development and reported plainly to the user.
-        if (import.meta.env.DEV) console.error('[workspace] unexpected failure', error);
-        dispatch({
-          type: 'runFailed',
-          error: {
-            kind: 'badResponse',
-            message: 'Something went wrong while running your code. Please try again.',
-            detail: error instanceof Error ? error.message : String(error),
-          },
-        });
-      }
-    })();
-  }, [executionService, preset]);
+  const run = useCallback(() => runCode(codeRef.current), [runCode]);
 
   const stop = useCallback(() => {
     abortController.current?.abort();
@@ -155,5 +169,5 @@ export function useWorkspace({ preset, service, initialState }: UseWorkspaceOpti
     dispatch({ type: 'restored', state: restored });
   }, []);
 
-  return { state, setCode, setRenderOptions, run, stop, restore };
+  return { state, setCode, setRenderOptions, run, runCode, stop, restore };
 }

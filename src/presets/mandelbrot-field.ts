@@ -101,7 +101,13 @@ export const mandelbrotField: ArtworkPreset = {
       label: 'Span',
       description: 'How much of the plane to show. Smaller values zoom in.',
       type: 'number',
-      min: 0.05,
+      /*
+       * Far below the step, so dragging on the artwork can zoom in about 700
+       * times without producing a value the slider would refuse to show. The
+       * step only governs the slider and the arrow keys, which stay usable at
+       * 0.05; a value between two steps is still perfectly representable.
+       */
+      min: 0.002,
       max: 2,
       step: 0.05,
       defaultValue: 1.4,
@@ -112,6 +118,10 @@ export const mandelbrotField: ArtworkPreset = {
   defaultPaletteId: 'heat',
   renderMode: 'continuous',
   outputLimits: { highResolution: true, maxRows: 144, maxColumns: 144, maxCells: 20_736 },
+
+  // The axes above are built in exactly the form this declaration promises,
+  // which is what lets a dragged region be turned back into three assignments.
+  planeExploration: { centreXVariable: 'centreX', centreYVariable: 'centreY', spanVariable: 'zoom' },
 
   primitives: [
     {
@@ -131,6 +141,7 @@ export const mandelbrotField: ArtworkPreset = {
   tags: ['fractal', 'iteration', 'complex plane'],
 
   tryChangingThis: [
+    'Drag a rectangle on the artwork. Watch the centre and span lines above rewrite themselves.',
     'Reduce the span to 0.3 and move the centre to ¯0.75 to find the seahorse valley.',
     'Raise the iterations to 50. The edge grows filaments — and the run takes longer.',
     'Set the centre across to ¯1.25 and the span to 0.15.',

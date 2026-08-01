@@ -1,0 +1,240 @@
+/**
+ * Dragging a region out of the artwork, in a real browser.
+ *
+ * jsdom cannot lay a canvas out, so the integration tests have to be told where
+ * the canvas is. Here it really is somewhere, the pointer really moves across
+ * it, and the letterboxing is whatever the layout made it — which is the part
+ * that no amount of unit testing can vouch for.
+ */
+
+import { expect, test, type Page } from '@playwright/test';
+import { stubTryApl } from './stubTryApl';
+
+const WIDE = { width: 1440, height: 950 };
+const PHONE = { width: 390, height: 844 };
+
+function runStatus(page: Page) {
+  return page.locator('[role="status"][data-status]');
+}
+
+async function openMandelbrot(page: Page) {
+  await stubTryApl(page);
+  await page.goto('./#/art/mandelbrot-field');
+  await expect(page.getByRole('heading', { level: 1, name: 'Mandelbrot Field' })).toBeVisible();
+}
+
+async function runAndWait(page: Page) {
+  await page.getByRole('button', { name: /^Run/ }).click();
+  await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
+}
+
+async function settledSignature(page: Page): Promise<string> {
+  const read = () =>
+    page.evaluate(() => {
+      const canvas = document.querySelector('canvas');
+      if (canvas === null) return 'no-canvas';
+      const data = canvas.toDataURL();
+      let hash = 0x811c9dc5;
+      for (let index = 0; index < data.length; index += 1) {
+        hash ^= data.charCodeAt(index);
+        hash = Math.imul(hash, 0x01000193) >>> 0;
+      }
+      return `${data.length}:${hash.toString(16)}`;
+    });
+
+  let previous = await read();
+  let repeats = 0;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    await page.waitForTimeout(100);
+    const current = await read();
+    repeats = current === previous ? repeats + 1 : 0;
+    previous = current;
+    if (repeats >= 2) return current;
+  }
+  return previous;
+}
+
+/** The editor's text, which is where the truth about the view lives. */
+async function code(page: Page): Promise<string> {
+  return (await page.locator('.cm-content').innerText()).replaceAll(' ', ' ');
+}
+
+/**
+ * The view as the code now states it.
+ *
+ * Read back as numbers rather than matched as strings, because a drag is only
+ * ever as accurate as the pointer position the browser reported. Coordinates
+ * arrive rounded, and the rounding differs between engines, so a gesture that
+ * was symmetric about the middle of the canvas lands about a pixel off — some
+ * 0.003 of the plane at the starting span. The assertions allow for that; the
+ * mistakes worth catching, such as ignoring the letterbox, are wrong by a
+ * hundred times as much.
+ */
+async function viewFromCode(page: Page): Promise<{ centreX: number; centreY: number; span: number }> {
+  const text = await code(page);
+  const number = (variable: string): number => {
+    const match = new RegExp(`${variable}←(¯?[\\d.]+)`, 'u').exec(text);
+    if (match === null) throw new Error(`${variable} is not assigned a plain number`);
+    return Number((match[1] as string).replace('¯', '-'));
+  };
+  return { centreX: number('centreX'), centreY: number('centreY'), span: number('zoom') };
+}
+
+/** A pixel or two of the plane, at the preset's starting span. */
+const PIXEL_TOLERANCE = 0.01;
+
+/** Drags between two points given as fractions of the canvas box. */
+async function dragRegion(page: Page, from: readonly [number, number], to: readonly [number, number]) {
+  const box = await page.locator('canvas').boundingBox();
+  if (box === null) throw new Error('the canvas is not on screen');
+
+  const at = ([u, v]: readonly [number, number]) => ({
+    x: box.x + box.width * u,
+    y: box.y + box.height * v,
+  });
+
+  const start = at(from);
+  const end = at(to);
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  // More than one move, so the overlay is genuinely tracking rather than
+  // jumping straight to the release point.
+  await page.mouse.move((start.x + end.x) / 2, (start.y + end.y) / 2);
+  await page.mouse.move(end.x, end.y);
+  await page.mouse.up();
+}
+
+test.describe('exploring the Mandelbrot set', () => {
+  test.use({ viewport: WIDE });
+
+  test('a drag rewrites the visible APL and redraws from it', async ({ page }) => {
+    await openMandelbrot(page);
+    await runAndWait(page);
+
+    expect(await code(page)).toContain('zoom←1.4');
+    const before = await settledSignature(page);
+
+    await dragRegion(page, [0.35, 0.35], [0.55, 0.55]);
+    await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
+
+    /*
+     * The claim the whole application rests on. The artwork did not move a
+     * camera the code knows nothing about — the code changed, and the picture
+     * followed from running it.
+     */
+    const after = await code(page);
+    expect(after).not.toContain('zoom←1.4');
+    expect(after).toMatch(/zoom←0\.\d+/u);
+    expect(after).toMatch(/centreX←¯?\d+\.\d+/u);
+
+    expect(await settledSignature(page)).not.toBe(before);
+  });
+
+  test('the span narrows in proportion to the region dragged', async ({ page }) => {
+    await openMandelbrot(page);
+    await runAndWait(page);
+
+    // A quarter of the width, so a quarter of the span, whatever the
+    // letterboxing turned out to be.
+    await dragRegion(page, [0.375, 0.375], [0.625, 0.625]);
+    await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
+
+    expect((await viewFromCode(page)).span).toBeCloseTo(1.4 * 0.25, 2);
+  });
+
+  test('a drag on the middle leaves the centre where it was', async ({ page }) => {
+    await openMandelbrot(page);
+    await runAndWait(page);
+
+    await dragRegion(page, [0.3, 0.3], [0.7, 0.7]);
+    await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
+
+    // Symmetric about the middle, so only the span should have moved. This is
+    // the assertion that fails if the letterbox offset is handled wrongly: on a
+    // wide window the mat either side is a fifth of the canvas, so ignoring it
+    // would move the centre by about half a plane unit.
+    const view = await viewFromCode(page);
+    expect(view.centreX).toBeGreaterThan(-0.6 - PIXEL_TOLERANCE);
+    expect(view.centreX).toBeLessThan(-0.6 + PIXEL_TOLERANCE);
+    expect(Math.abs(view.centreY)).toBeLessThan(PIXEL_TOLERANCE);
+    expect(view.span).toBeCloseTo(1.4 * 0.4, 2);
+  });
+
+  test('Back returns to the view that was left', async ({ page }) => {
+    await openMandelbrot(page);
+    await runAndWait(page);
+    const original = await settledSignature(page);
+
+    await dragRegion(page, [0.35, 0.35], [0.6, 0.6]);
+    await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
+    expect(await code(page)).not.toContain('zoom←1.4');
+
+    await page.getByRole('button', { name: /^Back/ }).click();
+    await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
+
+    expect(await code(page)).toContain('zoom←1.4');
+    expect(await settledSignature(page)).toBe(original);
+  });
+
+  test('a press without a drag changes nothing', async ({ page }) => {
+    await openMandelbrot(page);
+    await runAndWait(page);
+    const before = await settledSignature(page);
+
+    const box = await page.locator('canvas').boundingBox();
+    if (box === null) throw new Error('the canvas is not on screen');
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+    await page.waitForTimeout(400);
+    expect(await code(page)).toContain('zoom←1.4');
+    expect(await settledSignature(page)).toBe(before);
+  });
+
+  test('Escape abandons a drag in progress without leaving Focus mode', async ({ page }) => {
+    await openMandelbrot(page);
+    await runAndWait(page);
+    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await page.getByRole('button', { name: 'Controls', exact: true }).click();
+
+    const box = await page.locator('canvas').boundingBox();
+    if (box === null) throw new Error('the canvas is not on screen');
+    await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.3);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.6);
+
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+
+    // The innermost thing Escape can mean here is the drag.
+    expect(await code(page)).toContain('zoom←1.4');
+    await expect(page.getByRole('button', { name: 'Exit focus' })).toBeVisible();
+  });
+
+  test('an artwork that is not a plane offers no view controls', async ({ page }) => {
+    await stubTryApl(page);
+    await page.goto('./#/art/modular-bloom');
+    await expect(page.getByRole('heading', { level: 1, name: 'Modular Bloom' })).toBeVisible();
+
+    await expect(page.getByRole('button', { name: 'Zoom out' })).toHaveCount(0);
+    await expect(page.getByText(/Drag a region/)).toHaveCount(0);
+  });
+});
+
+test.describe('exploring on a phone', () => {
+  test.use({ viewport: PHONE });
+
+  test('a drag on the artwork tab zooms in', async ({ page }) => {
+    await openMandelbrot(page);
+    await page.getByRole('tab', { name: 'Code' }).click();
+    await runAndWait(page);
+    await page.getByRole('tab', { name: 'Artwork' }).click();
+
+    await dragRegion(page, [0.35, 0.35], [0.6, 0.6]);
+
+    // The run status lives with the Run controls, which are on the Code tab, so
+    // there is nothing to wait on until we are back there.
+    await page.getByRole('tab', { name: 'Code' }).click();
+    await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
+    expect(await code(page)).not.toContain('zoom←1.4');
+  });
+});

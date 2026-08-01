@@ -10,6 +10,7 @@
 import { type MatrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
+import { fitArtwork } from './fitArtwork';
 import { renderArtwork } from './renderArtwork';
 import { getPalette } from './palettes';
 import { transformMatrix, type RenderOptions } from './renderOptions';
@@ -73,16 +74,13 @@ export function drawArtwork(
   const source = toSourceCanvas(image);
 
   // Letterbox rather than stretch: an artwork's aspect ratio is part of it.
-  const scale = Math.min(pixelWidth / image.width, pixelHeight / image.height);
-  const drawWidth = image.width * scale;
-  const drawHeight = image.height * scale;
-  const offsetX = (pixelWidth - drawWidth) / 2;
-  const offsetY = (pixelHeight - drawHeight) / 2;
+  // Shared with the hit-testing, which has to agree with this exactly.
+  const box = fitArtwork(image.width, image.height, pixelWidth, pixelHeight);
 
   context.imageSmoothingEnabled = request.options.smoothScaling;
   if (request.options.smoothScaling) context.imageSmoothingQuality = 'high';
 
-  context.drawImage(source, offsetX, offsetY, drawWidth, drawHeight);
+  context.drawImage(source, box.left, box.top, box.width, box.height);
 }
 
 /**

@@ -23,6 +23,29 @@
   opacity: 0.55;
 }
 
+.frame[data-explorable='true'] .canvas {
+  cursor: crosshair;
+  /* Otherwise a drag on the artwork selects the page around it, or scrolls the
+     view out from under the finger on a touch screen. */
+  touch-action: none;
+  user-select: none;
+}
+
+/*
+ * The region being dragged out.
+ *
+ * A light outline with a dark companion, so it is visible over a pale artwork
+ * and a dark one alike without tinting what is underneath — the point of the
+ * gesture is to look closely at what is inside the rectangle.
+ */
+.selection {
+  position: absolute;
+  pointer-events: none;
+  outline: 1px solid rgb(0 0 0 / 65%);
+  border: 1px solid rgb(255 255 255 / 92%);
+  background: rgb(255 255 255 / 10%);
+}
+
 .empty {
   padding: var(--space-5);
   text-align: center;

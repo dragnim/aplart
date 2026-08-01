@@ -30,6 +30,17 @@ import { TryChangingThis } from './TryChangingThis';
 import { randomiseParameters } from './randomise';
 import { readSavedProjectImmediate, useLocalProject } from './useLocalProject';
 import { FocusToolbar } from './FocusToolbar';
+import { type SourceRect } from '@/renderer/displayMapping';
+import {
+  readViewport,
+  panViewport,
+  scaleViewport,
+  sameViewport,
+  selectionToViewport,
+  viewportBounds,
+  writeViewport,
+  type Viewport,
+} from './planeViewport';
 import { useArtworkActions } from './useArtworkActions';
 import { isFullscreen, useFullscreen } from './useFullscreen';
 import { RenderControls } from './RenderControls';
@@ -47,6 +58,9 @@ interface Props {
 }
 
 type MobileTab = 'artwork' | 'code' | 'controls';
+
+/** How many views back the Back button can reach. */
+const VIEW_HISTORY_LIMIT = 40;
 
 export function WorkspacePage({ presetId, sharedState, service }: Props) {
   const preset = getPreset(presetId);
@@ -115,7 +129,7 @@ function Workspace({
     ...(service === undefined ? {} : { service }),
     ...(initialState === undefined ? {} : { initialState }),
   });
-  const { state, setCode, setRenderOptions, run, stop } = workspace;
+  const { state, setCode, setRenderOptions, run, runCode, stop } = workspace;
 
   const editorHandle = useRef<AplEditorHandle>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -301,6 +315,76 @@ function Workspace({
    */
   const shownTab: MobileTab = focus && tab === 'artwork' ? 'code' : tab;
 
+  /*
+   * Exploring the plane by dragging on the artwork.
+   *
+   * Every one of these ends in the same two steps: rewrite the three
+   * assignments, then run what was written. Nothing keeps a view of its own —
+   * the code is the view, which is why a drag is undoable in the editor and
+   * shows up in a shared link without anything extra being stored.
+   */
+  const exploration = preset.planeExploration;
+  const viewport = exploration === undefined ? null : readViewport(state.code, exploration);
+  const bounds = useMemo(
+    () => (exploration === undefined ? null : viewportBounds(preset.parameters, exploration)),
+    [exploration, preset.parameters],
+  );
+
+  /** Views departed from, most recent last. Session-only, like Focus mode. */
+  const [viewHistory, setViewHistory] = useState<readonly Viewport[]>([]);
+
+  const applyViewport = useCallback(
+    (next: Viewport, options: { readonly remember: boolean }) => {
+      if (exploration === undefined || viewport === null) return;
+      if (sameViewport(next, viewport)) return;
+
+      if (options.remember) {
+        // Capped: an afternoon of zooming should not grow without limit, and
+        // nobody steps back forty views.
+        setViewHistory((previous) => [...previous, viewport].slice(-VIEW_HISTORY_LIMIT));
+      }
+
+      const updated = writeViewport(state.code, exploration, next);
+      setCode(updated);
+      // Run the code that was just written, not whatever the ref still holds.
+      runCode(updated);
+    },
+    [exploration, viewport, state.code, setCode, runCode],
+  );
+
+  const handleSelectRegion = useCallback(
+    (rect: SourceRect) => {
+      if (viewport === null || bounds === null) return;
+      applyViewport(selectionToViewport(viewport, rect, bounds), { remember: true });
+    },
+    [viewport, bounds, applyViewport],
+  );
+
+  const handleZoom = useCallback(
+    (factor: number) => {
+      if (viewport === null || bounds === null) return;
+      applyViewport(scaleViewport(viewport, factor, bounds), { remember: true });
+    },
+    [viewport, bounds, applyViewport],
+  );
+
+  const handlePan = useCallback(
+    (across: number, down: number) => {
+      if (viewport === null || bounds === null) return;
+      applyViewport(panViewport(viewport, across, down, bounds), { remember: true });
+    },
+    [viewport, bounds, applyViewport],
+  );
+
+  const handleBack = useCallback(() => {
+    const previous = viewHistory.at(-1);
+    if (previous === undefined) return;
+    setViewHistory((history) => history.slice(0, -1));
+    // Not remembered: stepping back and forth would otherwise fill the history
+    // with the same two views.
+    applyViewport(previous, { remember: false });
+  }, [viewHistory, applyViewport]);
+
   const handleRandomise = useCallback(() => {
     analytics.track({ name: 'randomise_used', presetId: preset.id });
     const { values, seed } = randomiseParameters(preset.parameters);
@@ -359,6 +443,79 @@ function Workspace({
             Reset parameters
           </button>
         </div>
+
+        {/*
+          The plane controls sit inside Code controls rather than in a section of
+          their own, because that is exactly what they are: another way of
+          setting the same three assignments the sliders above set. Separating
+          them would suggest the artwork has a camera as well as a formula.
+
+          They are also the keyboard route to everything the drag does. The
+          sliders set the centre and the span directly; these step the view in
+          and out without needing a pointer at all.
+        */}
+        {exploration !== undefined && (
+          <div className={styles.viewActions}>
+            <p className={styles.viewHint}>
+              {viewport === null
+                ? 'Drag a region on the artwork to zoom into it — available while the view lines are plain numbers.'
+                : 'Drag a region on the artwork to zoom into it. The centre and span above are rewritten, and the code is run again.'}
+            </p>
+            {/*
+              Zoom and pan in steps, which is the same view change the drag
+              makes and the only one available without a pointer. Each step is a
+              fraction of the current span rather than a fixed amount: no single
+              fixed step works across a seven-hundredfold range of zoom.
+            */}
+            <div className={styles.parameterActions}>
+              <button
+                type="button"
+                className={styles.secondary}
+                onClick={() => handleZoom(0.5)}
+                disabled={viewport === null}
+              >
+                Zoom in
+              </button>
+              <button
+                type="button"
+                className={styles.secondary}
+                onClick={() => handleZoom(2)}
+                disabled={viewport === null}
+              >
+                Zoom out
+              </button>
+              <button
+                type="button"
+                className={styles.secondary}
+                onClick={handleBack}
+                disabled={viewHistory.length === 0}
+              >
+                Back{viewHistory.length > 0 ? ` (${String(viewHistory.length)})` : ''}
+              </button>
+            </div>
+
+            <div className={styles.parameterActions}>
+              {(
+                [
+                  ['Pan left', -0.5, 0],
+                  ['Pan right', 0.5, 0],
+                  ['Pan up', 0, -0.5],
+                  ['Pan down', 0, 0.5],
+                ] as const
+              ).map(([label, across, down]) => (
+                <button
+                  key={label}
+                  type="button"
+                  className={styles.secondary}
+                  onClick={() => handlePan(across, down)}
+                  disabled={viewport === null}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       <section aria-labelledby="appearance-heading">
@@ -391,6 +548,14 @@ function Workspace({
         options={state.renderOptions}
         busy={state.status === 'running'}
         canvasRef={canvasRef}
+        exploration={
+          exploration === undefined
+            ? undefined
+            : // Off when the code no longer says where the view is. Someone who
+              // has rewritten `zoom←` into an expression is not served by a
+              // drag that overwrites it.
+              { enabled: viewport !== null, onSelect: handleSelectRegion }
+        }
       />
     </div>
   );

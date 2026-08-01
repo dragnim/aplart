@@ -62,6 +62,27 @@ export interface PresetOutputLimits {
   readonly highResolution?: boolean;
 }
 
+/**
+ * Declares that a preset's matrix is a patch of a plane, so a region of the
+ * artwork can be selected and turned back into code.
+ *
+ * A preset that sets this is promising that its axes are laid out as
+ *
+ *     axis ← centre + span × ¯1+2×(¯1+⍳size)÷size-1
+ *
+ * with the named columns variable running across the matrix and the rows
+ * variable running down it — the first column at `centre-span` and the last at
+ * `centre+span`. Nothing verifies that promise, so the declaration is as much a
+ * statement of intent as a configuration: a preset whose axes are built
+ * differently must not set it.
+ */
+export interface PlaneExploration {
+  readonly centreXVariable: string;
+  readonly centreYVariable: string;
+  /** Half the width of the view. Named "span" because smaller means further in. */
+  readonly spanVariable: string;
+}
+
 export interface ArtworkPreset {
   readonly id: string;
   readonly title: string;
@@ -74,6 +95,8 @@ export interface ArtworkPreset {
   readonly availablePaletteIds?: readonly string[];
   readonly renderMode: RenderMode;
   readonly outputLimits?: PresetOutputLimits;
+  /** Set only by presets whose matrix is a patch of a plane. */
+  readonly planeExploration?: PlaneExploration;
   readonly primitives: readonly PrimitiveReference[];
   readonly thumbnailPath: string;
   readonly fixturePath: string;
