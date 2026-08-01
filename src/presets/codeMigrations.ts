@@ -11,15 +11,20 @@
  * So the name is brought forward. This is the one place anything rewrites
  * somebody's code without being asked, which is why it is deliberately narrow:
  * a rename is only applied for the preset that declared it, only to whole
- * identifiers, and only when the new name is not already present — if it is,
+ * identifiers, only where the identifier is executable rather than prose or
+ * character data, and only when the new name is not already present — if it is,
  * the code has moved on and is left alone.
  */
+
+import { stripComment } from '@/execution/aplSource';
 
 /** Old name to new name, per preset. Append; never reorder or remove. */
 const RENAMES: Readonly<Record<string, readonly (readonly [string, string])[]>> = {
   // "density" never described a count of tile shapes; it described nothing.
   'truchet-grid': [['density', 'classes']],
 };
+
+const QUOTE = "'";
 
 /**
  * APL identifiers are letters, digits and underscores, so a rename must not
@@ -30,6 +35,74 @@ function wholeIdentifier(name: string): RegExp {
   return new RegExp(`(?<![A-Za-z0-9_])${name}(?![A-Za-z0-9_])`, 'gu');
 }
 
+/**
+ * Splits a line into the parts that are executable and the parts that are not.
+ *
+ * A comment and a character literal both contain text that looks like code and
+ * is not, and a rename that reached into either would be editing someone's
+ * prose or changing a string their artwork prints. `stripComment` already knows
+ * where a comment starts without being fooled by a `⍝` inside quotes; the
+ * quoted spans are walked here.
+ */
+function segments(line: string): { readonly text: string; readonly executable: boolean }[] {
+  const code = stripComment(line);
+  const comment = line.slice(code.length);
+
+  const parts: { text: string; executable: boolean }[] = [];
+  let index = 0;
+
+  while (index < code.length) {
+    const opening = code.indexOf(QUOTE, index);
+    if (opening === -1) {
+      parts.push({ text: code.slice(index), executable: true });
+      break;
+    }
+
+    parts.push({ text: code.slice(index, opening), executable: true });
+
+    // Find the end of the literal, stepping over doubled quotes.
+    let end = opening + 1;
+    while (end < code.length) {
+      if (code[end] === QUOTE) {
+        if (code[end + 1] === QUOTE) {
+          end += 2;
+          continue;
+        }
+        end += 1;
+        break;
+      }
+      end += 1;
+    }
+
+    parts.push({ text: code.slice(opening, end), executable: false });
+    index = end;
+  }
+
+  if (comment !== '') parts.push({ text: comment, executable: false });
+  return parts;
+}
+
+function mapCode(code: string, transform: (executableText: string) => string): string {
+  return code
+    .split('\n')
+    .map((line) =>
+      segments(line)
+        .map((part) => (part.executable ? transform(part.text) : part.text))
+        .join(''),
+    )
+    .join('\n');
+}
+
+/** Whether the code actually uses a name, as opposed to mentioning it. */
+function usesIdentifier(code: string, name: string): boolean {
+  let found = false;
+  mapCode(code, (text) => {
+    if (wholeIdentifier(name).test(text)) found = true;
+    return text;
+  });
+  return found;
+}
+
 export function migratePresetCode(presetId: string, code: string): string {
   const renames = RENAMES[presetId];
   if (renames === undefined) return code;
@@ -38,8 +111,8 @@ export function migratePresetCode(presetId: string, code: string): string {
   for (const [from, to] of renames) {
     // Already using the new name: nothing to bring forward, and rewriting could
     // only collide with something the author put there themselves.
-    if (wholeIdentifier(to).test(migrated)) continue;
-    migrated = migrated.replace(wholeIdentifier(from), to);
+    if (usesIdentifier(migrated, to)) continue;
+    migrated = mapCode(migrated, (text) => text.replace(wholeIdentifier(from), to));
   }
   return migrated;
 }
