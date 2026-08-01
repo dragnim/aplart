@@ -17,10 +17,11 @@ export interface Palette {
 
 export const palettes: readonly Palette[] = [
   {
-    id: 'dyalog',
-    name: 'Dyalog',
-    // Built around #FF6A13. Used as an accent within a warm ramp rather than
-    // as a flat fill, so the brand colour reads as deliberate.
+    id: 'ember',
+    name: 'Ember',
+    // A warm ramp built around #ff6a13, used as an accent within the gradient
+    // rather than as a flat fill. Named for what it looks like: this is a
+    // colour choice, not a badge.
     colours: ['#160f0a', '#3a1f0e', '#6b3410', '#a34910', '#ff6a13', '#ff9553', '#ffc39a', '#fff1e4'],
     background: '#160f0a',
   },
@@ -71,12 +72,33 @@ export const palettes: readonly Palette[] = [
 
 const byId = new Map(palettes.map((palette) => [palette.id, palette]));
 
-export const DEFAULT_PALETTE_ID = 'dyalog';
+export const DEFAULT_PALETTE_ID = 'ember';
+
+/**
+ * Palette identifiers that have been renamed.
+ *
+ * Shared links are permanent — someone can post one and it may be opened years
+ * later — and saved projects outlive a rename too. Both carry a palette id, so
+ * a rename has to be a redirect rather than a break.
+ */
+const RENAMED: Readonly<Record<string, string>> = {
+  dyalog: 'ember',
+};
+
+/**
+ * Resolves an id that may predate a rename.
+ *
+ * Applied wherever a stored or shared id enters the application, so nothing
+ * downstream has to know the old names existed.
+ */
+export function canonicalPaletteId(id: string): string {
+  return RENAMED[id] ?? id;
+}
 
 export function getPalette(id: string): Palette {
-  return byId.get(id) ?? (palettes[0] as Palette);
+  return byId.get(canonicalPaletteId(id)) ?? (palettes[0] as Palette);
 }
 
 export function paletteExists(id: string): boolean {
-  return byId.has(id);
+  return byId.has(canonicalPaletteId(id));
 }

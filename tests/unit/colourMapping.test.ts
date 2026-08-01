@@ -33,8 +33,8 @@ describe('palette definitions', () => {
     }
   });
 
-  it('the Dyalog palette uses the brand orange', () => {
-    expect(getPalette('dyalog').colours).toContain('#ff6a13');
+  it('the Ember palette keeps its warm accent colour', () => {
+    expect(getPalette('ember').colours).toContain('#ff6a13');
   });
 
   it('falls back to a real palette for an unknown id', () => {

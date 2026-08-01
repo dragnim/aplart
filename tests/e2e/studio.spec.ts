@@ -258,7 +258,7 @@ test.describe('keyboard and screen reader use', () => {
 
     // Dimensions and value range, not an attempt to narrate the picture.
     await expect(page.getByRole('img')).toHaveAccessibleName(
-      /A 64 by 64 grid with .* ranging from 0 to 16, drawn with the Dyalog palette\./,
+      /A 64 by 64 grid with .* ranging from 0 to 16, drawn with the Ember palette\./,
     );
   });
 });
@@ -370,7 +370,7 @@ test.describe('editing aids', () => {
     await page.getByRole('button', { name: 'Reset everything' }).click();
 
     await expect(page.locator('.cm-content')).toContainText('modulus←17');
-    await expect(page.getByRole('radio', { name: /Dyalog/ })).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByRole('radio', { name: /Ember/ })).toHaveAttribute('aria-checked', 'true');
     await expect(page.getByText('Original', { exact: true })).toBeVisible();
   });
 

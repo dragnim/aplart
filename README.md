@@ -271,8 +271,8 @@ CI.
 
 ## APL font
 
-APL glyphs are set in [APL387](https://github.com/Dyalog/APL387), Dyalog's redrawn successor to Adrian
-Smith's APL385 Unicode, released into the public domain under The Unlicence.
+APL glyphs are set in [APL387](https://github.com/Dyalog/APL387), a redrawn successor to Adrian Smith's
+APL385 Unicode, released into the public domain under The Unlicence.
 
 The upstream repository does not commit a built font — it is produced by their CI. `scripts/subset-font.py`
 downloads the built TTF and subsets it to the Latin, punctuation, arrow, mathematical-operator and
@@ -373,5 +373,9 @@ neither is closed off.
 
 MIT — see [LICENSE](LICENSE).
 
-APL Art is an independent project. It is not an official Dyalog product, though it depends on Dyalog's
-TryAPL service and APL387 font, both used with thanks.
+APL Art is an independent project. It writes and runs Dyalog APL, and depends on the TryAPL service and the
+APL387 font, both used with thanks.
+
+Interaction ideas for the Mandelbrot explorer were inspired by
+[Brian Becker's Mandelbrot explorer](https://bpbecker.github.io/Mandelbrot/). The implementation here is
+APL Art's own.

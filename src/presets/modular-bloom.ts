@@ -67,7 +67,7 @@ export const modularBloom: ArtworkPreset = {
     },
   ],
 
-  defaultPaletteId: 'dyalog',
+  defaultPaletteId: 'ember',
   renderMode: 'continuous',
 
   primitives: [

@@ -5,8 +5,8 @@ export function AboutPage() {
     <article className={styles.page}>
       <h1 className={styles.title}>About APL Art</h1>
       <p className={styles.lede}>
-        Every picture on this site is drawn from numbers produced by a few lines of Dyalog APL. Change the
-        code, and the picture changes with it.
+        APL Art is a creative coding playground for making patterns, fractals and generative artwork with
+        Dyalog APL. Choose a piece, change its parameters or edit the code, then run it to see what happens.
       </p>
 
       <section className={styles.section}>
@@ -42,15 +42,18 @@ export function AboutPage() {
         <h2 className={styles.heading}>Credits and licensing</h2>
         <ul className={styles.list}>
           <li>
-            APL execution is provided by{' '}
+            Code is executed using{' '}
             <a href="https://tryapl.org/" rel="noreferrer noopener" target="_blank">
               TryAPL
             </a>
-            , a free service from{' '}
-            <a href="https://www.dyalog.com/" rel="noreferrer noopener" target="_blank">
-              Dyalog Ltd
+            . Palette changes, display effects and exports are handled in your browser.
+          </li>
+          <li>
+            Interaction ideas for the Mandelbrot explorer were inspired by{' '}
+            <a href="https://bpbecker.github.io/Mandelbrot/" rel="noreferrer noopener" target="_blank">
+              Brian Becker’s Mandelbrot explorer
             </a>
-            . APL Art is an independent project and is not an official Dyalog product.
+            . The implementation here is APL Art’s own.
           </li>
           <li>
             The APL glyphs are set in{' '}
@@ -72,9 +75,9 @@ export function AboutPage() {
       <section className={styles.section}>
         <h2 className={styles.heading}>Privacy</h2>
         <p className={styles.paragraph}>
-          There are no accounts, no analytics and no tracking. Your work is kept in your own browser's storage
-          and never uploaded. The only thing that leaves your device is the APL code itself, sent to TryAPL so
-          that it can be run.
+          APL Art does not currently use analytics or advertising. Local projects are stored in your browser.
+          There are no accounts, and your work is never uploaded — the only thing that leaves your device is
+          the APL code itself, sent to TryAPL so that it can be run.
         </p>
       </section>
     </article>

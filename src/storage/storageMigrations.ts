@@ -6,7 +6,7 @@
  * work, or crashing the gallery on load, is worse.
  */
 
-import { paletteExists } from '@/renderer/palettes';
+import { DEFAULT_PALETTE_ID, canonicalPaletteId, paletteExists } from '@/renderer/palettes';
 import { defaultRenderOptions, isRotation, type RenderOptions } from '@/renderer/renderOptions';
 import { PROJECT_SCHEMA_VERSION, type Project, type StoredMatrix } from './ProjectRepository';
 
@@ -42,8 +42,12 @@ export function migrateProject(raw: unknown): MigrationOutcome {
     return { ok: false, reason: 'missing an id, preset or code' };
   }
 
+  // A project saved before a palette was renamed keeps working: the id is
+  // redirected rather than discarded.
   const paletteId =
-    typeof record.paletteId === 'string' && paletteExists(record.paletteId) ? record.paletteId : 'dyalog';
+    typeof record.paletteId === 'string' && paletteExists(record.paletteId)
+      ? canonicalPaletteId(record.paletteId)
+      : DEFAULT_PALETTE_ID;
 
   return {
     ok: true,

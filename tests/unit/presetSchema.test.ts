@@ -22,7 +22,7 @@ function makePreset(overrides: Partial<ArtworkPreset> = {}): ArtworkPreset {
         randomisable: true,
       },
     ],
-    defaultPaletteId: 'dyalog',
+    defaultPaletteId: 'ember',
     renderMode: 'indexed',
     primitives: [{ glyph: '⍳', name: 'Index generator', shortDescription: 'Counts from one.' }],
     thumbnailPath: 'thumbnails/modular-bloom.png',

@@ -9,7 +9,7 @@
 import { inflateSync } from 'fflate';
 import { config } from '@/app/config';
 import { isRotation, type RenderOptions } from '@/renderer/renderOptions';
-import { paletteExists } from '@/renderer/palettes';
+import { DEFAULT_PALETTE_ID, canonicalPaletteId, paletteExists } from '@/renderer/palettes';
 import { fromBase64Url } from './encodeShareState';
 import { migrateShareState } from './migrations';
 import { MAX_DECODED_SHARE_BYTES, SHARE_SCHEMA_VERSION, type SharedArtworkState } from './shareState';
@@ -83,8 +83,13 @@ export function validateShareState(parsed: unknown): DecodeResult {
     return { ok: false, reason: 'the code in this link is longer than the limit' };
   }
 
+  // Canonicalised, not just checked: a link written before a palette was
+  // renamed still names the old id and must resolve to the new one rather than
+  // silently falling back to the default.
   const palette =
-    typeof source.palette === 'string' && paletteExists(source.palette) ? source.palette : 'dyalog';
+    typeof source.palette === 'string' && paletteExists(source.palette)
+      ? canonicalPaletteId(source.palette)
+      : DEFAULT_PALETTE_ID;
 
   const params =
     typeof source.params === 'object' && source.params !== null && !Array.isArray(source.params)

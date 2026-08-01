@@ -86,7 +86,7 @@ describe('the workspace', () => {
     await user.click(screen.getByRole('button', { name: /^Run/ }));
 
     await waitFor(() => {
-      expect(screen.getByRole('img')).toHaveAccessibleName(/Dyalog palette/);
+      expect(screen.getByRole('img')).toHaveAccessibleName(/Ember palette/);
     });
   });
 

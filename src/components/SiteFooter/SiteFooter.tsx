@@ -3,14 +3,15 @@ import styles from './SiteFooter.module.css';
 export function SiteFooter() {
   return (
     <footer className={styles.footer}>
+      {/*
+        Names the language and the execution service, and stops there. APL Art
+        is not anyone's product but its own, and saying whose service TryAPL is
+        would imply a relationship that does not exist.
+      */}
       <p className={styles.line}>
         APL Art runs Dyalog APL through{' '}
         <a href="https://tryapl.org/" rel="noreferrer noopener" target="_blank">
           TryAPL
-        </a>
-        , the free online APL interpreter from{' '}
-        <a href="https://www.dyalog.com/" rel="noreferrer noopener" target="_blank">
-          Dyalog Ltd
         </a>
         .
       </p>

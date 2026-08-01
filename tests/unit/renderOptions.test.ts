@@ -13,7 +13,7 @@ const MATRIX = fromNested([
 ]);
 
 function options(overrides: Partial<RenderOptions> = {}): RenderOptions {
-  return { ...defaultRenderOptions('dyalog'), ...overrides };
+  return { ...defaultRenderOptions('ember'), ...overrides };
 }
 
 describe('transformMatrix', () => {

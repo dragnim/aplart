@@ -53,7 +53,7 @@ describe('migrateProject', () => {
 
   it('falls back to a real palette when the stored one is unknown', () => {
     const outcome = migrateProject(makeProject({ paletteId: 'not-a-palette' }));
-    expect(outcome.ok && outcome.project.paletteId).toBe('dyalog');
+    expect(outcome.ok && outcome.project.paletteId).toBe('ember');
   });
 
   it('discards a nonsense rotation', () => {
