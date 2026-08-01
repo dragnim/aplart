@@ -16,7 +16,7 @@ export const truchetGrid: ArtworkPreset = {
   id: 'truchet-grid',
   title: 'Truchet Grid',
   description:
-    'Curved tiles laid at random, joining into paths that wander across the whole piece. The same seed always gives the same tiling.',
+    'Curved tiles scattered by hashing each position, joining into paths that wander across the whole piece. Nothing is random: the same seed always gives the same tiling.',
   category: 'pattern',
   difficulty: 'intermediate',
 
@@ -66,12 +66,25 @@ export const truchetGrid: ArtworkPreset = {
     {
       id: 'density',
       variable: 'density',
-      label: 'Tile classes',
-      description:
-        'How many tile shapes are used. Two gives the classic flowing curves; more adds diagonals that cut across them.',
+      label: 'Tile shapes',
+      description: 'Two gives the classic flowing curves. Three and four add diagonals that cut across them.',
       type: 'integer',
       min: 2,
-      max: 8,
+      /*
+       * Four, not eight.
+       *
+       * There are four motifs, and the renderer picks one with the class
+       * modulo four — so class 4 draws the same shape as class 0. Asking for
+       * more than four never added a shape; it only changed how often the four
+       * came up, and eight gave each of them exactly a quarter, which is
+       * statistically the same artwork as four. Looking at 2 through 8 side by
+       * side at two seeds confirmed it: the last four are indistinguishable.
+       *
+       * The old range was made to look meaningful by tinting the ground per
+       * class, which drew a grid of squares over the tiling. With that gone the
+       * control has to be honest about what it can actually do.
+       */
+      max: 4,
       step: 1,
       defaultValue: 2,
       randomisable: true,
@@ -112,7 +125,7 @@ export const truchetGrid: ArtworkPreset = {
   tryChangingThis: [
     'Change the seed. Every value gives a completely different arrangement.',
     'Raise the tile shapes to 3 or 4 to cut diagonals across the curves.',
-    'Try 8 shapes with the Sunset palette.',
+    'Try 4 shapes with the Sunset palette.',
     'Delete the 1○ so the angle is used directly. The scrambling collapses and the rows start to repeat.',
     'Go back to the same seed and confirm you get the same picture.',
   ],

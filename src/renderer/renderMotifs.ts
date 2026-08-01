@@ -15,7 +15,7 @@
 
 import { type MatrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
-import { createColourMapper, parseHexColour, type Rgb } from './colourMapping';
+import { parseHexColour } from './colourMapping';
 import { type Palette } from './palettes';
 import { type RgbaImage } from './colourMapping';
 
@@ -57,6 +57,13 @@ export function strokeFor(cell: number): number {
  * tiling — the pair that produces flowing curves. Classes 2 and 3 are the two
  * diagonals, which break the flow up and give a piece with more tile classes
  * something coarser to contrast against.
+ *
+ * Four is therefore the most a tiling can usefully ask for: the class is taken
+ * modulo this list, so a fifth class draws the first shape again. A preset
+ * offering more would be promising shapes that do not exist. Adding real ones —
+ * a straight through the middle joins the arcs at the same edge midpoints, and
+ * would be the honest way to extend the range — is a change to make
+ * deliberately, not by widening a slider.
  */
 type Motif = 'arcsNwSe' | 'arcsNeSw' | 'diagonalNwSe' | 'diagonalNeSw';
 
@@ -75,10 +82,16 @@ function onStroke(motif: Motif, u: number, v: number, stroke: number): boolean {
       return nearRing(u, v, 0, 0, stroke) || nearRing(u, v, 1, 1, stroke);
     case 'arcsNeSw':
       return nearRing(u, v, 1, 0, stroke) || nearRing(u, v, 0, 1, stroke);
+    /*
+     * The perpendicular distance to the line, not the difference of the
+     * coordinates — those differ by a factor of √2. The old form compared
+     * `|u-v|` against `stroke × 0.75`, which drew the diagonals 6% wider than
+     * the arcs: close enough to look deliberate, and not.
+     */
     case 'diagonalNwSe':
-      return Math.abs(u - v) < stroke * 0.75;
+      return Math.abs(u - v) * Math.SQRT1_2 < stroke / 2;
     case 'diagonalNeSw':
-      return Math.abs(u + v - 1) < stroke * 0.75;
+      return Math.abs(u + v - 1) * Math.SQRT1_2 < stroke / 2;
   }
 }
 
@@ -97,7 +110,13 @@ function nearRing(u: number, v: number, centreU: number, centreV: number, stroke
  */
 export function renderMotifsToRgba(
   matrix: NumericMatrix,
-  stats: MatrixStats,
+  /*
+   * Unused, and kept anyway: every renderer takes the same pair so the
+   * dispatcher can call any of them without knowing which. The other modes map
+   * a value's position within the range onto a colour; a tiling maps it onto a
+   * shape, and a shape does not care what the range is.
+   */
+  _stats: MatrixStats,
   options: { readonly palette: Palette; readonly invert?: boolean },
 ): RgbaImage {
   const cell = cellSizeFor(matrix);
@@ -122,40 +141,26 @@ export function renderMotifsToRgba(
   }
 
   /*
-   * The ground is tinted only very slightly by the cell's value.
+   * The ground is flat. No per-cell tint at all.
    *
-   * A stronger tint was tried and thrown away: varying the background per cell
-   * drew visible blocks across the tiling and broke the very illusion the
-   * motifs exist to create, which is that the curves continue across tile
-   * edges. A Truchet tiling is about shape, so shape carries the variety and
-   * colour stays out of the way.
+   * It was tried at 0.12 and then at 0.05, and both drew a grid of faint
+   * squares across the piece — which is precisely the thing the motifs exist to
+   * disguise. A Truchet tiling is meant to read as paths flowing over one
+   * surface, not as something assembled tile by tile, and no amount of
+   * shading is worth giving that away. Shape carries the variety.
    */
-  const tint = createColourMapper(stats, {
-    mode: 'continuous',
-    palette: options.palette,
-    ...(options.invert === undefined ? {} : { invert: options.invert }),
-  });
-
   for (let row = 0; row < matrix.rows; row += 1) {
     for (let column = 0; column < matrix.columns; column += 1) {
       const value = matrix.values[row * matrix.columns + column] as number;
       const index = ((Math.round(value) % MOTIFS.length) + MOTIFS.length) % MOTIFS.length;
       const motif = MOTIFS[index] as Motif;
 
-      /*
-       * 0.12 was chosen when the stroke was half again as wide and hid most of
-       * the ground. With a thin line the tiles are mostly background, and the
-       * per-cell shade showed as a grid of faint squares — the one thing the
-       * motifs exist to disguise. Barely there is the most it can be.
-       */
-      const cellTint = mixTowards(background, tint(value), 0.05);
-
       for (let y = 0; y < cell; y += 1) {
         // Sampled at pixel centres, so a motif is not lopsided by half a pixel.
         const v = (y + 0.5) / cell;
         for (let x = 0; x < cell; x += 1) {
           const u = (x + 0.5) / cell;
-          const colour = onStroke(motif, u, v, stroke) ? foreground : cellTint;
+          const colour = onStroke(motif, u, v, stroke) ? foreground : background;
 
           const offset = ((row * cell + y) * width + column * cell + x) * 4;
           data[offset] = colour.r;
@@ -168,12 +173,4 @@ export function renderMotifsToRgba(
   }
 
   return { width, height, data };
-}
-
-function mixTowards(from: Rgb, to: Rgb, amount: number): Rgb {
-  return {
-    r: Math.round(from.r + (to.r - from.r) * amount),
-    g: Math.round(from.g + (to.g - from.g) * amount),
-    b: Math.round(from.b + (to.b - from.b) * amount),
-  };
 }

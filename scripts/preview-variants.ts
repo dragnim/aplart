@@ -32,10 +32,23 @@ const CELL_SIZE = 256;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function main(): Promise<number> {
-  const [presetId, variable, ...rawValues] = process.argv.slice(2);
+  const [presetId, variable, ...rest] = process.argv.slice(2);
+
+  /*
+   * Anything of the form name=value is held fixed for every variant, so a sweep
+   * can be repeated against a different starting point — the same seven tile
+   * counts at a second seed, say, which is the only way to tell a real
+   * difference between them from one lucky arrangement.
+   */
+  const rawValues = rest.filter((argument) => !argument.includes('='));
+  const fixed = rest
+    .filter((argument) => argument.includes('='))
+    .map((argument) => argument.split('=', 2) as [string, string]);
 
   if (presetId === undefined || variable === undefined || rawValues.length === 0) {
-    console.error('Usage: npm run preset:variants -- <presetId> <variable> <value> [value...]');
+    console.error(
+      'Usage: npm run preset:variants -- <presetId> <variable> <value> [value...] [name=value...]',
+    );
     return 1;
   }
 
@@ -45,11 +58,21 @@ async function main(): Promise<number> {
     return 1;
   }
 
+  let baseCode = preset.code;
+  for (const [name, value] of fixed) {
+    const pinned = setParameterValue(baseCode, name, Number(value));
+    if (!pinned.ok) {
+      console.error(`"${name}" is not a top-level assignment in ${presetId}.`);
+      return 1;
+    }
+    baseCode = pinned.code;
+  }
+
   const images: RgbaSource[] = [];
 
   for (const rawValue of rawValues) {
     const value = Number(rawValue);
-    const updated = setParameterValue(preset.code, variable, value);
+    const updated = setParameterValue(baseCode, variable, value);
     if (!updated.ok) {
       console.error(`"${variable}" is not a top-level assignment in ${presetId}.`);
       return 1;
@@ -77,8 +100,9 @@ async function main(): Promise<number> {
     await sleep(700);
   }
 
-  const sheet = montage(images, { columns: Math.min(images.length, 3) });
-  const path = join(REPO_ROOT, '.preview', `${presetId}-${variable}.png`);
+  const sheet = montage(images, { columns: Math.min(images.length, 4) });
+  const suffix = fixed.map(([name, value]) => `-${name}${value}`).join('');
+  const path = join(REPO_ROOT, '.preview', `${presetId}-${variable}${suffix}.png`);
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, encodePng(sheet));
 

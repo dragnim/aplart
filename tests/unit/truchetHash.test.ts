@@ -15,8 +15,13 @@
  * of the formula, not of the last bit.
  */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { truchetGrid } from '@/presets/truchet-grid';
+
+/** How many motifs the renderer can draw. The class is taken modulo this. */
+const MOTIF_COUNT = 4;
 
 /** The tile class the preset's expression gives for a cell, one-based. */
 function tileAt(row: number, column: number, seed: number, density: number): number {
@@ -169,13 +174,68 @@ describe('the tile hash', () => {
     expect(shapes.size).toBe(40);
   });
 
-  it('stays in range for more tile classes', () => {
-    for (const density of [2, 3, 4, 8]) {
+  it('stays in range for every tile-shape count offered', () => {
+    for (const density of [2, 3, 4]) {
       const flat = grid(SIZE, 7, density, tileAt).flat();
       expect(Math.min(...flat)).toBeGreaterThanOrEqual(0);
       expect(Math.max(...flat)).toBeLessThan(density);
       // All of them actually used, or the control would be a lie.
       expect(new Set(flat).size).toBe(density);
     }
+  });
+
+  it('does not run in columns either', () => {
+    // Rows are where the old generator's structure showed, so a fix that only
+    // moved the problem into the columns would have looked like a fix.
+    const rows = grid(SIZE, 7, 2, tileAt);
+    const columns = rows[0]?.map((_unused, column) => rows.map((row) => row[column] as number)) ?? [];
+    expect(longestRun(columns)).toBeLessThanOrEqual(12);
+  });
+
+  it('uses a wide vocabulary of neighbourhoods on its own terms', () => {
+    // An absolute floor as well as the comparison, so this still says something
+    // if the old generator is ever deleted from these tests.
+    expect(distinctNeighbourhoods(grid(SIZE, 7, 2, tileAt))).toBeGreaterThan(200);
+  });
+});
+
+describe('the committed fixture', () => {
+  /**
+   * The interpreter and the model agree.
+   *
+   * Everything above evaluates the preset's arithmetic in JavaScript, and the
+   * end-to-end stub does the same. That is only worth anything if Dyalog's `1○`
+   * and `Math.sin` actually produce the same tiles — which they do here, to the
+   * last cell. If they ever stop, every claim in this file is about a formula
+   * nobody is running.
+   */
+  it('matches the JavaScript model cell for cell', () => {
+    const fixture = JSON.parse(
+      readFileSync(join(import.meta.dirname, '..', 'fixtures', 'truchet-grid.json'), 'utf8'),
+    ) as { rows: number; columns: number; values: number[][] };
+
+    const modelled = grid(fixture.rows, 7, 2, tileAt);
+    expect(fixture.columns).toBe(fixture.rows);
+    expect(fixture.values).toEqual(modelled);
+  });
+});
+
+describe('the tile-shape control', () => {
+  it('offers no more shapes than the renderer has', () => {
+    /*
+     * The renderer picks a motif with the class modulo four, so a fifth class
+     * draws the first shape again. The control used to go to eight, which was
+     * only made to look meaningful by tinting the ground per class — a grid of
+     * squares over the tiling. Whatever the range is, it cannot exceed what can
+     * actually be drawn.
+     */
+    const density = truchetGrid.parameters.find((parameter) => parameter.variable === 'density');
+    expect(density?.max).toBe(MOTIF_COUNT);
+  });
+
+  it('does not describe the tiling as random', () => {
+    // It is a hash of the position. Calling it random invites the reasonable
+    // expectation that the same link would draw something different each time.
+    expect(truchetGrid.description).toMatch(/Nothing is random/);
   });
 });

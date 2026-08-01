@@ -73,6 +73,48 @@ describe('strokeFor', () => {
   });
 });
 
+describe('the motif families weigh the same', () => {
+  /** What fraction of a tile is drawn on, for a tiling of one class only. */
+  function inkFor(tileClass: number): number {
+    const size = 6;
+    const { matrix, stats } = tiling(
+      Array.from({ length: size }, () => Array.from({ length: size }, () => tileClass)),
+    );
+    const image = renderMotifsToRgba(matrix, stats, { palette: PALETTE });
+
+    // The line is the last palette entry; anything else is ground.
+    const line = PALETTE.colours[PALETTE.colours.length - 1] ?? '#ffffff';
+    const [r, g, b] = [1, 3, 5].map((offset) => Number.parseInt(line.slice(offset, offset + 2), 16));
+
+    let on = 0;
+    for (let index = 0; index < image.data.length; index += 4) {
+      if (image.data[index] === r && image.data[index + 1] === g && image.data[index + 2] === b) on += 1;
+    }
+    return on / (image.width * image.height);
+  }
+
+  it('draws diagonals as heavily as arcs', () => {
+    /*
+     * The diagonals were tested with `|u-v| < stroke × 0.75`, but the
+     * perpendicular distance to that line is `|u-v| ÷ √2` — so they came out 6%
+     * wider than the arcs. Close enough to look deliberate, and not.
+     *
+     * A diagonal covers a little less of a tile than two quarter-arcs even at
+     * equal width, because it is shorter than they are; what matters is that
+     * neither family looks heavier, so the tolerance is on the ratio.
+     */
+    const arcs = (inkFor(0) + inkFor(1)) / 2;
+    const diagonals = (inkFor(2) + inkFor(3)) / 2;
+    expect(diagonals / arcs).toBeGreaterThan(0.8);
+    expect(diagonals / arcs).toBeLessThan(1.0);
+  });
+
+  it('draws both orientations of each family identically', () => {
+    expect(inkFor(0)).toBeCloseTo(inkFor(1), 3);
+    expect(inkFor(2)).toBeCloseTo(inkFor(3), 3);
+  });
+});
+
 describe('renderMotifsToRgba', () => {
   it('renders a whole block of pixels per tile, not one', () => {
     const { matrix, stats } = tiling([
