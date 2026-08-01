@@ -49,6 +49,16 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
+
+      // Test doubles genuinely need these: stubbed fetch implementations are
+      // async without awaiting, request bodies are inspected as strings,
+      // aborted requests reject with DOMExceptions rather than Errors, and
+      // assertion helpers rethrow deliberately without chaining a cause.
+      '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/no-base-to-string': 'off',
+      '@typescript-eslint/prefer-promise-reject-errors': 'off',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+      'preserve-caught-error': 'off',
     },
   },
 );
