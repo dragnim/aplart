@@ -46,8 +46,15 @@ try {
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
         body: JSON.stringify(['', 0, '', '3 3⍴⍳9']),
       });
-      const body = await res.json();
-      return { ok: true, status: res.status, output: body[3] };
+      // The response comes from an external service, so nothing about its
+      // shape is assumed until it has been checked.
+      const body = /** @type {unknown[]} */ (await res.json());
+      const lines = body[3];
+      return {
+        ok: true,
+        status: res.status,
+        output: Array.isArray(lines) ? lines.map((line) => String(line)) : [],
+      };
     } catch (error) {
       return { ok: false, error: String(error) };
     }

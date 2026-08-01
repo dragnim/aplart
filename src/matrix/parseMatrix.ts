@@ -26,8 +26,7 @@ export type MatrixParseResult =
  * The exponent of a number in scientific notation is itself overbarred when
  * negative, as in `1.5E¯7`.
  */
-const APL_NUMBER =
-  /^[¯-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][¯+-]?\d+)?$/u;
+const APL_NUMBER = /^[¯-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][¯+-]?\d+)?$/u;
 
 function toNumber(token: string): number {
   // JavaScript understands none of the overbars, so normalise them to minus
