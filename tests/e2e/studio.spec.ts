@@ -82,7 +82,11 @@ test.describe('the artwork journey', () => {
     await runAndWait(page);
 
     expect(stub.requests.at(-1)).toContain('modulus←12');
-    expect(await canvasSignature(page)).not.toBe(before);
+
+    // Polled, not asserted once: the status reaches "Finished" when the state
+    // updates, but the canvas is repainted by an effect after that, so reading
+    // it immediately is a race.
+    await expect.poll(() => canvasSignature(page), { message: 'the artwork never changed' }).not.toBe(before);
   });
 
   test('runs from the keyboard with the shortcut', async ({ page, isMobile }) => {
@@ -107,7 +111,9 @@ test.describe('the artwork journey', () => {
     await page.getByRole('radio', { name: /Poolrooms/ }).click();
 
     await expect(page.getByRole('img', { name: /Poolrooms palette/ })).toBeVisible();
-    expect(await canvasSignature(page)).not.toBe(before);
+    await expect
+      .poll(() => canvasSignature(page), { message: 'the artwork never recoloured' })
+      .not.toBe(before);
     expect(stub.requests).toHaveLength(requestsAfterRun);
   });
 

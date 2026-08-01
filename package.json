@@ -29,7 +29,9 @@
     "verify:cors": "node scripts/verify-live-cors.mjs",
     "generate:thumbnails": "tsx scripts/generate-thumbnails.ts",
     "refresh:fixtures": "tsx scripts/refresh-fixtures.ts",
-    "screenshot": "node scripts/screenshot.mjs"
+    "screenshot": "node scripts/screenshot.mjs",
+    "contact-sheet": "tsx scripts/contact-sheet.ts",
+    "debug:preset": "tsx scripts/debug-preset.ts"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",

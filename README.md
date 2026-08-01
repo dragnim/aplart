@@ -129,6 +129,7 @@ request.** Measured against the live endpoint:
 | ----------------------------- | ---------------------------------- |
 | Maximum lines in a response   | **93**, silently truncated         |
 | Maximum characters per line   | **995**, silently truncated        |
+| Workspace size                | **512 KB** (`WS FULL`)             |
 | `⎕PW`                         | `NOT SUPPORTED` — cannot be raised |
 | Workspace state between calls | Not preserved (`CORRUPT WS`)       |
 
@@ -146,6 +147,21 @@ consequences shape the design:
 
 In both tiers the adapter verifies the reassembled cell count against a shape probe. A short or
 truncated band is a hard error, never a silently incorrect picture.
+
+### The 512 KB workspace
+
+Response size is not the only ceiling. Each run gets a 512 KB workspace, and a preset that holds
+several matrices of doubles at once will exhaust it long before it hits the transfer limits.
+Mandelbrot Field is the clearest case: it fails with `WS FULL` somewhere between 160×160 and
+176×176, so its resolution is capped at 144.
+
+This is why `tests/live/presets.test.ts` runs every numeric control at its maximum **at the same
+time** as well as one at a time. A preset that builds one array per unit of a second parameter — a
+wave per direction, a matrix per iteration — only runs out of memory when two controls are high
+together, and that is a combination a visitor reaches in seconds.
+
+When authoring a preset, keep the peak number of live arrays in mind, not just the size of the
+result.
 
 ## TryAPL integration notes
 

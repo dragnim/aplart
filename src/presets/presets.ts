@@ -7,12 +7,29 @@
  * preset fails the build long before it can reach a visitor.
  */
 
+import { cellularEcho } from './cellular-echo';
+import { checkerShift } from './checker-shift';
+import { mandelbrotField } from './mandelbrot-field';
 import { modularBloom } from './modular-bloom';
+import { sierpinskiArray } from './sierpinski-array';
+import { truchetGrid } from './truchet-grid';
+import { waveInterference } from './wave-interference';
 import { validatePreset, type ArtworkPreset, type PresetValidationIssue } from './schema';
 
 // Presets are registered here as they are authored. Each lives in its own
 // module so that its APL, parameters and prose stay together.
-const authored: readonly ArtworkPreset[] = [modularBloom];
+//
+// Gallery order, roughly easiest first, so a visitor scrolling down meets the
+// gentle pieces before the fractals.
+const authored: readonly ArtworkPreset[] = [
+  modularBloom,
+  checkerShift,
+  waveInterference,
+  truchetGrid,
+  sierpinskiArray,
+  cellularEcho,
+  mandelbrotField,
+];
 
 const issues: PresetValidationIssue[] = [];
 const valid: ArtworkPreset[] = [];

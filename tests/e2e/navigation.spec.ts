@@ -67,3 +67,64 @@ test.describe('site navigation', () => {
     expect(errors).toEqual([]);
   });
 });
+
+test.describe('the gallery with every artwork', () => {
+  test('shows a card per preset, each with a real thumbnail', async ({ page }) => {
+    await page.goto('./');
+
+    const cards = page.getByRole('article');
+    await expect(cards).toHaveCount(7);
+
+    // Every thumbnail is a committed PNG generated from real APL output, so a
+    // broken path or a missing file must fail rather than show a gap.
+    //
+    // They are lazily loaded, which is the point of the attribute: on a phone
+    // most of them are still below the fold. Each one is scrolled to before it
+    // is checked, rather than assuming the browser has fetched them all.
+    const images = page.locator('article img');
+    await expect(images).toHaveCount(7);
+
+    for (let index = 0; index < 7; index += 1) {
+      const image = images.nth(index);
+      await image.scrollIntoViewIfNeeded();
+      await expect
+        .poll(
+          () =>
+            image.evaluate((element) => {
+              const img = element as HTMLImageElement;
+              return img.complete && img.naturalWidth > 0;
+            }),
+          { message: `thumbnail ${index} never loaded`, timeout: 10_000 },
+        )
+        .toBe(true);
+    }
+  });
+
+  test('filters narrow the gallery and every filter leads somewhere', async ({ page }) => {
+    await page.goto('./');
+
+    await page.getByRole('button', { name: /^Fractals/ }).click();
+    await expect(page.getByRole('article')).toHaveCount(2);
+
+    await page.getByRole('button', { name: /^Beginner/ }).click();
+    await expect(page.getByRole('article')).toHaveCount(2);
+
+    await page.getByRole('button', { name: /^All/ }).click();
+    await expect(page.getByRole('article')).toHaveCount(7);
+  });
+
+  test('every artwork opens', async ({ page }) => {
+    await page.goto('./');
+    const count = await page.getByRole('link', { name: /^Open/ }).count();
+
+    for (let index = 0; index < count; index += 1) {
+      await page.goto('./');
+      const link = page.getByRole('link', { name: /^Open/ }).nth(index);
+      const label = (await link.getAttribute('aria-label')) ?? (await link.innerText());
+      await link.click();
+      await expect(page.getByRole('heading', { level: 1 }), `opening ${label}`).not.toHaveText(
+        'We could not find that',
+      );
+    }
+  });
+});
