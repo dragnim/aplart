@@ -9,7 +9,7 @@
 export interface FakeFullscreenApi {
   /** Elements that were asked to go fullscreen, in order. */
   readonly requests: Element[];
-  /** The browser leaving fullscreen on its own — Escape, F11, its own button. */
+  /** The browser leaving fullscreen on its own — Escape, or its own control. */
   readonly leaveWithoutAsking: () => void;
   /** Whether the fake currently reports a fullscreen element. */
   readonly isFullscreen: () => boolean;

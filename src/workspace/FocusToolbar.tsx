@@ -104,17 +104,22 @@ export function FocusToolbar({
       </div>
 
       {/*
-        Only ever a refusal, and only for a few seconds. An alert rather than a
-        status: it is the answer to something just pressed, and nothing else on
-        screen would otherwise show that the press did nothing.
+        Only ever a refusal, and only for a few seconds.
+
+        A status rather than an alert. Nothing is broken and nothing needs
+        attending to — the press simply did not take effect, and Focus mode is
+        still doing the job. It is announced once, when it appears, and removes
+        itself; there is no control to dismiss because there is nothing to act
+        on.
       */}
       {fullscreen?.error != null && (
-        <p className={styles.refusal} role="alert">
+        <p className={styles.refusal} role="status">
           {/*
-            Right-aligned on a line of its own, in an opaque pill. Left-aligned
-            and unbacked it landed over the drawer, where salmon text on a white
-            panel was close to invisible — a message about a failure that cannot
-            be read is worse than none.
+            Right-aligned on a line of its own, over the artwork rather than the
+            drawer: left-aligned it landed on the white panel, where the warning
+            colour was close to invisible. It keeps a quiet dark backing because
+            it sits over an arbitrary picture — plain text there is legible
+            against some artworks and not others.
           */}
           <span>{fullscreen.error}</span>
         </p>

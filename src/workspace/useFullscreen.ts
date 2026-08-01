@@ -51,9 +51,14 @@ export function useFullscreen(target: RefObject<HTMLElement | null>): Fullscreen
 
   /*
    * The state is read from the browser, never assumed from our own calls.
-   * Fullscreen can be left by Escape, by F11 and by the browser's own
-   * controls, none of which pass through this code — a flag we maintained
+   * Fullscreen can be left by Escape and by the browser's own fullscreen
+   * controls, neither of which passes through this code — a flag we maintained
    * ourselves would be wrong within one keystroke.
+   *
+   * F11 is a separate thing and deliberately not listed: it is the browser's
+   * own window fullscreen, outside the Fullscreen API, and normally does not
+   * touch `fullscreenElement` at all. Reading the browser's state rather than
+   * tracking our own means we neither claim it does nor need to care.
    */
   useEffect(() => {
     if (!supported) return;

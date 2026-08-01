@@ -153,7 +153,7 @@ test.describe('accessibility of the workspace', () => {
     test.skip((await fullscreen.count()) === 0, 'this browser does not offer fullscreen');
 
     await fullscreen.click();
-    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.getByText(/Focus mode still fills the window/)).toBeVisible();
     await audit(page);
   });
 

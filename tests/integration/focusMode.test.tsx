@@ -335,7 +335,11 @@ describe('browser fullscreen', () => {
 
     await user.click(screen.getByRole('button', { name: 'Fullscreen' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/Focus mode still fills the window/);
+    // Found by its words rather than its role: Focus mode has several status
+    // regions, and the refusal is deliberately not the loudest of them.
+    const refusal = await screen.findByText(/Focus mode still fills the window/);
+    // A status, not an alert. Nothing is broken and nothing needs attending to.
+    expect(refusal.closest('[role="status"]')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Fullscreen' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Exit focus' })).toBeInTheDocument();
   });

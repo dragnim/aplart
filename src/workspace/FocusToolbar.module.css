@@ -116,14 +116,23 @@
   pointer-events: auto;
 }
 
+/*
+ * A status line, not a badge. The backing is the least that keeps it legible
+ * over an arbitrary artwork; the small radius and the muted weight are there so
+ * it reads as the toolbar talking rather than as something demanding a press.
+ */
 .refusal span {
   display: inline-block;
   max-width: 30rem;
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-md);
-  /* Opaque enough to be legible over any artwork underneath. */
-  background: rgb(0 0 0 / 90%);
-  color: #ff9d94;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  /*
+   * 76% black is the least that carries the text over any artwork. The worst
+   * case is a white picture behind it, compositing to rgb(61 61 61), against
+   * which #ffb3ab is 6.1:1 — above the 4.5:1 that small text needs.
+   */
+  background: rgb(0 0 0 / 76%);
+  color: #ffb3ab;
   font-size: var(--text-xs);
   text-align: left;
 }

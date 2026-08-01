@@ -113,8 +113,8 @@ describe('useFullscreen', () => {
       });
       expect(result.current?.active).toBe(true);
 
-      // Escape, F11, or the browser's own control. None of these pass through
-      // the hook, so a flag it maintained itself would now be wrong.
+      // Escape, or the browser's own fullscreen control. Neither passes
+      // through the hook, so a flag it maintained itself would now be wrong.
       act(() => api.leaveWithoutAsking());
       expect(result.current?.active).toBe(false);
     });

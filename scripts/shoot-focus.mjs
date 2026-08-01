@@ -85,7 +85,7 @@ try {
   // The drawer slides out; capturing mid-transition tells me nothing.
   await refused.waitForTimeout(600);
   await refused.getByRole('button', { name: 'Fullscreen' }).click();
-  await refused.getByRole('alert').waitFor();
+  await refused.getByText(/Focus mode still fills the window/).waitFor();
   await refused.screenshot({ path: `${OUT}/f5-desktop-fullscreen-refused.png` });
 
   // --- Phone ---
