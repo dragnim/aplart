@@ -32,7 +32,8 @@
     "generate:thumbnails": "tsx scripts/generate-thumbnails.ts",
     "preset:variants": "tsx scripts/preview-variants.ts",
     "preset:sheet": "tsx scripts/contact-sheet.ts",
-    "preset:debug": "tsx scripts/debug-preset.ts"
+    "preset:debug": "tsx scripts/debug-preset.ts",
+    "verify:deployment": "node scripts/verify-deployment.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",

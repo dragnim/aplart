@@ -55,22 +55,23 @@ No API keys, accounts or secrets are needed.
 
 ## Development commands
 
-| Command                    | What it does                                                       |
-| -------------------------- | ------------------------------------------------------------------ |
-| `npm run dev`              | Start the development server with hot reloading.                   |
-| `npm run build`            | Typecheck, then build the static site into `dist/`.                |
-| `npm run preview`          | Serve the built site locally, exactly as Pages will.               |
-| `npm run typecheck`        | Run TypeScript with no emit.                                       |
-| `npm run lint`             | Run ESLint over the whole repository.                              |
-| `npm run lint:fix`         | Run ESLint and apply the fixes it can make safely.                 |
-| `npm run format`           | Format everything with Prettier.                                   |
-| `npm run format:check`     | Fail if anything is unformatted — this is what CI runs.            |
-| `npm test`                 | Run unit and component tests once.                                 |
-| `npm run test:watch`       | Run those tests in watch mode.                                     |
-| `npm run test:live`        | Run the suite that calls the **real** TryAPL endpoint (see below). |
-| `npm run test:e2e`         | Build, preview and run the Playwright journeys.                    |
-| `npm run validate:presets` | Validate every preset and fail if any is malformed.                |
-| `npm run verify:cors`      | Check that the **deployed** site can reach the APL endpoint.       |
+| Command                     | What it does                                                       |
+| --------------------------- | ------------------------------------------------------------------ |
+| `npm run dev`               | Start the development server with hot reloading.                   |
+| `npm run build`             | Typecheck, then build the static site into `dist/`.                |
+| `npm run preview`           | Serve the built site locally, exactly as Pages will.               |
+| `npm run typecheck`         | Run TypeScript with no emit.                                       |
+| `npm run lint`              | Run ESLint over the whole repository.                              |
+| `npm run lint:fix`          | Run ESLint and apply the fixes it can make safely.                 |
+| `npm run format`            | Format everything with Prettier.                                   |
+| `npm run format:check`      | Fail if anything is unformatted — this is what CI runs.            |
+| `npm test`                  | Run unit and component tests once.                                 |
+| `npm run test:watch`        | Run those tests in watch mode.                                     |
+| `npm run test:live`         | Run the suite that calls the **real** TryAPL endpoint (see below). |
+| `npm run test:e2e`          | Build, preview and run the Playwright journeys.                    |
+| `npm run validate:presets`  | Validate every preset and fail if any is malformed.                |
+| `npm run verify:cors`       | Check that the **deployed** site can reach the APL endpoint.       |
+| `npm run verify:deployment` | Check the **deployed** site against the production-only criteria.  |
 
 Asset and authoring tools:
 
@@ -332,12 +333,19 @@ deploying.
 
 ## Testing
 
-| Suite              | Command               | What it covers                                                                       |
-| ------------------ | --------------------- | ------------------------------------------------------------------------------------ |
-| Unit and component | `npm test`            | Parsing, transport planning, colour mapping, parameter binding, sharing, storage.    |
-| End-to-end         | `npm run test:e2e`    | Full journeys in Chromium and WebKit, plus the accessibility audit.                  |
-| Live service       | `npm run test:live`   | Every preset against the real TryAPL endpoint, at its defaults and its range limits. |
-| Deployed site      | `npm run verify:cors` | That the published origin can actually reach the APL endpoint.                       |
+| Suite              | Command                     | What it covers                                                                       |
+| ------------------ | --------------------------- | ------------------------------------------------------------------------------------ |
+| Unit and component | `npm test`                  | Parsing, transport planning, colour mapping, parameter binding, sharing, storage.    |
+| End-to-end         | `npm run test:e2e`          | Full journeys in Chromium and WebKit, plus the accessibility audit.                  |
+| Live service       | `npm run test:live`         | Every preset against the real TryAPL endpoint, at its defaults and its range limits. |
+| Deployed site      | `npm run verify:cors`       | That the published origin can actually reach the APL endpoint.                       |
+| Deployed site      | `npm run verify:deployment` | The things only production can show — see below.                                     |
+
+`verify:deployment` covers what no test suite can, because it depends on the real deployment: assets
+resolving under a subdirectory, a hash route surviving a cold direct visit with no server rewrites, the
+committed thumbnails actually being published, and a real browser at the real origin being allowed to
+reach TryAPL and draw a picture from what comes back. It exercises the banded high-resolution preset
+too, since that is the path most likely to break somewhere other than a developer's machine.
 
 The end-to-end tests stub TryAPL **at the network boundary** rather than substituting a mock service, so
 the real `TryAplExecutionService` — wire format, error detection, banding and all — is still the thing
