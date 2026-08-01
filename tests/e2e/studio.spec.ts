@@ -39,6 +39,25 @@ async function canvasSignature(page: Page): Promise<string> {
   });
 }
 
+/**
+ * The signature, once the canvas has stopped changing.
+ *
+ * The canvas is painted by an effect and repainted by a ResizeObserver, so a
+ * read taken the instant a run finishes can catch it mid-settle. Any later
+ * comparison against that value then fails for the wrong reason. Waiting for
+ * two identical consecutive reads makes the baseline trustworthy.
+ */
+async function settledCanvasSignature(page: Page): Promise<string> {
+  let previous = await canvasSignature(page);
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await page.waitForTimeout(100);
+    const current = await canvasSignature(page);
+    if (current === previous) return current;
+    previous = current;
+  }
+  return previous;
+}
+
 /** Replaces the editor's contents. fill() drives contenteditable reliably; a
  *  select-all keystroke does not on every browser. */
 async function setCode(page: Page, code: string) {
@@ -71,7 +90,7 @@ test.describe('the artwork journey', () => {
     const stub = await stubTryApl(page);
     await openModularBloom(page);
     await runAndWait(page);
-    const before = await canvasSignature(page);
+    const before = await settledCanvasSignature(page);
 
     await expect(page.locator('.cm-content')).toContainText('modulus←17');
 
@@ -106,7 +125,7 @@ test.describe('the artwork journey', () => {
     await runAndWait(page);
 
     const requestsAfterRun = stub.requests.length;
-    const before = await canvasSignature(page);
+    const before = await settledCanvasSignature(page);
 
     await page.getByRole('radio', { name: /Poolrooms/ }).click();
 
@@ -121,7 +140,7 @@ test.describe('the artwork journey', () => {
     await stubTryApl(page);
     await openModularBloom(page);
     await runAndWait(page);
-    const drawn = await canvasSignature(page);
+    const drawn = await settledCanvasSignature(page);
 
     // Remove the size assignment so the expression cannot resolve.
     await setCode(page, 'modulus←9\nmodulus|1');

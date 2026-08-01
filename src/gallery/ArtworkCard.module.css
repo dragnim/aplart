@@ -143,10 +143,21 @@
 
   .card[data-featured='true'] .thumbnailLink {
     flex: 0 0 50%;
+    display: grid;
+    place-items: center;
   }
 
+  /*
+   * Contained, not covered. The featured card is as tall as the row beside it,
+   * which is taller than a square artwork; covering that space cropped the
+   * left and right edges off the one piece most visitors look at. Any spare
+   * height is filled by the dark thumbnail surround rather than by the card's
+   * white background, so it reads as a mount rather than as a gap.
+   */
   .card[data-featured='true'] .thumbnail {
     height: 100%;
+    aspect-ratio: auto;
+    object-fit: contain;
   }
 
   .card[data-featured='true'] .body {

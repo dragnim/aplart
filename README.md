@@ -10,8 +10,12 @@ Live site: <https://dragnim.github.io/aplart/>
 Every picture is drawn from numbers returned by actually running the APL shown in the editor. Nothing
 is simulated in JavaScript.
 
-> **Status:** in development. The foundation, routing and deployment pipeline are in place; the
-> execution engine, editor and presets are being built next. See [Roadmap](#roadmap).
+![The APL Art gallery, showing seven generative artworks](docs/screenshot-gallery.png)
+
+Open a piece and the code is right there beside it. Move a slider and the matching number in the APL
+changes with it.
+
+![The workspace: APL on the left, the artwork it produced on the right](docs/screenshot-workspace.png)
 
 ---
 
@@ -27,6 +31,7 @@ is simulated in JavaScript.
 - [APL font](#apl-font)
 - [Accessibility](#accessibility)
 - [Deployment](#deployment)
+- [Testing](#testing)
 - [Roadmap](#roadmap)
 - [Licence](#licence)
 
@@ -291,6 +296,25 @@ The target is WCAG 2.2 AA. Specifically:
 - Touch targets are at least 44×44 CSS pixels.
 - Motion respects `prefers-reduced-motion`, which zeroes the transition duration tokens outright.
 
+### How this is checked
+
+Three things, none of which rely on remembering to look:
+
+- **axe-core**, over fifteen page states in `tests/e2e/accessibility.spec.ts`: every route, the
+  workspace before and after a run, showing an error, with the reset dialog open, and each tab of the
+  narrow layout. Currently zero violations against `wcag2a` through `wcag22aa`.
+- **Contrast, arithmetically**, in `tests/unit/contrast.test.ts`. Ratios are computed from the WCAG
+  formula and the colours are read out of `tokens.css`, so changing a token either keeps the contrast
+  or fails the build. This covers the editor's syntax colours too, including the active-line tint.
+- **Behaviour that axe cannot see**, in the journeys: completing the whole flow by keyboard alone, the
+  canvas description, the announced status region, and reduced motion actually taking effect.
+
+Automated checks catch perhaps a third of real accessibility problems, so this is a floor rather than a
+claim of compliance. Two known limits worth stating plainly: nothing here has been tested with an
+actual screen reader, and the artwork itself is only ever described structurally — its dimensions,
+value range and palette — because describing what a generative image _looks like_ is not something this
+application can honestly do.
+
 ## Deployment
 
 Pushing to `main` triggers `.github/workflows/deploy-pages.yml`, which typechecks, lints, validates
@@ -306,16 +330,38 @@ does not publish from a private repository on GitHub Free.
 `.github/workflows/ci.yml` runs the same checks plus the Playwright journeys on pull requests, without
 deploying.
 
+## Testing
+
+| Suite              | Command               | What it covers                                                                       |
+| ------------------ | --------------------- | ------------------------------------------------------------------------------------ |
+| Unit and component | `npm test`            | Parsing, transport planning, colour mapping, parameter binding, sharing, storage.    |
+| End-to-end         | `npm run test:e2e`    | Full journeys in Chromium and WebKit, plus the accessibility audit.                  |
+| Live service       | `npm run test:live`   | Every preset against the real TryAPL endpoint, at its defaults and its range limits. |
+| Deployed site      | `npm run verify:cors` | That the published origin can actually reach the APL endpoint.                       |
+
+The end-to-end tests stub TryAPL **at the network boundary** rather than substituting a mock service, so
+the real `TryAplExecutionService` — wire format, error detection, banding and all — is still the thing
+under test. `MockAplExecutionService` exists for the component tests, where there is no network to
+intercept.
+
+Only the first two run in required CI. The live suite calls a shared public service, and a pull request
+must not fail because that service is momentarily busy.
+
 ## Roadmap
 
-**MVP, in progress:** execution engine and matrix parsing; CodeMirror 6 APL editor with symbol toolbar;
-seven presets; parameter binding; palettes and render options; PNG export; share links; local saving;
-responsive and accessible layouts.
+**Done:** execution engine with two-tier transport; CodeMirror 6 APL editor with symbol toolbar and APL
+syntax highlighting; seven presets; parameter binding with detached-control handling; eight palettes and
+the render options; PNG export; share links; local saving; responsive layouts; the accessibility work
+above; GitHub Pages deployment.
 
 **Later:** animated matrices, coordinate and path rendering, SVG export, user-defined palettes,
-step-through of intermediate arrays, embeddable artworks. Accounts, cloud projects and a public
-community gallery are deliberately out of scope for now, but the storage layer sits behind a
-`ProjectRepository` interface so they remain possible.
+step-through of intermediate arrays, embeddable artworks. Truchet Grid currently renders tile classes as
+cell colours; drawing actual tile motifs is a renderer feature and the matrix it produces is already the
+right input for one.
+
+Accounts, cloud projects and a public community gallery are deliberately out of scope, but the storage
+layer sits behind a `ProjectRepository` interface and the renderer behind a single matrix contract, so
+neither is closed off.
 
 ## Licence
 
