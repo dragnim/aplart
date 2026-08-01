@@ -80,7 +80,7 @@
   cursor: not-allowed;
 }
 
-.exportGroup {
+.menuGroup {
   position: relative;
 }
 
@@ -111,7 +111,12 @@
   cursor: pointer;
 }
 
-.menuItem:hover {
+.menuItem:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.menuItem:hover:not(:disabled) {
   background: var(--surface-sunken);
 }
 

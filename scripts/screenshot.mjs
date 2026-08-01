@@ -1,24 +1,55 @@
 /**
  * Drives the built site in a real browser and captures screenshots.
  *
- *     npm run build
- *     npm run preview -- --port 4173 --strictPort &
- *     npm run screenshot
+ *     npm run build && npm run screenshot
  *     npm run screenshot -- https://dragnim.github.io/aplart/
  *
  * Used to look at the application the way a visitor does, and to produce the
- * README screenshot. It runs a real artwork through the real APL service, so
+ * README screenshots. It runs a real artwork through the real APL service, so
  * what is captured is the actual output rather than a mock.
+ *
+ * With no argument it starts its own preview server on a port of its own and
+ * shuts it down afterwards. That is deliberate: leaving a hand-started server
+ * on Playwright's port made the end-to-end suite refuse to start, repeatedly.
  *
  * Images go to .preview/, which is not committed. Console errors are reported
  * and set a non-zero exit code.
  */
 
+import { spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 
-const BASE = process.argv[2] ?? 'http://localhost:4173/aplart/';
+/** Deliberately not Playwright's 4173. */
+const PORT = 4180;
+const BASE = process.argv[2] ?? `http://localhost:${PORT}/aplart/`;
 const OUT = '.preview';
+
+/** Started only when pointing at localhost; a remote URL needs no server. */
+let server = null;
+
+if (process.argv[2] === undefined) {
+  server = spawn(
+    process.platform === 'win32' ? 'npx.cmd' : 'npx',
+    ['vite', 'preview', '--port', String(PORT), '--strictPort'],
+    { stdio: 'ignore', shell: process.platform === 'win32' },
+  );
+
+  const deadline = Date.now() + 60_000;
+  for (;;) {
+    try {
+      const probe = await fetch(BASE);
+      if (probe.ok) break;
+    } catch {
+      // Not up yet.
+    }
+    if (Date.now() > deadline) {
+      server.kill();
+      throw new Error(`The preview server did not start on port ${PORT}.`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+}
 
 await mkdir(OUT, { recursive: true });
 
@@ -85,6 +116,7 @@ try {
   console.log('mobile');
 } finally {
   await browser.close();
+  server?.kill();
 }
 
 if (errors.length > 0) {

@@ -421,3 +421,52 @@ test.describe('remembering work between visits', () => {
     await expect(page.locator('.cm-content')).toContainText('modulus←17');
   });
 });
+
+test.describe('the narrow toolbar', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('collapses the header actions into one menu', async ({ page }) => {
+    await stubTryApl(page);
+    await openModularBloom(page);
+
+    // Four buttons wrapped onto three rows here, pushing the artwork off the
+    // screen. Only one control should be showing.
+    await expect(page.getByRole('button', { name: 'Actions' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Copy APL' })).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Share' })).toBeHidden();
+
+    await page.getByRole('button', { name: 'Actions' }).click();
+
+    const menu = page.getByRole('menu');
+    await expect(menu.getByRole('menuitem', { name: 'Copy APL' })).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: 'Share' })).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: 'Export 512 × 512' })).toBeVisible();
+
+    // Reset is offered but inert until there is something to reset.
+    await expect(menu.getByRole('menuitem', { name: 'Reset' })).toBeDisabled();
+  });
+
+  test('the artwork tabs are reachable without scrolling past the header', async ({ page }) => {
+    await stubTryApl(page);
+    await openModularBloom(page);
+
+    const tabs = page.getByRole('tablist');
+    const box = await tabs.boundingBox();
+    expect(box).not.toBeNull();
+    // Within the first screenful on a phone, so the artwork really does come first.
+    expect(box?.y ?? Infinity).toBeLessThan(400);
+  });
+
+  test('a menu action still works from the menu', async ({ page }) => {
+    await stubTryApl(page);
+    await openModularBloom(page);
+    await page.getByRole('tab', { name: 'Code' }).click();
+    await runAndWait(page);
+
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Actions' }).click();
+    await page.getByRole('menuitem', { name: 'Export 512 × 512' }).click();
+
+    expect((await download).suggestedFilename()).toBe('apl-art-modular-bloom-512px.png');
+  });
+});

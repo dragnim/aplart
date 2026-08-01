@@ -4,6 +4,7 @@
  */
 
 import { useCallback, useState } from 'react';
+import { useMediaQuery } from '@/app/useMediaQuery';
 import { fromRenderOptions } from '@/sharing/decodeShareState';
 import { buildShareUrl, encodeShareState } from '@/sharing/encodeShareState';
 import { SHARE_SCHEMA_VERSION, SHARE_URL_WARNING_LENGTH } from '@/sharing/shareState';
@@ -26,6 +27,9 @@ const EXPORT_SIZES: readonly ExportSize[] = [512, 1024, 2048, 'original'];
 export function WorkspaceToolbar({ preset, state, seed, onResetArtwork }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  // Enough width for the four controls to sit on one line beside the title.
+  const roomForRow = useMediaQuery('(min-width: 48rem)');
 
   const announce = useCallback((message: string) => {
     setNotice(message);
@@ -111,46 +115,126 @@ export function WorkspaceToolbar({ preset, state, seed, onResetArtwork }: Props)
         </div>
       </div>
 
-      <div className={styles.actions}>
-        <button type="button" className={styles.action} onClick={() => void handleCopyApl()}>
-          Copy APL
-        </button>
-        <button type="button" className={styles.action} onClick={() => void handleShare()}>
-          Share
-        </button>
-
-        <div className={styles.exportGroup}>
-          <button
-            type="button"
-            className={styles.action}
-            aria-expanded={exportOpen}
-            aria-haspopup="menu"
-            onClick={() => setExportOpen((open) => !open)}
-          >
-            Export
+      {/*
+        On a narrow screen these four controls wrapped onto three rows, pushing
+        the artwork itself below the fold on a phone. Collapsed into one menu
+        instead: none of them is what someone came here to do.
+      */}
+      {roomForRow ? (
+        <div className={styles.actions}>
+          <button type="button" className={styles.action} onClick={() => void handleCopyApl()}>
+            Copy APL
           </button>
-          {exportOpen && (
-            <ul className={styles.menu} role="menu">
-              {EXPORT_SIZES.map((size) => (
-                <li key={String(size)} role="none">
+          <button type="button" className={styles.action} onClick={() => void handleShare()}>
+            Share
+          </button>
+
+          <div className={styles.menuGroup}>
+            <button
+              type="button"
+              className={styles.action}
+              aria-expanded={exportOpen}
+              aria-haspopup="menu"
+              onClick={() => setExportOpen((open) => !open)}
+            >
+              Export
+            </button>
+            {exportOpen && (
+              <ul className={styles.menu} role="menu">
+                {EXPORT_SIZES.map((size) => (
+                  <li key={String(size)} role="none">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={styles.menuItem}
+                      onClick={() => void handleExport(size)}
+                    >
+                      {size === 'original' ? 'Original size' : `${size} × ${size}`}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <button type="button" className={styles.action} onClick={onResetArtwork} disabled={!state.modified}>
+            Reset
+          </button>
+        </div>
+      ) : (
+        <div className={styles.actions}>
+          <div className={styles.menuGroup}>
+            <button
+              type="button"
+              className={styles.action}
+              aria-expanded={actionsOpen}
+              aria-haspopup="menu"
+              onClick={() => setActionsOpen((open) => !open)}
+            >
+              Actions
+            </button>
+            {actionsOpen && (
+              <ul className={styles.menu} role="menu">
+                <li role="none">
                   <button
                     type="button"
                     role="menuitem"
                     className={styles.menuItem}
-                    onClick={() => void handleExport(size)}
+                    onClick={() => {
+                      setActionsOpen(false);
+                      void handleCopyApl();
+                    }}
                   >
-                    {size === 'original' ? 'Original size' : `${size} × ${size}`}
+                    Copy APL
                   </button>
                 </li>
-              ))}
-            </ul>
-          )}
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={styles.menuItem}
+                    onClick={() => {
+                      setActionsOpen(false);
+                      void handleShare();
+                    }}
+                  >
+                    Share
+                  </button>
+                </li>
+                {EXPORT_SIZES.map((size) => (
+                  <li key={String(size)} role="none">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={styles.menuItem}
+                      onClick={() => {
+                        setActionsOpen(false);
+                        void handleExport(size);
+                      }}
+                    >
+                      {size === 'original' ? 'Export at original size' : `Export ${size} × ${size}`}
+                    </button>
+                  </li>
+                ))}
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={styles.menuItem}
+                    disabled={!state.modified}
+                    onClick={() => {
+                      setActionsOpen(false);
+                      onResetArtwork();
+                    }}
+                  >
+                    Reset
+                  </button>
+                </li>
+              </ul>
+            )}
+          </div>
         </div>
-
-        <button type="button" className={styles.action} onClick={onResetArtwork} disabled={!state.modified}>
-          Reset
-        </button>
-      </div>
+      )}
 
       <p className={styles.notice} role="status" aria-live="polite">
         {notice}
