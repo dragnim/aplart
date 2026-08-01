@@ -8,15 +8,15 @@ import { type ArtworkPreset } from './schema';
  * for sharing: the same link must always draw the same picture, and TryAPL's
  * roll would not give that.
  *
- * The MVP renders tile classes as cell colours rather than drawing motifs.
- * Motif rendering is a renderer feature, not a preset one, and the matrix this
- * produces is already the right input for it.
+ * The APL emits a tile class per cell; the renderer turns each class into a
+ * quarter-arc or a diagonal. Which motif belongs to which class is a rendering
+ * decision, so the preset does not know or care.
  */
 export const truchetGrid: ArtworkPreset = {
   id: 'truchet-grid',
   title: 'Truchet Grid',
   description:
-    'A scattered field of tile classes. The seed decides the arrangement, so the same seed always gives the same tiling.',
+    'Curved tiles laid at random, joining into paths that wander across the whole piece. The same seed always gives the same tiling.',
   category: 'pattern',
   difficulty: 'intermediate',
 
@@ -24,7 +24,7 @@ export const truchetGrid: ArtworkPreset = {
     '⍝ Controls',
     'size←28',
     'seed←7',
-    'density←4',
+    'density←2',
     '',
     '⍝ Hash each cell position into a tile class.',
     '⍝ The multipliers are irrational, so the sequence never settles into a cycle.',
@@ -60,20 +60,22 @@ export const truchetGrid: ArtworkPreset = {
       id: 'density',
       variable: 'density',
       label: 'Tile classes',
-      description: 'How many different tiles are used. Two gives the sparsest look.',
+      description:
+        'How many tile shapes are used. Two gives the classic flowing curves; more adds diagonals that cut across them.',
       type: 'integer',
       min: 2,
       max: 8,
       step: 1,
-      defaultValue: 4,
+      defaultValue: 2,
       randomisable: true,
     },
   ],
 
   defaultPaletteId: 'mono',
-  // Continuous, not indexed: with four tile classes, indexing an eight-step
-  // ramp directly would only ever reach its darkest half.
-  renderMode: 'continuous',
+  // Tile motifs rather than coloured cells. A Truchet tiling is a grid of
+  // shapes whose edges line up, so the curves run on across tile boundaries;
+  // a flat colour per cell cannot show that at all.
+  renderMode: 'tiles',
 
   primitives: [
     {
@@ -97,8 +99,8 @@ export const truchetGrid: ArtworkPreset = {
 
   tryChangingThis: [
     'Change the seed. Every value gives a completely different arrangement.',
-    'Set the tile classes to 2 for a stark two-colour scatter.',
-    'Set them to 8 and switch to the Sunset palette.',
+    'Raise the tile shapes to 3 or 4 to cut diagonals across the curves.',
+    'Try 8 shapes with the Sunset palette.',
     'Change 0.7548776662 to 0.5 and watch the randomness collapse into stripes.',
     'Go back to the same seed and confirm you get the same picture.',
   ],

@@ -10,6 +10,7 @@ import { type MatrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
 import { buildArtworkImage, toSourceCanvas } from './CanvasRenderer';
+import { cellSizeFor } from './renderMotifs';
 import { type RenderOptions } from './renderOptions';
 
 export type ExportSize = 512 | 1024 | 2048 | 'original';
@@ -49,38 +50,56 @@ export function exportFilename(title: string, size: ExportSize): string {
   return `apl-art-${slug}-${suffix}.png`;
 }
 
-/** The pixel dimensions an export will produce, for showing before it runs. */
+/**
+ * The pixel dimensions an export will produce, for showing before it runs.
+ *
+ * The mode is needed, not just the matrix: a cell mode renders one pixel per
+ * cell, but tile motifs render a whole block per cell, so predicting from the
+ * cell count alone would be wrong by more than an order of magnitude.
+ */
 export function exportDimensions(
   matrix: NumericMatrix,
   options: RenderOptions,
   size: ExportSize,
+  mode: RenderMode = 'indexed',
 ): { width: number; height: number } {
   const turned = options.rotation === 90 || options.rotation === 270;
   const cellsWide = turned ? matrix.rows : matrix.columns;
   const cellsHigh = turned ? matrix.columns : matrix.rows;
 
-  if (size === 'original') return { width: cellsWide, height: cellsHigh };
+  const perCell = mode === 'tiles' ? cellSizeFor(matrix) : 1;
+  const sourceWidth = cellsWide * perCell;
+  const sourceHeight = cellsHigh * perCell;
 
-  const scale = scaleFor(cellsWide, cellsHigh, size);
-  return { width: cellsWide * scale, height: cellsHigh * scale };
+  if (size === 'original') return { width: sourceWidth, height: sourceHeight };
+
+  const scale = scaleFor(sourceWidth, sourceHeight, size);
+  return { width: Math.round(sourceWidth * scale), height: Math.round(sourceHeight * scale) };
 }
 
 /**
- * An integer scale factor, so cells stay square and edges stay hard.
+ * The factor that takes a rendered image to the requested size.
  *
- * A fractional factor would leave some cells one pixel wider than their
- * neighbours, which is very visible on a regular grid.
+ * Scaling up uses a whole number, so cells stay square and edges stay hard: a
+ * fractional factor would leave some cells a pixel wider than their
+ * neighbours, which is glaring on a regular grid.
+ *
+ * Scaling *down* has to be allowed to be fractional. A mode that draws shapes
+ * rather than cells — tile motifs — already produces a large image, so a
+ * 28-tile Truchet arrives here 672 pixels across. Flooring that to a whole
+ * number gave 1, and asking for a 512 pixel export quietly produced 672.
  */
 function scaleFor(width: number, height: number, target: number): number {
-  return Math.max(1, Math.floor(target / Math.max(width, height)));
+  const exact = target / Math.max(width, height);
+  return exact >= 1 ? Math.floor(exact) : exact;
 }
 
 export async function exportArtworkPng(request: ExportRequest): Promise<Blob> {
   const { image, palette } = buildArtworkImage(request);
 
   const scale = request.size === 'original' ? 1 : scaleFor(image.width, image.height, request.size);
-  const artworkWidth = image.width * scale;
-  const artworkHeight = image.height * scale;
+  const artworkWidth = Math.round(image.width * scale);
+  const artworkHeight = Math.round(image.height * scale);
 
   const caption = (request.caption ?? []).map((line) => line.trim()).filter((line) => line !== '');
 
@@ -99,9 +118,17 @@ export async function exportArtworkPng(request: ExportRequest): Promise<Blob> {
   context.fillStyle = palette.background ?? '#000000';
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Nearest-neighbour unless the artwork was explicitly set to smooth.
-  context.imageSmoothingEnabled = request.options.smoothScaling;
-  if (request.options.smoothScaling) context.imageSmoothingQuality = 'high';
+  /*
+   * Nearest-neighbour when enlarging, so cell edges stay hard.
+   *
+   * Reducing is different: a drawn motif being sampled down without smoothing
+   * loses parts of its strokes and comes out ragged, so smoothing is used
+   * regardless of the appearance setting. That setting is about how the artwork
+   * looks enlarged, which is not the situation here.
+   */
+  const reducing = scale < 1;
+  context.imageSmoothingEnabled = reducing || request.options.smoothScaling;
+  if (context.imageSmoothingEnabled) context.imageSmoothingQuality = 'high';
   context.drawImage(toSourceCanvas(image), 0, 0, artworkWidth, artworkHeight);
 
   if (caption.length > 0) {

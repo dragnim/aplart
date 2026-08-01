@@ -13,7 +13,8 @@ import { describe, expect, it } from 'vitest';
 import { matrixStats } from '@/matrix/matrixStats';
 import { fixtureToMatrix, hashCode, validateFixture, type PresetFixture } from '@/presets/fixtures';
 import { presets } from '@/presets/presets';
-import { renderToRgba } from '@/renderer/colourMapping';
+import { renderArtwork } from '@/renderer/renderArtwork';
+import { cellSizeFor } from '@/renderer/renderMotifs';
 import { getPalette } from '@/renderer/palettes';
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..');
@@ -60,19 +61,23 @@ describe.each(presets.map((preset) => [preset.id, preset] as const))('%s', (_id,
 
   it('renders to an image without touching the network', () => {
     const matrix = fixtureToMatrix(fixture);
-    const image = renderToRgba(matrix, matrixStats(matrix), {
+    const image = renderArtwork(matrix, matrixStats(matrix), {
       mode: preset.renderMode,
       palette: getPalette(preset.defaultPaletteId),
     });
 
-    expect(image.width).toBe(fixture.columns);
-    expect(image.height).toBe(fixture.rows);
-    expect(image.data).toHaveLength(fixture.rows * fixture.columns * 4);
+    // A cell mode paints one pixel per cell. A tile mode draws a shape, so it
+    // needs a block of pixels per cell — the same fixture, a bigger image.
+    const perCell = preset.renderMode === 'tiles' ? cellSizeFor(matrix) : 1;
+
+    expect(image.width).toBe(fixture.columns * perCell);
+    expect(image.height).toBe(fixture.rows * perCell);
+    expect(image.data).toHaveLength(image.width * image.height * 4);
   });
 
   it('produces more than one colour, so the artwork is not a flat block', () => {
     const matrix = fixtureToMatrix(fixture);
-    const image = renderToRgba(matrix, matrixStats(matrix), {
+    const image = renderArtwork(matrix, matrixStats(matrix), {
       mode: preset.renderMode,
       palette: getPalette(preset.defaultPaletteId),
     });

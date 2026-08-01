@@ -19,7 +19,7 @@ import { setParameterValue } from '../src/editor/parameterBinding';
 import { TryAplExecutionService } from '../src/execution/TryAplExecutionService';
 import { runArtwork } from '../src/execution/runArtwork';
 import { getPreset } from '../src/presets/presets';
-import { renderToRgba } from '../src/renderer/colourMapping';
+import { renderArtwork } from '../src/renderer/renderArtwork';
 import { getPalette } from '../src/renderer/palettes';
 import { encodePng, scaleNearest, type RgbaSource } from './lib/encodePng';
 import { montage } from './lib/montage';
@@ -65,7 +65,7 @@ async function main(): Promise<number> {
       timeoutMs: 30_000,
     });
 
-    const image = renderToRgba(run.matrix, run.stats, {
+    const image = renderArtwork(run.matrix, run.stats, {
       mode: preset.renderMode,
       palette: getPalette(preset.defaultPaletteId),
     });

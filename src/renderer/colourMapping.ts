@@ -59,8 +59,17 @@ export function sampleGradient(stops: readonly Rgb[], position: number): Rgb {
   return mixRgb(stops[lower] as Rgb, stops[upper] as Rgb, scaled - lower);
 }
 
+/**
+ * The modes that map a value to a single colour.
+ *
+ * 'tiles' is deliberately excluded: it draws a shape rather than filling a
+ * cell, so it has no per-value colour to look up. Saying so in the type means
+ * adding another cell mode later cannot silently fall through this switch.
+ */
+export type CellRenderMode = Exclude<RenderMode, 'tiles'>;
+
 export interface ColourMappingOptions {
-  readonly mode: RenderMode;
+  readonly mode: CellRenderMode;
   readonly palette: Palette;
   /** Reverse the ramp. A presentation choice; it never re-runs the APL. */
   readonly invert?: boolean;

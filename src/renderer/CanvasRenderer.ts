@@ -10,7 +10,7 @@
 import { type MatrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
-import { renderToRgba } from './colourMapping';
+import { renderArtwork } from './renderArtwork';
 import { getPalette } from './palettes';
 import { transformMatrix, type RenderOptions } from './renderOptions';
 
@@ -32,7 +32,7 @@ export function buildArtworkImage(request: DrawRequest) {
   const palette = getPalette(request.options.paletteId);
 
   return {
-    image: renderToRgba(transformed, request.stats, {
+    image: renderArtwork(transformed, request.stats, {
       mode: request.mode,
       palette,
       invert: request.options.invert,

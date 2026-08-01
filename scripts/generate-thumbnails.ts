@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { matrixStats } from '../src/matrix/matrixStats';
 import { fixtureToMatrix, validateFixture, type PresetFixture } from '../src/presets/fixtures';
 import { presets } from '../src/presets/presets';
-import { renderToRgba } from '../src/renderer/colourMapping';
+import { renderArtwork } from '../src/renderer/renderArtwork';
 import { getPalette } from '../src/renderer/palettes';
 import { encodePng, scaleNearest } from './lib/encodePng';
 
@@ -49,7 +49,7 @@ async function main(): Promise<number> {
       }
 
       const matrix = fixtureToMatrix(fixture);
-      const image = renderToRgba(matrix, matrixStats(matrix), {
+      const image = renderArtwork(matrix, matrixStats(matrix), {
         mode: preset.renderMode,
         palette: getPalette(preset.defaultPaletteId),
       });

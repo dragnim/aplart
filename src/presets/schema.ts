@@ -10,7 +10,14 @@
 
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced';
 
-export type RenderMode = 'indexed' | 'continuous' | 'binary' | 'threshold';
+/**
+ * How a matrix becomes a picture.
+ *
+ * The first four paint one colour per cell. 'tiles' draws a shape per cell
+ * instead, so neighbouring cells join into continuous curves — which is what a
+ * Truchet tiling actually is.
+ */
+export type RenderMode = 'indexed' | 'continuous' | 'binary' | 'threshold' | 'tiles';
 
 export type PresetCategory = 'pattern' | 'fractal' | 'geometry' | 'cellular';
 

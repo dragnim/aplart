@@ -16,9 +16,9 @@ import { fileURLToPath } from 'node:url';
 import { matrixStats } from '../src/matrix/matrixStats';
 import { fixtureToMatrix, type PresetFixture } from '../src/presets/fixtures';
 import { presets } from '../src/presets/presets';
-import { renderToRgba } from '../src/renderer/colourMapping';
+import { renderArtwork } from '../src/renderer/renderArtwork';
 import { getPalette } from '../src/renderer/palettes';
-import { encodePng, scaleNearest, type RgbaSource } from './lib/encodePng';
+import { encodePng, fitWithin, type RgbaSource } from './lib/encodePng';
 import { montage } from './lib/montage';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -32,13 +32,12 @@ async function main(): Promise<number> {
     const fixture = JSON.parse(raw) as PresetFixture;
     const matrix = fixtureToMatrix(fixture);
 
-    const image = renderToRgba(matrix, matrixStats(matrix), {
+    const image = renderArtwork(matrix, matrixStats(matrix), {
       mode: preset.renderMode,
       palette: getPalette(preset.defaultPaletteId),
     });
 
-    const factor = Math.max(1, Math.floor(CELL / Math.max(image.width, image.height)));
-    images.push(scaleNearest(image, factor));
+    images.push(fitWithin(image, CELL));
     console.log(`  ${preset.id.padEnd(22)} ${preset.defaultPaletteId.padEnd(11)} ${preset.renderMode}`);
   }
 

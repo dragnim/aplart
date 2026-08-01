@@ -363,9 +363,7 @@ the render options; PNG export; share links; local saving; responsive layouts; t
 above; GitHub Pages deployment.
 
 **Later:** animated matrices, coordinate and path rendering, SVG export, user-defined palettes,
-step-through of intermediate arrays, embeddable artworks. Truchet Grid currently renders tile classes as
-cell colours; drawing actual tile motifs is a renderer feature and the matrix it produces is already the
-right input for one.
+step-through of intermediate arrays, embeddable artworks.
 
 Accounts, cloud projects and a public community gallery are deliberately out of scope, but the storage
 layer sits behind a `ProjectRepository` interface and the renderer behind a single matrix contract, so

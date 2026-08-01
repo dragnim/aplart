@@ -109,3 +109,38 @@ function crc32(buffer: Buffer): number {
   }
   return (crc ^ 0xffffffff) >>> 0;
 }
+
+/**
+ * Fits an image inside a square of `maxSize`, enlarging or reducing as needed.
+ *
+ * scaleNearest only enlarges by whole numbers, which is right for the shipped
+ * thumbnails. It is wrong for a contact sheet: once one preset started
+ * rendering tile motifs its source image was 672 pixels across while the rest
+ * were under 130, so the montage sized every cell to the largest and the sheet
+ * became mostly empty space.
+ */
+export function fitWithin(image: RgbaSource, maxSize: number): RgbaSource {
+  const longest = Math.max(image.width, image.height);
+  if (longest === maxSize) return image;
+  if (longest < maxSize) return scaleNearest(image, Math.floor(maxSize / longest));
+
+  const factor = maxSize / longest;
+  const width = Math.max(1, Math.round(image.width * factor));
+  const height = Math.max(1, Math.round(image.height * factor));
+  const data = new Uint8ClampedArray(width * height * 4);
+
+  for (let y = 0; y < height; y += 1) {
+    const sourceY = Math.min(image.height - 1, Math.floor(y / factor));
+    for (let x = 0; x < width; x += 1) {
+      const sourceX = Math.min(image.width - 1, Math.floor(x / factor));
+      const from = (sourceY * image.width + sourceX) * 4;
+      const to = (y * width + x) * 4;
+      data[to] = image.data[from] as number;
+      data[to + 1] = image.data[from + 1] as number;
+      data[to + 2] = image.data[from + 2] as number;
+      data[to + 3] = 255;
+    }
+  }
+
+  return { width, height, data };
+}
