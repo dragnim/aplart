@@ -85,7 +85,11 @@ export function HelpPage() {
             Share copies everything needed to rebuild your piece into the link itself. Anyone opening it sees
             your code and presses Run to draw it.
           </li>
-          <li>Export saves a PNG at the size you choose, with crisp edges for cell-based work.</li>
+          <li>
+            Export saves a PNG at the size you choose, with crisp edges for cell-based work. Turn on “Include
+            caption” to add the artwork's name and how many characters of APL made it — useful if you are
+            sharing the image somewhere the code cannot follow it.
+          </li>
         </ul>
       </section>
 

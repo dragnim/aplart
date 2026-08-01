@@ -20,7 +20,12 @@ export interface ExportRequest {
   readonly mode: RenderMode;
   readonly options: RenderOptions;
   readonly size: ExportSize;
-  readonly caption?: string | undefined;
+  /**
+   * Lines printed beneath the artwork. Omitted or empty means no caption at
+   * all, and no extra height — the specification is explicit that a caption is
+   * off by default.
+   */
+  readonly caption?: readonly string[] | undefined;
   readonly title: string;
 }
 
@@ -77,9 +82,12 @@ export async function exportArtworkPng(request: ExportRequest): Promise<Blob> {
   const artworkWidth = image.width * scale;
   const artworkHeight = image.height * scale;
 
-  const caption = request.caption?.trim();
-  const captionHeight =
-    caption === undefined || caption === '' ? 0 : Math.max(28, Math.round(artworkHeight * 0.08));
+  const caption = (request.caption ?? []).map((line) => line.trim()).filter((line) => line !== '');
+
+  // Scaled to the artwork rather than fixed, so a 2048px export does not get a
+  // caption sized for a thumbnail. Floored so a small export stays legible.
+  const lineHeight = caption.length === 0 ? 0 : Math.max(22, Math.round(artworkHeight * 0.055));
+  const captionHeight = caption.length === 0 ? 0 : lineHeight * caption.length + lineHeight * 0.6;
 
   const canvas = document.createElement('canvas');
   canvas.width = artworkWidth;
@@ -96,13 +104,24 @@ export async function exportArtworkPng(request: ExportRequest): Promise<Blob> {
   if (request.options.smoothScaling) context.imageSmoothingQuality = 'high';
   context.drawImage(toSourceCanvas(image), 0, 0, artworkWidth, artworkHeight);
 
-  if (caption !== undefined && caption !== '') {
+  if (caption.length > 0) {
     context.imageSmoothingEnabled = true;
-    context.fillStyle = 'rgba(255, 255, 255, 0.82)';
-    context.font = `${Math.round(captionHeight * 0.42)}px ui-sans-serif, system-ui, sans-serif`;
     context.textBaseline = 'middle';
     context.textAlign = 'center';
-    context.fillText(caption, artworkWidth / 2, artworkHeight + captionHeight / 2, artworkWidth * 0.92);
+
+    caption.forEach((line, index) => {
+      // The first line names the piece, so it carries the emphasis; the rest
+      // are supporting detail and sit back a little.
+      const first = index === 0;
+      context.fillStyle = first ? 'rgba(255, 255, 255, 0.92)' : 'rgba(255, 255, 255, 0.68)';
+      context.font = `${first ? 600 : 400} ${Math.round(lineHeight * (first ? 0.5 : 0.42))}px ui-sans-serif, system-ui, sans-serif`;
+      context.fillText(
+        line,
+        artworkWidth / 2,
+        artworkHeight + lineHeight * 0.5 + lineHeight * index + lineHeight * 0.15,
+        artworkWidth * 0.92,
+      );
+    });
   }
 
   return new Promise<Blob>((resolve, reject) => {

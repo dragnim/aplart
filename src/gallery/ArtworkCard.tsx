@@ -1,5 +1,6 @@
 import { assetUrl } from '@/app/config';
 import { hrefForArtwork } from '@/app/router';
+import { aplCharacterCount } from '@/presets/codeMetrics';
 import { type ArtworkPreset } from '@/presets/schema';
 import styles from './ArtworkCard.module.css';
 
@@ -10,7 +11,9 @@ interface Props {
 }
 
 export function ArtworkCard({ preset, featured = false }: Props) {
-  const characters = [...preset.code].length;
+  // The expression that runs, not the editor contents: comments and blank
+  // lines are a larger number and a less true one.
+  const characters = aplCharacterCount(preset.code);
   const titleId = `artwork-${preset.id}-title`;
 
   return (

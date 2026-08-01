@@ -470,3 +470,98 @@ test.describe('the narrow toolbar', () => {
     expect((await download).suggestedFilename()).toBe('apl-art-modular-bloom-512px.png');
   });
 });
+
+test.describe('the export caption', () => {
+  test.use({ viewport: WIDE });
+
+  /** Reads width and height straight out of a PNG's IHDR chunk. */
+  async function pngSize(path: string) {
+    const { readFile } = await import('node:fs/promises');
+    const bytes = await readFile(path);
+    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+  }
+
+  test('is off by default and states the real character count', async ({ page }) => {
+    await stubTryApl(page);
+    await openModularBloom(page);
+    await runAndWait(page);
+
+    await page.getByRole('button', { name: 'Export' }).click();
+    const toggle = page.getByRole('menuitemcheckbox', { name: /Include caption/ });
+
+    // The specification is explicit that a caption is not included by default.
+    await expect(toggle).toHaveAttribute('aria-checked', 'false');
+
+    // The wording is shown before it is burned into the image, and the number
+    // counts the expression that runs — not the editor contents.
+    await expect(toggle).toContainText('Generated with 66 characters of Dyalog APL');
+  });
+
+  test('adds the caption to the image only when asked', async ({ page }, testInfo) => {
+    await stubTryApl(page);
+    await openModularBloom(page);
+    await runAndWait(page);
+
+    const plainPath = testInfo.outputPath('plain.png');
+    const plain = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export' }).click();
+    await page.getByRole('menuitem', { name: '512 × 512' }).click();
+    await (await plain).saveAs(plainPath);
+    const plainSize = await pngSize(plainPath);
+
+    const captionedPath = testInfo.outputPath('captioned.png');
+    const captioned = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export' }).click();
+    await page.getByRole('menuitemcheckbox', { name: /Include caption/ }).click();
+    await page.getByRole('menuitem', { name: '512 × 512' }).click();
+    await (await captioned).saveAs(captionedPath);
+    const captionedSize = await pngSize(captionedPath);
+
+    // Same artwork, extra height for the caption beneath it.
+    expect(captionedSize.width).toBe(plainSize.width);
+    expect(captionedSize.height).toBeGreaterThan(plainSize.height);
+  });
+
+  test('the choice survives while the menu is reopened', async ({ page }) => {
+    await stubTryApl(page);
+    await openModularBloom(page);
+    await runAndWait(page);
+
+    await page.getByRole('button', { name: 'Export' }).click();
+    await page.getByRole('menuitemcheckbox', { name: /Include caption/ }).click();
+    await page.keyboard.press('Escape');
+
+    await page.getByRole('button', { name: 'Export' }).click();
+    await expect(page.getByRole('menuitemcheckbox', { name: /Include caption/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  });
+});
+
+test.describe('dismissing the export menu', () => {
+  test.use({ viewport: WIDE });
+
+  test('closes on Escape', async ({ page }) => {
+    await stubTryApl(page);
+    await openModularBloom(page);
+
+    await page.getByRole('button', { name: 'Export' }).click();
+    await expect(page.getByRole('menu')).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Export' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('closes when something else is pressed', async ({ page }) => {
+    await stubTryApl(page);
+    await openModularBloom(page);
+
+    await page.getByRole('button', { name: 'Export' }).click();
+    await expect(page.getByRole('menu')).toBeVisible();
+
+    await page.getByRole('heading', { level: 1 }).click();
+    await expect(page.getByRole('menu')).toBeHidden();
+  });
+});

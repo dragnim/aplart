@@ -3,11 +3,13 @@
  * do with it.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { useDismissable } from '@/components/useDismissable';
 import { useMediaQuery } from '@/app/useMediaQuery';
 import { fromRenderOptions } from '@/sharing/decodeShareState';
 import { buildShareUrl, encodeShareState } from '@/sharing/encodeShareState';
 import { SHARE_SCHEMA_VERSION, SHARE_URL_WARNING_LENGTH } from '@/sharing/shareState';
+import { captionLinesFor } from '@/presets/codeMetrics';
 import { type ArtworkPreset } from '@/presets/schema';
 import { downloadBlob, exportArtworkPng, exportFilename, type ExportSize } from '@/renderer/exportPng';
 import { type WorkspaceState } from './workspaceState';
@@ -28,8 +30,17 @@ export function WorkspaceToolbar({ preset, state, seed, onResetArtwork }: Props)
   const [notice, setNotice] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
+  // Off by default, as the specification requires.
+  const [withCaption, setWithCaption] = useState(false);
   // Enough width for the four controls to sit on one line beside the title.
   const roomForRow = useMediaQuery('(min-width: 48rem)');
+
+  const exportGroup = useRef<HTMLDivElement>(null);
+  const actionsGroup = useRef<HTMLDivElement>(null);
+  const closeExport = useCallback(() => setExportOpen(false), []);
+  const closeActions = useCallback(() => setActionsOpen(false), []);
+  useDismissable(exportOpen, exportGroup, closeExport);
+  useDismissable(actionsOpen, actionsGroup, closeActions);
 
   const announce = useCallback((message: string) => {
     setNotice(message);
@@ -90,15 +101,21 @@ export function WorkspaceToolbar({ preset, state, seed, onResetArtwork }: Props)
           options: state.renderOptions,
           size,
           title: preset.title,
+          // Off unless asked for. The caption counts the expression that ran,
+          // not the editor contents, so the claim it makes is checkable.
+          ...(withCaption ? { caption: captionLinesFor(preset.title, state.code) } : {}),
         });
         downloadBlob(blob, exportFilename(preset.title, size));
-        announce('Image exported.');
+        announce(withCaption ? 'Image exported with its caption.' : 'Image exported.');
       } catch (error) {
         announce(error instanceof Error ? error.message : 'The image could not be exported.');
       }
     },
-    [state.matrix, state.stats, state.renderOptions, preset, announce],
+    [state.matrix, state.stats, state.renderOptions, state.code, preset, withCaption, announce],
   );
+
+  /** Shown on the toggle so the caption is known before it is committed to. */
+  const captionPreview = captionLinesFor(preset.title, state.code)[1] ?? '';
 
   return (
     <div className={styles.toolbar}>
@@ -129,7 +146,7 @@ export function WorkspaceToolbar({ preset, state, seed, onResetArtwork }: Props)
             Share
           </button>
 
-          <div className={styles.menuGroup}>
+          <div className={styles.menuGroup} ref={exportGroup}>
             <button
               type="button"
               className={styles.action}
@@ -141,6 +158,24 @@ export function WorkspaceToolbar({ preset, state, seed, onResetArtwork }: Props)
             </button>
             {exportOpen && (
               <ul className={styles.menu} role="menu">
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitemcheckbox"
+                    aria-checked={withCaption}
+                    className={styles.menuToggle}
+                    onClick={() => setWithCaption((on) => !on)}
+                  >
+                    <span aria-hidden="true" className={styles.tick}>
+                      {withCaption ? '✓' : ''}
+                    </span>
+                    <span>
+                      Include caption
+                      <span className={styles.captionPreview}>{captionPreview}</span>
+                    </span>
+                  </button>
+                </li>
+                <li role="separator" className={styles.separator} />
                 {EXPORT_SIZES.map((size) => (
                   <li key={String(size)} role="none">
                     <button
@@ -163,7 +198,7 @@ export function WorkspaceToolbar({ preset, state, seed, onResetArtwork }: Props)
         </div>
       ) : (
         <div className={styles.actions}>
-          <div className={styles.menuGroup}>
+          <div className={styles.menuGroup} ref={actionsGroup}>
             <button
               type="button"
               className={styles.action}
@@ -201,6 +236,25 @@ export function WorkspaceToolbar({ preset, state, seed, onResetArtwork }: Props)
                     Share
                   </button>
                 </li>
+                <li role="separator" className={styles.separator} />
+                <li role="none">
+                  <button
+                    type="button"
+                    role="menuitemcheckbox"
+                    aria-checked={withCaption}
+                    className={styles.menuToggle}
+                    onClick={() => setWithCaption((on) => !on)}
+                  >
+                    <span aria-hidden="true" className={styles.tick}>
+                      {withCaption ? '✓' : ''}
+                    </span>
+                    <span>
+                      Include caption
+                      <span className={styles.captionPreview}>{captionPreview}</span>
+                    </span>
+                  </button>
+                </li>
+                <li role="separator" className={styles.separator} />
                 {EXPORT_SIZES.map((size) => (
                   <li key={String(size)} role="none">
                     <button
