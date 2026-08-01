@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { matrixStats } from '@/matrix/matrixStats';
 import { fromNested } from '@/matrix/matrixTypes';
-import { cellSizeFor, renderMotifsToRgba } from '@/renderer/renderMotifs';
+import { cellSizeFor, renderMotifsToRgba, strokeFor } from '@/renderer/renderMotifs';
 import { renderArtwork } from '@/renderer/renderArtwork';
 import { getPalette } from '@/renderer/palettes';
 import { exportDimensions } from '@/renderer/exportPng';
@@ -31,19 +31,45 @@ describe('cellSizeFor', () => {
           [1, 0],
         ]),
       ),
-    ).toBe(24);
+    ).toBe(40);
+  });
+
+  it('rasterises a coarse tiling large enough not to be scaled up on screen', () => {
+    // The preset's own default. At the old cap of 24 this came out 480 pixels
+    // across and was then blown up with nearest-neighbour, which put visible
+    // steps on every arc — worst exactly where the tiles were big enough to
+    // look at.
+    const preset = fromNested(Array.from({ length: 20 }, () => Array.from({ length: 20 }, () => 0)));
+    expect(20 * cellSizeFor(preset)).toBeGreaterThanOrEqual(768);
   });
 
   it('keeps a large tiling within a sane buffer', () => {
     const big = fromNested(Array.from({ length: 88 }, () => Array.from({ length: 88 }, () => 0)));
     const cell = cellSizeFor(big);
     expect(cell).toBeGreaterThanOrEqual(8);
-    expect(88 * cell).toBeLessThanOrEqual(800);
+    expect(88 * cell).toBeLessThanOrEqual(1024);
   });
 
   it('never goes below the size at which an arc is still curved', () => {
     const huge = fromNested(Array.from({ length: 256 }, () => Array.from({ length: 256 }, () => 0)));
     expect(cellSizeFor(huge)).toBe(8);
+  });
+});
+
+describe('strokeFor', () => {
+  it('draws a thin line on a large tile, so arcs read as curves', () => {
+    expect(strokeFor(40)).toBeCloseTo(0.13, 5);
+  });
+
+  it('never lets the line thin below about a pixel and a half', () => {
+    // A fixed fraction of the cell would put a 1-pixel stroke on an 8-pixel
+    // tile, where an arc breaks up into dots.
+    expect(strokeFor(8) * 8).toBeGreaterThanOrEqual(1.5);
+    expect(strokeFor(4) * 4).toBeGreaterThanOrEqual(1.5);
+  });
+
+  it('is never so wide that neighbouring arcs merge', () => {
+    for (const cell of [8, 12, 24, 40]) expect(strokeFor(cell)).toBeLessThan(0.25);
   });
 });
 

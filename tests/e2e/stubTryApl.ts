@@ -102,7 +102,15 @@ function evaluate(expression: string): NumericMatrix | { readonly error: readonl
     return fromNested(rows);
   }
 
-  // Truchet Grid: density|⌊10000×1|(seed×0.6180339887)+(⍳size)∘.×(⍳size)×0.7548776662
+  /*
+   * Truchet Grid.
+   *
+   *   angle←(12.9898×⍳size)∘.+(78.233×⍳size)+seed×0.6180339887
+   *   density|⌊density×1|43758.5453×1○angle
+   *
+   * The last bits of `sin` need not match the interpreter's for these tests,
+   * which check shapes and dimensions rather than individual tiles.
+   */
   const density = read('density');
   const seed = read('seed');
   if (size !== null && density !== null && density !== 0 && seed !== null) {
@@ -111,8 +119,8 @@ function evaluate(expression: string): NumericMatrix | { readonly error: readonl
     for (let row = 1; row <= size; row += 1) {
       const values: number[] = [];
       for (let column = 1; column <= size; column += 1) {
-        const product = offset + row * (column * 0.754_877_666_2);
-        values.push(Math.floor(10_000 * (product - Math.floor(product))) % density);
+        const hashed = 43_758.5453 * Math.sin(12.9898 * row + 78.233 * column + offset);
+        values.push(Math.floor(density * (hashed - Math.floor(hashed))) % density);
       }
       rows.push(values);
     }

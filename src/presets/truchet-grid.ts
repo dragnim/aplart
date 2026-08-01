@@ -22,13 +22,17 @@ export const truchetGrid: ArtworkPreset = {
 
   code: [
     '⍝ Controls',
-    'size←28',
+    'size←20',
     'seed←7',
     'density←2',
     '',
     '⍝ Hash each cell position into a tile class.',
-    '⍝ The multipliers are irrational, so the sequence never settles into a cycle.',
-    'density|⌊10000×1|(seed×0.6180339887)+(⍳size)∘.×(⍳size)×0.7548776662',
+    '⍝ Sine of a large angle is what does the scrambling. Multiplying the row',
+    '⍝ and column numbers together looks random but is not: the step along a',
+    '⍝ row is fixed, so whenever it lands near a whole number the whole row',
+    '⍝ comes out almost constant and a band appears across the tiling.',
+    'angle←(12.9898×⍳size)∘.+(78.233×⍳size)+seed×0.6180339887',
+    'density|⌊density×1|43758.5453×1○angle',
   ].join('\n'),
 
   parameters: [
@@ -41,7 +45,10 @@ export const truchetGrid: ArtworkPreset = {
       min: 8,
       max: 88,
       step: 1,
-      defaultValue: 28,
+      // Twenty tiles across, rather than twenty-eight. The point of a Truchet
+      // tiling is that you can follow a path through it, and that needs tiles
+      // large enough to see one arc at a time.
+      defaultValue: 20,
       randomisable: true,
     },
     {
@@ -79,9 +86,14 @@ export const truchetGrid: ArtworkPreset = {
 
   primitives: [
     {
-      glyph: '∘.×',
-      name: 'Outer product',
-      shortDescription: 'Multiplies every item on the left by every item on the right.',
+      glyph: '∘.+',
+      name: 'Outer sum',
+      shortDescription: 'Adds every item on the left to every item on the right, making a table.',
+    },
+    {
+      glyph: '○',
+      name: 'Circle functions',
+      shortDescription: 'A family of trigonometric functions. 1○ is sine.',
     },
     {
       glyph: '|',
@@ -101,7 +113,7 @@ export const truchetGrid: ArtworkPreset = {
     'Change the seed. Every value gives a completely different arrangement.',
     'Raise the tile shapes to 3 or 4 to cut diagonals across the curves.',
     'Try 8 shapes with the Sunset palette.',
-    'Change 0.7548776662 to 0.5 and watch the randomness collapse into stripes.',
+    'Delete the 1○ so the angle is used directly. The scrambling collapses and the rows start to repeat.',
     'Go back to the same seed and confirm you get the same picture.',
   ],
 };

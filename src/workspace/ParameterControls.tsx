@@ -9,6 +9,7 @@
 
 import { bindingStateFor, type ParameterValue } from '@/editor/parameterBinding';
 import { type ArtworkParameter } from '@/presets/schema';
+import { LOG_SLIDER_POSITIONS, fromSliderPosition, toSliderPosition } from './sliderScale';
 import styles from './ParameterControls.module.css';
 
 interface Props {
@@ -68,6 +69,12 @@ function ParameterControl({
   }
 
   const { value } = binding;
+  const numeric = typeof value === 'number' ? value : 0;
+
+  // A geometric scale needs a positive, ordered range to map onto.
+  const min = parameter.min ?? 0;
+  const max = parameter.max ?? 0;
+  const logarithmic = parameter.scale === 'logarithmic' && min > 0 && max > min;
 
   return (
     <div className={styles.control}>
@@ -86,19 +93,42 @@ function ParameterControl({
         </p>
       )}
 
-      {(parameter.type === 'integer' || parameter.type === 'number') && (
-        <input
-          id={controlId}
-          className={styles.slider}
-          type="range"
-          min={parameter.min}
-          max={parameter.max}
-          step={parameter.step ?? (parameter.type === 'integer' ? 1 : 0.01)}
-          value={typeof value === 'number' ? value : 0}
-          aria-describedby={describedBy}
-          onChange={(event) => onChange(parameter, Number(event.target.value))}
-        />
-      )}
+      {(parameter.type === 'integer' || parameter.type === 'number') &&
+        (logarithmic ? (
+          /*
+           * The slider carries a position; the value is worked out from it. The
+           * number the person reads is still the one in the code, shown above,
+           * and the range's own text value is deliberately not that number —
+           * hence the explicit aria-valuetext, without which a screen reader
+           * would announce the position.
+           */
+          <input
+            id={controlId}
+            className={styles.slider}
+            type="range"
+            min={0}
+            max={LOG_SLIDER_POSITIONS}
+            step={1}
+            value={toSliderPosition(numeric, min, max)}
+            aria-valuetext={String(numeric)}
+            aria-describedby={describedBy}
+            onChange={(event) =>
+              onChange(parameter, fromSliderPosition(Number(event.target.value), min, max))
+            }
+          />
+        ) : (
+          <input
+            id={controlId}
+            className={styles.slider}
+            type="range"
+            min={parameter.min}
+            max={parameter.max}
+            step={parameter.step ?? (parameter.type === 'integer' ? 1 : 0.01)}
+            value={numeric}
+            aria-describedby={describedBy}
+            onChange={(event) => onChange(parameter, Number(event.target.value))}
+          />
+        ))}
 
       {parameter.type === 'select' && (
         <select

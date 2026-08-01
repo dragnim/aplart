@@ -20,24 +20,34 @@ import { type Palette } from './palettes';
 import { type RgbaImage } from './colourMapping';
 
 /**
- * How wide the drawn line is, as a fraction of a cell.
- *
- * Wide enough to read at thumbnail size, narrow enough that the background
- * still shows between neighbouring strokes.
- */
-const STROKE = 0.19;
-
-/**
  * Pixels per tile, chosen from the matrix size.
  *
- * A fixed size would make a 28-tile piece tiny and an 88-tile piece enormous.
- * Aiming at roughly 768 pixels across keeps arcs smooth enough to read while
- * bounding the buffer: 88 tiles still only reaches 8 pixels each, which is the
- * floor at which a quarter-arc is still recognisably curved.
+ * A fixed size would make a 20-tile piece tiny and an 88-tile piece enormous.
+ * Aiming at roughly a thousand pixels across keeps arcs smooth while bounding
+ * the buffer.
+ *
+ * The cap was 24 and the target 768, which meant a deliberately coarse tiling
+ * was rasterised small and then scaled up on screen — nearest-neighbour, so the
+ * curves came out visibly stepped exactly when the tiles were large enough to
+ * look at properly.
  */
 export function cellSizeFor(matrix: NumericMatrix): number {
   const longest = Math.max(matrix.rows, matrix.columns);
-  return Math.min(24, Math.max(8, Math.floor(768 / longest)));
+  return Math.min(40, Math.max(8, Math.floor(1000 / longest)));
+}
+
+/**
+ * How wide the drawn line is, as a fraction of a cell.
+ *
+ * A line at a fixed fraction of the cell cannot be right at both ends of the
+ * range: 0.19 read as a confident stroke on a small tile and as a heavy band on
+ * a large one, which turned neighbouring arcs into a mesh of blobs rather than
+ * curves that could be followed. So the fraction is thin, with a floor of about
+ * a pixel and a half — below that a stroke starts to break up, and no amount of
+ * thinness is worth an arc that disappears.
+ */
+export function strokeFor(cell: number): number {
+  return Math.max(0.13, 1.6 / cell);
 }
 
 /**
@@ -59,22 +69,22 @@ const MOTIFS: readonly Motif[] = ['arcsNwSe', 'arcsNeSw', 'diagonalNwSe', 'diago
  * radius one half centred on opposite corners, which is what makes them meet
  * exactly at the midpoint of each edge and join up with the neighbouring tile.
  */
-function onStroke(motif: Motif, u: number, v: number): boolean {
+function onStroke(motif: Motif, u: number, v: number, stroke: number): boolean {
   switch (motif) {
     case 'arcsNwSe':
-      return nearRing(u, v, 0, 0) || nearRing(u, v, 1, 1);
+      return nearRing(u, v, 0, 0, stroke) || nearRing(u, v, 1, 1, stroke);
     case 'arcsNeSw':
-      return nearRing(u, v, 1, 0) || nearRing(u, v, 0, 1);
+      return nearRing(u, v, 1, 0, stroke) || nearRing(u, v, 0, 1, stroke);
     case 'diagonalNwSe':
-      return Math.abs(u - v) < STROKE * 0.75;
+      return Math.abs(u - v) < stroke * 0.75;
     case 'diagonalNeSw':
-      return Math.abs(u + v - 1) < STROKE * 0.75;
+      return Math.abs(u + v - 1) < stroke * 0.75;
   }
 }
 
-function nearRing(u: number, v: number, centreU: number, centreV: number): boolean {
+function nearRing(u: number, v: number, centreU: number, centreV: number, stroke: number): boolean {
   const distance = Math.hypot(u - centreU, v - centreV);
-  return Math.abs(distance - 0.5) < STROKE / 2;
+  return Math.abs(distance - 0.5) < stroke / 2;
 }
 
 /**
@@ -91,6 +101,7 @@ export function renderMotifsToRgba(
   options: { readonly palette: Palette; readonly invert?: boolean },
 ): RgbaImage {
   const cell = cellSizeFor(matrix);
+  const stroke = strokeFor(cell);
   const width = matrix.columns * cell;
   const height = matrix.rows * cell;
   const data = new Uint8ClampedArray(width * height * 4);
@@ -131,14 +142,20 @@ export function renderMotifsToRgba(
       const index = ((Math.round(value) % MOTIFS.length) + MOTIFS.length) % MOTIFS.length;
       const motif = MOTIFS[index] as Motif;
 
-      const cellTint = mixTowards(background, tint(value), 0.12);
+      /*
+       * 0.12 was chosen when the stroke was half again as wide and hid most of
+       * the ground. With a thin line the tiles are mostly background, and the
+       * per-cell shade showed as a grid of faint squares — the one thing the
+       * motifs exist to disguise. Barely there is the most it can be.
+       */
+      const cellTint = mixTowards(background, tint(value), 0.05);
 
       for (let y = 0; y < cell; y += 1) {
         // Sampled at pixel centres, so a motif is not lopsided by half a pixel.
         const v = (y + 0.5) / cell;
         for (let x = 0; x < cell; x += 1) {
           const u = (x + 0.5) / cell;
-          const colour = onStroke(motif, u, v) ? foreground : cellTint;
+          const colour = onStroke(motif, u, v, stroke) ? foreground : cellTint;
 
           const offset = ((row * cell + y) * width + column * cell + x) * 4;
           data[offset] = colour.r;

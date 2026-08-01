@@ -7,14 +7,13 @@
  * assertions here are therefore about what does *not* happen.
  */
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockAplExecutionService } from '@/execution/MockAplExecutionService';
 import { fromNested } from '@/matrix/matrixTypes';
 import { modularBloom } from '@/presets/modular-bloom';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
-import { installFullscreenApi, removeFullscreenApi } from '../support/fullscreenApi';
 
 /**
  * Chooses the layout, and stubs what jsdom does not implement.
@@ -239,128 +238,6 @@ describe('Focus mode on a wide screen', () => {
 
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Controls' }));
     });
-  });
-});
-
-describe('browser fullscreen', () => {
-  beforeEach(() => stubEnvironment(true));
-  afterEach(() => removeFullscreenApi());
-
-  it('is not offered when the browser will not do it', async () => {
-    // No API installed at all, which is an iPhone.
-    const user = userEvent.setup();
-    renderWorkspace();
-    await enterFocus(user);
-
-    // Focus mode is the fallback, and it already fills the window. A button
-    // that cannot work is worse than no button.
-    expect(screen.queryByRole('button', { name: /ullscreen/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Exit focus' })).toBeInTheDocument();
-  });
-
-  it('is offered inside Focus mode only', async () => {
-    installFullscreenApi();
-    const user = userEvent.setup();
-    renderWorkspace();
-
-    expect(screen.queryByRole('button', { name: 'Fullscreen' })).not.toBeInTheDocument();
-    await enterFocus(user);
-    expect(screen.getByRole('button', { name: 'Fullscreen' })).toBeInTheDocument();
-  });
-
-  it('takes the whole shell, so the controls come with it', async () => {
-    const api = installFullscreenApi();
-    const user = userEvent.setup();
-    renderWorkspace();
-    await enterFocus(user);
-
-    await user.click(screen.getByRole('button', { name: 'Fullscreen' }));
-
-    // The page, not the canvas: going fullscreen on the artwork alone would
-    // leave the toolbar and the drawer on a screen nobody can see.
-    const requested = api.requests[0];
-    expect(requested).toBeDefined();
-    expect(requested).toHaveAttribute('data-focus', 'true');
-    expect(requested).toContainElement(screen.getByRole('button', { name: 'Exit focus' }));
-  });
-
-  it('offers the way back out once it is in', async () => {
-    installFullscreenApi();
-    const user = userEvent.setup();
-    renderWorkspace();
-    await enterFocus(user);
-
-    await user.click(screen.getByRole('button', { name: 'Fullscreen' }));
-    const leave = await screen.findByRole('button', { name: 'Leave fullscreen' });
-
-    await user.click(leave);
-    expect(await screen.findByRole('button', { name: 'Fullscreen' })).toBeInTheDocument();
-  });
-
-  it('follows the browser when fullscreen is left without being asked', async () => {
-    const api = installFullscreenApi();
-    const user = userEvent.setup();
-    renderWorkspace();
-    await enterFocus(user);
-    await user.click(screen.getByRole('button', { name: 'Fullscreen' }));
-    await screen.findByRole('button', { name: 'Leave fullscreen' });
-
-    act(() => api.leaveWithoutAsking());
-
-    expect(screen.getByRole('button', { name: 'Fullscreen' })).toBeInTheDocument();
-    // Fullscreen is a layer on top of Focus mode, so losing it leaves the rest.
-    expect(screen.getByRole('button', { name: 'Exit focus' })).toBeInTheDocument();
-  });
-
-  it('leaves fullscreen when Focus mode is left', async () => {
-    const api = installFullscreenApi();
-    const user = userEvent.setup();
-    renderWorkspace();
-    await enterFocus(user);
-    await user.click(screen.getByRole('button', { name: 'Fullscreen' }));
-    await screen.findByRole('button', { name: 'Leave fullscreen' });
-
-    await user.click(screen.getByRole('button', { name: 'Exit focus' }));
-
-    // Otherwise the ordinary workspace is left on a screen with no browser
-    // chrome and no obvious way back.
-    await waitFor(() => expect(api.isFullscreen()).toBe(false));
-  });
-
-  it('says so when the browser refuses, and changes nothing else', async () => {
-    installFullscreenApi({ refuse: true });
-    const user = userEvent.setup();
-    renderWorkspace();
-    await enterFocus(user);
-
-    await user.click(screen.getByRole('button', { name: 'Fullscreen' }));
-
-    // Found by its words rather than its role: Focus mode has several status
-    // regions, and the refusal is deliberately not the loudest of them.
-    const refusal = await screen.findByText(/Focus mode still fills the window/);
-    // A status, not an alert. Nothing is broken and nothing needs attending to.
-    expect(refusal.closest('[role="status"]')).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'Fullscreen' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Exit focus' })).toBeInTheDocument();
-  });
-
-  it('leaves Escape to the browser while it is fullscreen', async () => {
-    installFullscreenApi();
-    const user = userEvent.setup();
-    renderWorkspace();
-    await enterFocus(user);
-    await user.click(screen.getByRole('button', { name: 'Fullscreen' }));
-    await screen.findByRole('button', { name: 'Leave fullscreen' });
-
-    await user.keyboard('{Escape}');
-
-    /*
-     * Escape is how fullscreen is left, and most browsers never deliver that
-     * keystroke to the page at all. Unwinding a layer of our own as well would
-     * mean one press did two things — and which two would differ by browser.
-     */
-    expect(drawer()).toHaveAttribute('data-drawer', 'open');
-    expect(screen.getByRole('button', { name: 'Exit focus' })).toBeInTheDocument();
   });
 });
 

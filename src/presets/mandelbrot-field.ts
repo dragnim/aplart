@@ -79,7 +79,15 @@ export const mandelbrotField: ArtworkPreset = {
       type: 'number',
       min: -2,
       max: 1,
-      step: 0.01,
+      /*
+       * Fine, because a step has to be smaller than the view it moves. At the
+       * deepest zoom the view is 0.004 wide, so 0.01 would have thrown the
+       * centre several views away on one arrow key. A signed coordinate cannot
+       * have a geometric scale, so this is precision over travel: the handle
+       * still crosses the range in one drag, and the Pan buttons move by a
+       * proportion of the current span, which is what stepping is for.
+       */
+      step: 0.001,
       defaultValue: -0.6,
       randomisable: true,
     },
@@ -91,7 +99,8 @@ export const mandelbrotField: ArtworkPreset = {
       type: 'number',
       min: -1.2,
       max: 1.2,
-      step: 0.01,
+      // As with the centre across: smaller than the narrowest view it moves.
+      step: 0.001,
       defaultValue: 0,
       randomisable: true,
     },
@@ -102,14 +111,18 @@ export const mandelbrotField: ArtworkPreset = {
       description: 'How much of the plane to show. Smaller values zoom in.',
       type: 'number',
       /*
-       * Far below the step, so dragging on the artwork can zoom in about 700
-       * times without producing a value the slider would refuse to show. The
-       * step only governs the slider and the arrow keys, which stay usable at
-       * 0.05; a value between two steps is still perfectly representable.
+       * A thousandfold range, so dragging on the artwork can zoom in about 700
+       * times without producing a value the slider would refuse to show. This
+       * is the limit that is currently safe to run rather than a limit of the
+       * arithmetic; nothing in the interface calls it a maximum zoom.
+       *
+       * Geometric, because no fixed step is right across that range: at 0.05 a
+       * single arrow key would have thrown away a carefully chosen deep view,
+       * and at 0.001 crossing the range would take two thousand presses.
        */
       min: 0.002,
       max: 2,
-      step: 0.05,
+      scale: 'logarithmic',
       defaultValue: 1.4,
       randomisable: true,
     },

@@ -63,11 +63,6 @@ export function HelpPage() {
             Nothing is recalculated on the way in or out. It is the same code, the same parameters and the
             same artwork, shown differently.
           </li>
-          <li>
-            <strong>Fullscreen</strong>, inside Focus mode, also removes the browser&rsquo;s own chrome. Not
-            every browser allows it — an iPhone will not — and where it is unavailable the button is simply
-            not shown. Focus mode already fills the window.
-          </li>
         </ul>
       </section>
 

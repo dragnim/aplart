@@ -66,28 +66,6 @@ try {
   await page.waitForTimeout(600);
   await page.screenshot({ path: `${OUT}/f2-desktop-drawer-closed.png` });
 
-  // --- A refused fullscreen request ---
-  //
-  // The one state of the fullscreen button that cannot be reached by driving
-  // the interface, and the one whose layout in the bar is worth looking at.
-  const refused = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-  refused.on('console', (m) => {
-    if (m.type() === 'error') errors.push(`[refused] ${m.text()}`);
-  });
-  await refused.addInitScript(() => {
-    Element.prototype.requestFullscreen = () => Promise.reject(new Error('blocked'));
-  });
-  await refused.goto(`${BASE}#/art/truchet-grid`, { waitUntil: 'networkidle' });
-  await refused.waitForSelector('.cm-content');
-  await runArtwork(refused);
-  await refused.getByRole('button', { name: 'Focus mode' }).click();
-  await refused.getByRole('button', { name: 'Controls', exact: true }).click();
-  // The drawer slides out; capturing mid-transition tells me nothing.
-  await refused.waitForTimeout(600);
-  await refused.getByRole('button', { name: 'Fullscreen' }).click();
-  await refused.getByText(/Focus mode still fills the window/).waitFor();
-  await refused.screenshot({ path: `${OUT}/f5-desktop-fullscreen-refused.png` });
-
   // --- Phone ---
   const phone = await browser.newPage({ viewport: { width: 390, height: 844 } });
   phone.on('console', (m) => {

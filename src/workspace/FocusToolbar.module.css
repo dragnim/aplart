@@ -7,8 +7,6 @@
      controls must stay reachable whichever is open. */
   z-index: 30;
   display: flex;
-  /* So the fullscreen refusal can take a line of its own beneath the row. */
-  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
@@ -102,39 +100,6 @@
 .exit {
   border-color: rgb(255 255 255 / 45%);
   font-weight: 600;
-}
-
-/*
- * A line of its own beneath the bar's row, so nothing is pushed about, and
- * aligned to the actions rather than the title — the drawer occupies the left
- * of the screen, and a message there is unreadable.
- */
-.refusal {
-  flex-basis: 100%;
-  margin: 0;
-  text-align: right;
-  pointer-events: auto;
-}
-
-/*
- * A status line, not a badge. The backing is the least that keeps it legible
- * over an arbitrary artwork; the small radius and the muted weight are there so
- * it reads as the toolbar talking rather than as something demanding a press.
- */
-.refusal span {
-  display: inline-block;
-  max-width: 30rem;
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-sm);
-  /*
-   * 76% black is the least that carries the text over any artwork. The worst
-   * case is a white picture behind it, compositing to rgb(61 61 61), against
-   * which #ffb3ab is 6.1:1 — above the 4.5:1 that small text needs.
-   */
-  background: rgb(0 0 0 / 76%);
-  color: #ffb3ab;
-  font-size: var(--text-xs);
-  text-align: left;
 }
 
 @media (max-width: 48rem) {

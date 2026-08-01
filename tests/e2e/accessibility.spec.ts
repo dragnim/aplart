@@ -138,25 +138,6 @@ test.describe('accessibility of the workspace', () => {
     await audit(page);
   });
 
-  test('has no violations when a fullscreen request is refused', async ({ page }) => {
-    // The one fullscreen state that cannot be reached by driving the
-    // interface, and the message sits over the artwork rather than a surface.
-    await page.addInitScript(() => {
-      Element.prototype.requestFullscreen = () => Promise.reject(new Error('blocked'));
-    });
-    await stubTryApl(page);
-    await page.goto('./#/art/modular-bloom');
-    await page.waitForSelector('.cm-content');
-
-    await page.getByRole('button', { name: 'Focus mode' }).click();
-    const fullscreen = page.getByRole('button', { name: 'Fullscreen' });
-    test.skip((await fullscreen.count()) === 0, 'this browser does not offer fullscreen');
-
-    await fullscreen.click();
-    await expect(page.getByText(/Focus mode still fills the window/)).toBeVisible();
-    await audit(page);
-  });
-
   test('has no violations with a primitive explanation expanded', async ({ page }) => {
     await stubTryApl(page);
     await page.goto('./#/art/modular-bloom');

@@ -205,16 +205,6 @@
   overflow: hidden;
 }
 
-/*
- * Browser fullscreen is a layer on top of Focus mode, not an alternative to
- * it: the same bar and the same drawer, with the browser's chrome gone. The
- * only thing that has to be said here is the background, because the element
- * is now the whole screen and the page behind it is no longer providing one.
- */
-.page:fullscreen {
-  background: var(--surface-dark);
-}
-
 /* The artwork takes the whole viewport and the drawer sits on top of it. */
 .page[data-focus='true'] .columns,
 .page[data-focus='true'] .stacked {

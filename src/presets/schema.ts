@@ -42,6 +42,14 @@ export interface ArtworkParameter {
   readonly min?: number;
   readonly max?: number;
   readonly step?: number;
+  /**
+   * How the slider's travel maps to the value.
+   *
+   * `logarithmic` makes every step the same proportion instead of the same
+   * amount, for a control whose useful range spans orders of magnitude. `step`
+   * is then ignored. Requires a positive minimum.
+   */
+  readonly scale?: 'linear' | 'logarithmic';
   readonly defaultValue: number | string | boolean;
   readonly randomisable: boolean;
   readonly options?: readonly ParameterOption[];

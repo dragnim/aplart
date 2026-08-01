@@ -13,7 +13,6 @@
 import { useCallback, useState } from 'react';
 import { ExportMenu } from './ExportMenu';
 import { type ArtworkActions } from './useArtworkActions';
-import { type Fullscreen } from './useFullscreen';
 import { useIdleVisibility } from './useIdleVisibility';
 import { describeStatus, type WorkspaceState } from './workspaceState';
 import styles from './FocusToolbar.module.css';
@@ -25,19 +24,9 @@ interface Props {
   readonly drawerOpen: boolean;
   readonly onToggleDrawer: () => void;
   readonly onExitFocus: () => void;
-  /** Absent when the browser will not do fullscreen; then nothing is offered. */
-  readonly fullscreen: Fullscreen | null;
 }
 
-export function FocusToolbar({
-  title,
-  state,
-  actions,
-  drawerOpen,
-  onToggleDrawer,
-  onExitFocus,
-  fullscreen,
-}: Props) {
+export function FocusToolbar({ title, state, actions, drawerOpen, onToggleDrawer, onExitFocus }: Props) {
   const [holdingFocus, setHoldingFocus] = useState(false);
 
   // Held open while the drawer is open, while a control here has keyboard
@@ -88,42 +77,10 @@ export function FocusToolbar({
           Share
         </button>
         <ExportMenu actions={actions} triggerClassName={styles.action} />
-        {fullscreen !== null && (
-          <button type="button" className={styles.action} onClick={fullscreen.toggle}>
-            {/*
-              The label states what pressing it will do, rather than the
-              current state with aria-pressed. Both are correct; a changing
-              label is the one people read without being told to.
-            */}
-            {fullscreen.active ? 'Leave fullscreen' : 'Fullscreen'}
-          </button>
-        )}
         <button type="button" className={styles.exit} onClick={onExitFocus}>
           Exit focus
         </button>
       </div>
-
-      {/*
-        Only ever a refusal, and only for a few seconds.
-
-        A status rather than an alert. Nothing is broken and nothing needs
-        attending to — the press simply did not take effect, and Focus mode is
-        still doing the job. It is announced once, when it appears, and removes
-        itself; there is no control to dismiss because there is nothing to act
-        on.
-      */}
-      {fullscreen?.error != null && (
-        <p className={styles.refusal} role="status">
-          {/*
-            Right-aligned on a line of its own, over the artwork rather than the
-            drawer: left-aligned it landed on the white panel, where the warning
-            colour was close to invisible. It keeps a quiet dark backing because
-            it sits over an arbitrary picture — plain text there is legible
-            against some artworks and not others.
-          */}
-          <span>{fullscreen.error}</span>
-        </p>
-      )}
     </div>
   );
 }

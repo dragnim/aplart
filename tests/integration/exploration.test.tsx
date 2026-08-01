@@ -97,6 +97,17 @@ function sent(service: MockAplExecutionService) {
   return service.received.join('\n---\n');
 }
 
+/**
+ * What the Span control reports.
+ *
+ * Its slider carries a geometric position rather than the value, so its DOM
+ * value is not the span. `aria-valuetext` is what a screen reader announces and
+ * what the readout beside the label shows, which is the thing worth asserting.
+ */
+function spanShown() {
+  return screen.getByLabelText('Span').getAttribute('aria-valuetext');
+}
+
 describe('exploring the plane', () => {
   it('rewrites the view assignments, and runs what it wrote', async () => {
     const { service } = await openAndRun(mandelbrotField.id);
@@ -125,7 +136,7 @@ describe('exploring the plane', () => {
 
     // The sliders and the drag are two ways of writing the same assignments,
     // so they cannot disagree about where the view is.
-    await waitFor(() => expect(screen.getByLabelText('Span')).toHaveValue('0.35'));
+    await waitFor(() => expect(spanShown()).toBe('0.35'));
     expect(screen.getByLabelText('Centre across')).toHaveValue('-0.95');
     expect(screen.getByLabelText('Centre down')).toHaveValue('-0.35');
   });
@@ -149,7 +160,7 @@ describe('exploring the plane', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(service.executionCount).toBe(before);
-    expect(screen.getByLabelText('Span')).toHaveValue('1.4');
+    expect(spanShown()).toBe('1.4');
   });
 
   it('ignores a secondary-button press', async () => {
@@ -171,7 +182,7 @@ describe('exploring the plane', () => {
       await user.click(screen.getByRole('button', { name: 'Zoom out' }));
 
       // 1.4 doubled is 2.8, which the Span control tops out at 2.
-      await waitFor(() => expect(screen.getByLabelText('Span')).toHaveValue('2'));
+      await waitFor(() => expect(spanShown()).toBe('2'));
       expect(screen.getByLabelText('Centre across')).toHaveValue('-0.6');
     });
 
@@ -180,7 +191,7 @@ describe('exploring the plane', () => {
 
       await user.click(screen.getByRole('button', { name: 'Zoom in' }));
 
-      await waitFor(() => expect(screen.getByLabelText('Span')).toHaveValue('0.7'));
+      await waitFor(() => expect(spanShown()).toBe('0.7'));
     });
 
     it('pans by a fraction of the span, so it still works when zoomed in', async () => {
@@ -190,13 +201,13 @@ describe('exploring the plane', () => {
       // sliders alone step by 0.01, which is five whole views at the deepest
       // zoom and a thousandth of one at the widest.
       await user.click(screen.getByRole('button', { name: 'Zoom in' }));
-      await waitFor(() => expect(screen.getByLabelText('Span')).toHaveValue('0.7'));
+      await waitFor(() => expect(spanShown()).toBe('0.7'));
 
       await user.click(screen.getByRole('button', { name: 'Pan right' }));
 
       // Half of 0.7, not half of 1.4.
       await waitFor(() => expect(screen.getByLabelText('Centre across')).toHaveValue('-0.25'));
-      expect(screen.getByLabelText('Span')).toHaveValue('0.7');
+      expect(spanShown()).toBe('0.7');
     });
 
     it('offers nothing to go back to until somewhere has been left', async () => {
@@ -208,7 +219,7 @@ describe('exploring the plane', () => {
 
       await user.click(screen.getByRole('button', { name: 'Back (1)' }));
 
-      await waitFor(() => expect(screen.getByLabelText('Span')).toHaveValue('1.4'));
+      await waitFor(() => expect(spanShown()).toBe('1.4'));
       expect(screen.getByLabelText('Centre across')).toHaveValue('-0.6');
       // Stepping back is not itself somewhere to come back from.
       expect(screen.getByRole('button', { name: /^Back/ })).toBeDisabled();
@@ -218,15 +229,67 @@ describe('exploring the plane', () => {
       const { user } = await openAndRun(mandelbrotField.id);
 
       drag([100, 100], [200, 200]);
-      await waitFor(() => expect(screen.getByLabelText('Span')).toHaveValue('0.35'));
+      await waitFor(() => expect(spanShown()).toBe('0.35'));
       drag([100, 100], [200, 200]);
       await waitFor(() => expect(screen.getByRole('button', { name: 'Back (2)' })).toBeEnabled());
 
       await user.click(screen.getByRole('button', { name: 'Back (2)' }));
-      await waitFor(() => expect(screen.getByLabelText('Span')).toHaveValue('0.35'));
+      await waitFor(() => expect(spanShown()).toBe('0.35'));
 
       await user.click(screen.getByRole('button', { name: 'Back (1)' }));
-      await waitFor(() => expect(screen.getByLabelText('Span')).toHaveValue('1.4'));
+      await waitFor(() => expect(spanShown()).toBe('1.4'));
+    });
+  });
+
+  describe('the controls after a deep zoom', () => {
+    /** Zooms in far enough that the span is well below the old slider step. */
+    async function zoomDeep(user: ReturnType<typeof userEvent.setup>) {
+      for (let step = 0; step < 6; step += 1) {
+        await user.click(screen.getByRole('button', { name: 'Zoom in' }));
+        await waitFor(() => expect(screen.getByRole('button', { name: /^Back \(/ })).toBeEnabled());
+      }
+    }
+
+    it('keeps the exact span the navigation chose', async () => {
+      const { user } = await openAndRun(mandelbrotField.id);
+      await zoomDeep(user);
+
+      // 1.4 halved six times.
+      await waitFor(() => expect(spanShown()).toBe('0.021875'));
+    });
+
+    it('does not throw the view away when the span slider is nudged', async () => {
+      const { user, service } = await openAndRun(mandelbrotField.id);
+      await zoomDeep(user);
+      const chosen = Number(spanShown());
+
+      // The failure this guards: with a linear slider from 0.002 in steps of
+      // 0.05, the nearest stop to 0.0219 was 0.002 — one press away from a
+      // different piece of the plane entirely.
+      const slider = screen.getByLabelText('Span');
+      const position = Number((slider as HTMLInputElement).value);
+      fireEvent.change(slider, { target: { value: String(position - 1) } });
+
+      await waitFor(() => expect(Number(spanShown())).not.toBe(chosen));
+      const nudged = Number(spanShown());
+      expect(nudged / chosen).toBeGreaterThan(0.94);
+      expect(nudged / chosen).toBeLessThan(1.06);
+      expect(sent(service)).not.toContain('zoom←0.002');
+    });
+
+    it('does not throw the view away when the centre slider is nudged', async () => {
+      const { user } = await openAndRun(mandelbrotField.id);
+      await zoomDeep(user);
+      const span = Number(spanShown());
+
+      const slider = screen.getByLabelText('Centre across');
+      const before = Number((slider as HTMLInputElement).value);
+      fireEvent.change(slider, { target: { value: String(before + 0.001) } });
+
+      // One step has to be smaller than the view it moves, or a nudge is a jump.
+      await waitFor(() => expect(screen.getByLabelText('Centre across')).not.toHaveValue(String(before)));
+      const moved = Number((screen.getByLabelText('Centre across') as HTMLInputElement).value);
+      expect(Math.abs(moved - before)).toBeLessThan(span);
     });
   });
 
