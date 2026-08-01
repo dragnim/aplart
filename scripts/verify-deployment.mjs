@@ -56,10 +56,9 @@ try {
   for (let index = 0; index < imageCount; index += 1) {
     const image = images.nth(index);
     await image.scrollIntoViewIfNeeded();
-    const ok = await image.evaluate((element) => {
-      const img = element;
-      return img.complete && img.naturalWidth > 0;
-    });
+    const ok = await image.evaluate(
+      /** @param {HTMLImageElement} img */ (img) => img.complete && img.naturalWidth > 0,
+    );
     if (ok) loaded += 1;
   }
   record('every thumbnail loads', loaded === imageCount, `${loaded}/${imageCount}`);
