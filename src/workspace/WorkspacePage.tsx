@@ -7,15 +7,27 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { AplEditor, type AplEditorHandle } from '@/editor/AplEditor';
-import { restoreControlLine, setParameterValue, type ParameterValue } from '@/editor/parameterBinding';
+import {
+  restoreControlLine,
+  setParameterValue,
+  setParameterValues,
+  type ParameterValue,
+} from '@/editor/parameterBinding';
+import { SymbolToolbar } from '@/editor/SymbolToolbar';
+import { Dialog } from '@/components/Dialog/Dialog';
 import { WIDE_LAYOUT_QUERY, useMediaQuery } from '@/app/useMediaQuery';
 import { type AplExecutionService } from '@/execution/AplExecutionService';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { getPreset } from '@/presets/presets';
 import { type ArtworkParameter, type ArtworkPreset } from '@/presets/schema';
 import { ArtworkCanvas } from '@/renderer/ArtworkCanvas';
+import { defaultRenderOptions } from '@/renderer/renderOptions';
 import { decodeShareState, toRenderOptions } from '@/sharing/decodeShareState';
 import { ParameterControls } from './ParameterControls';
+import { PrimitivePanel } from './PrimitivePanel';
+import { TryChangingThis } from './TryChangingThis';
+import { randomiseParameters } from './randomise';
+import { readSavedProjectImmediate, useLocalProject } from './useLocalProject';
 import { RenderControls } from './RenderControls';
 import { RunPanel } from './RunPanel';
 import { WorkspaceToolbar } from './WorkspaceToolbar';
@@ -70,12 +82,27 @@ function Workspace({
   const shared = useMemo(() => (sharedState === null ? null : decodeShareState(sharedState)), [sharedState]);
 
   const initialState = useMemo(() => {
-    if (shared === null || !shared.ok) return undefined;
+    if (shared !== null) {
+      if (!shared.ok) return undefined;
+      return {
+        ...initialWorkspaceState(preset),
+        code: shared.state.code,
+        renderOptions: toRenderOptions(shared.state),
+        modified: shared.state.code !== preset.code,
+      };
+    }
+
+    // No shared link, so pick up where this browser left off. A link always
+    // wins over saved work: someone following one wants to see what they were
+    // sent, not what they were last doing.
+    const saved = readSavedProjectImmediate(preset.id);
+    if (saved === null) return undefined;
+
     return {
       ...initialWorkspaceState(preset),
-      code: shared.state.code,
-      renderOptions: toRenderOptions(shared.state),
-      modified: shared.state.code !== preset.code,
+      code: saved.code,
+      renderOptions: saved.renderOptions,
+      modified: saved.code !== preset.code,
     };
   }, [shared, preset]);
 
@@ -90,6 +117,11 @@ function Workspace({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [tab, setTab] = useState<MobileTab>('artwork');
   const wide = useMediaQuery(WIDE_LAYOUT_QUERY);
+  const [confirmingReset, setConfirmingReset] = useState(false);
+  // Carried into the share link so a randomised piece can be reproduced.
+  const [seed, setSeed] = useState<number | undefined>(undefined);
+
+  useLocalProject(preset, state);
 
   // Shared code is never run on arrival; the visitor is told what they have
   // been given and presses Run themselves.
@@ -119,6 +151,39 @@ function Workspace({
     setCode(preset.code);
   }, [preset.code, setCode]);
 
+  /**
+   * Reset parameters puts the controls back without touching anything else the
+   * user has written, so an edited expression survives. Reset artwork restores
+   * the preset wholesale, which is the destructive one and asks first.
+   */
+  const handleResetParameters = useCallback(() => {
+    const defaults = new Map(
+      preset.parameters.map((parameter) => [parameter.variable, parameter.defaultValue]),
+    );
+    setCode(setParameterValues(state.code, defaults));
+  }, [preset.parameters, state.code, setCode]);
+
+  const handleResetArtwork = useCallback(() => {
+    setCode(preset.code);
+    setRenderOptions(defaultRenderOptions(preset.defaultPaletteId));
+    setConfirmingReset(false);
+  }, [preset, setCode, setRenderOptions]);
+
+  const requestResetArtwork = useCallback(() => {
+    // Only ask when there is something to lose. Confirming a reset that would
+    // change nothing is just an extra click.
+    if (state.modified) setConfirmingReset(true);
+    else handleResetArtwork();
+  }, [state.modified, handleResetArtwork]);
+
+  const handleRandomise = useCallback(() => {
+    const { values, seed } = randomiseParameters(preset.parameters);
+    setSeed(seed);
+    // One code change for all of them, so undo treats it as a single action
+    // and only one run follows.
+    setCode(setParameterValues(state.code, values));
+  }, [preset.parameters, state.code, setCode]);
+
   const editorPanel = (
     <div className={styles.editorPanel}>
       <div className={styles.editorWrapper}>
@@ -130,12 +195,18 @@ function Workspace({
           handleRef={editorHandle}
         />
       </div>
+      <SymbolToolbar onInsert={(glyph) => editorHandle.current?.insertAtCursor(glyph)} />
       <RunPanel state={state} onRun={run} onStop={stop} onResetCode={handleResetCode} />
     </div>
   );
 
   const controlsPanel = (
     <div className={styles.controlsPanel}>
+      <TryChangingThis
+        prompts={preset.tryChangingThis ?? []}
+        openByDefault={preset.difficulty === 'beginner'}
+      />
+
       <section aria-labelledby="code-controls-heading">
         <h2 className={styles.sectionHeading} id="code-controls-heading">
           Code controls
@@ -147,6 +218,14 @@ function Workspace({
           onChange={handleParameterChange}
           onRestore={handleParameterRestore}
         />
+        <div className={styles.parameterActions}>
+          <button type="button" className={styles.secondary} onClick={handleRandomise}>
+            Randomise
+          </button>
+          <button type="button" className={styles.secondary} onClick={handleResetParameters}>
+            Reset parameters
+          </button>
+        </div>
       </section>
 
       <section aria-labelledby="appearance-heading">
@@ -160,6 +239,8 @@ function Workspace({
           onChange={setRenderOptions}
         />
       </section>
+
+      <PrimitivePanel primitives={preset.primitives} />
     </div>
   );
 
@@ -181,9 +262,29 @@ function Workspace({
       <WorkspaceToolbar
         preset={preset}
         state={state}
+        seed={seed}
         canvasRef={canvasRef}
-        onResetArtwork={handleResetCode}
+        onResetArtwork={requestResetArtwork}
       />
+
+      <Dialog
+        open={confirmingReset}
+        title="Reset this artwork?"
+        onClose={() => setConfirmingReset(false)}
+        actions={
+          <>
+            <button type="button" className={styles.secondary} onClick={() => setConfirmingReset(false)}>
+              Keep my changes
+            </button>
+            <button type="button" className={styles.destructive} onClick={handleResetArtwork}>
+              Reset everything
+            </button>
+          </>
+        }
+      >
+        Your edits to the code, the parameters and the appearance will all be replaced with the original. This
+        cannot be undone.
+      </Dialog>
 
       {shareNotice !== null && (
         <p className={styles.shareNotice} role="status">

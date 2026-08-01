@@ -15,13 +15,15 @@ import styles from './WorkspaceToolbar.module.css';
 interface Props {
   readonly preset: ArtworkPreset;
   readonly state: WorkspaceState;
+  /** Set once Randomise has run, so a shared link reproduces the same values. */
+  readonly seed?: number | undefined;
   readonly canvasRef: React.RefObject<HTMLCanvasElement | null>;
   readonly onResetArtwork: () => void;
 }
 
 const EXPORT_SIZES: readonly ExportSize[] = [512, 1024, 2048, 'original'];
 
-export function WorkspaceToolbar({ preset, state, onResetArtwork }: Props) {
+export function WorkspaceToolbar({ preset, state, seed, onResetArtwork }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
 
@@ -40,6 +42,7 @@ export function WorkspaceToolbar({ preset, state, onResetArtwork }: Props) {
       palette: state.renderOptions.paletteId,
       render: fromRenderOptions(state.renderOptions),
       title: preset.title,
+      ...(seed === undefined ? {} : { seed }),
     });
 
     const url = buildShareUrl(window.location.href, preset.id, encoded);
@@ -56,7 +59,7 @@ export function WorkspaceToolbar({ preset, state, onResetArtwork }: Props) {
     } catch {
       announce('The link could not be copied. Your browser blocked clipboard access.');
     }
-  }, [preset, state.code, state.renderOptions, announce]);
+  }, [preset, state.code, state.renderOptions, seed, announce]);
 
   const handleCopyApl = useCallback(async () => {
     try {

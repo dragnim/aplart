@@ -133,18 +133,8 @@ test.describe('the artwork journey', () => {
     expect(await canvasSignature(page)).toBe(drawn);
   });
 
-  test('resets to the original code', async ({ page }) => {
-    await stubTryApl(page);
-    await openModularBloom(page);
-
-    await setCode(page, 'size←8');
-    await expect(page.getByText('Edited')).toBeVisible();
-
-    await page.getByRole('button', { name: 'Reset' }).click();
-
-    await expect(page.locator('.cm-content')).toContainText('modulus←17');
-    await expect(page.getByText('Original')).toBeVisible();
-  });
+  // Resetting is covered in full by "reset artwork asks first and then
+  // restores everything", which also exercises the confirmation step.
 
   test('reports a server failure without losing the code', async ({ page }) => {
     await stubTryApl(page, { failure: 'server' });
@@ -278,5 +268,137 @@ test.describe('narrow viewports', () => {
     await page.getByRole('tab', { name: 'Code' }).click();
 
     await expect(page.locator('.cm-editor')).toHaveCount(1);
+  });
+});
+
+test.describe('editing aids', () => {
+  test.use({ viewport: WIDE });
+
+  test('the symbol toolbar inserts at the cursor and keeps focus in the editor', async ({ page }) => {
+    await stubTryApl(page);
+    await openModularBloom(page);
+
+    await setCode(page, 'size←4');
+    await page.locator('.cm-content').click();
+    await page.keyboard.press('End');
+
+    await page.getByRole('button', { name: /Insert Index generator/ }).click();
+    await expect(page.locator('.cm-content')).toContainText('size←4⍳');
+
+    // Focus must come back, or a run of glyphs cannot be tapped out.
+    await expect(page.locator('.cm-content')).toBeFocused();
+
+    await page.getByRole('button', { name: /Insert Reshape/ }).click();
+    await expect(page.locator('.cm-content')).toContainText('size←4⍳⍴');
+  });
+
+  test('every symbol button has a name a screen reader can read', async ({ page }) => {
+    await stubTryApl(page);
+    await openModularBloom(page);
+
+    const buttons = page.getByRole('toolbar', { name: 'APL symbols' }).getByRole('button');
+    const count = await buttons.count();
+    expect(count).toBeGreaterThan(40);
+
+    for (let index = 0; index < count; index += 1) {
+      const label = await buttons.nth(index).getAttribute('aria-label');
+      // "Insert Index generator, ⍳" rather than just the glyph.
+      expect(label, `button ${index}`).toMatch(/^Insert .+, .+$/u);
+    }
+  });
+
+  test('randomise changes the parameters and the code together', async ({ page }) => {
+    await stubTryApl(page);
+    await openModularBloom(page);
+
+    const before = await page.locator('.cm-content').innerText();
+    await page.getByRole('button', { name: 'Randomise' }).click();
+
+    await expect(page.locator('.cm-content')).not.toHaveText(before);
+    await expect(page.getByText('Edited')).toBeVisible();
+    await runAndWait(page);
+    await expect(page.getByRole('img', { name: /grid/ })).toBeVisible();
+  });
+
+  test('reset parameters restores the defaults but keeps other edits', async ({ page }) => {
+    await stubTryApl(page);
+    await openModularBloom(page);
+
+    // A hand-written comment stands in for work the user does not want lost.
+    await setCode(page, '⍝ mine\nsize←16\nmodulus←3\nmultiplier←1\nmodulus|multiplier×∘.×⍨⍳size');
+    await page.getByRole('button', { name: 'Reset parameters' }).click();
+
+    await expect(page.locator('.cm-content')).toContainText('size←64');
+    await expect(page.locator('.cm-content')).toContainText('modulus←17');
+    await expect(page.locator('.cm-content')).toContainText('⍝ mine');
+  });
+
+  test('reset artwork asks first and then restores everything', async ({ page }) => {
+    await stubTryApl(page);
+    await openModularBloom(page);
+
+    await setCode(page, 'size←8');
+    await page.getByRole('radio', { name: /Neon/ }).click();
+
+    await page.getByRole('button', { name: 'Reset', exact: true }).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    // Backing out must change nothing.
+    await page.getByRole('button', { name: 'Keep my changes' }).click();
+    await expect(page.locator('.cm-content')).toContainText('size←8');
+
+    await page.getByRole('button', { name: 'Reset', exact: true }).click();
+    await page.getByRole('button', { name: 'Reset everything' }).click();
+
+    await expect(page.locator('.cm-content')).toContainText('modulus←17');
+    await expect(page.getByRole('radio', { name: /Dyalog/ })).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByText('Original', { exact: true })).toBeVisible();
+  });
+
+  test('lists the primitives used, with an explanation for each', async ({ page }) => {
+    await stubTryApl(page);
+    await openModularBloom(page);
+
+    const panel = page.getByRole('region', { name: 'APL used in this piece' });
+    await expect(panel).toBeVisible();
+
+    await panel.getByRole('button', { name: /Residue/ }).click();
+    await expect(panel.getByText('The remainder after dividing.')).toBeVisible();
+  });
+});
+
+test.describe('remembering work between visits', () => {
+  test.use({ viewport: WIDE });
+
+  test('reopening an artwork restores the code and palette', async ({ page }) => {
+    await stubTryApl(page);
+    await openModularBloom(page);
+
+    await setCode(page, 'size←24\nmodulus←5\nmultiplier←1\nmodulus|multiplier×∘.×⍨⍳size');
+    await page.getByRole('radio', { name: /Forest/ }).click();
+    await runAndWait(page);
+
+    // Leave, and come back the way a returning visitor would.
+    await page.goto('./');
+    await page.reload();
+    await page.getByRole('link', { name: /^Open Modular Bloom/ }).click();
+
+    await expect(page.locator('.cm-content')).toContainText('modulus←5');
+    await expect(page.getByRole('radio', { name: /Forest/ })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  test('clearing local data puts the artwork back to its original', async ({ page }) => {
+    await stubTryApl(page);
+    await openModularBloom(page);
+    await setCode(page, 'size←24\nmodulus←5\nmultiplier←1\nmodulus|multiplier×∘.×⍨⍳size');
+    await expect(page.getByText('Edited')).toBeVisible();
+
+    await page.goto('./#/help');
+    await page.getByRole('button', { name: 'Clear local data' }).click();
+    await page.getByRole('button', { name: 'Clear everything' }).click();
+    await expect(page.getByText('Everything saved in this browser has been removed.')).toBeVisible();
+
+    await page.goto('./#/art/modular-bloom');
+    await expect(page.locator('.cm-content')).toContainText('modulus←17');
   });
 });

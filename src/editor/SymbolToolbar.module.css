@@ -1,0 +1,47 @@
+.wrapper {
+  position: relative;
+  min-width: 0;
+}
+
+.toolbar {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  background: var(--surface-dark-raised);
+  border-radius: var(--radius-md);
+  /* Horizontally scrollable on narrow screens rather than wrapping into a
+     wall of glyphs that pushes the editor off the page. */
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-dark) transparent;
+}
+
+.symbol {
+  flex: none;
+  display: grid;
+  place-items: center;
+  min-width: var(--tap-target);
+  min-height: var(--tap-target);
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-on-dark);
+  font-family: var(--font-apl);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease),
+    border-color var(--motion-fast) var(--ease);
+}
+
+.symbol:hover {
+  background: rgb(255 255 255 / 10%);
+  border-color: var(--border-dark);
+}
+
+.symbol:active {
+  background: rgb(255 106 19 / 30%);
+}

@@ -1,3 +1,4 @@
+import { ClearLocalData } from './ClearLocalData';
 import styles from './prose.module.css';
 
 export function HelpPage() {
@@ -86,6 +87,11 @@ export function HelpPage() {
           </li>
           <li>Export saves a PNG at the size you choose, with crisp edges for cell-based work.</li>
         </ul>
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.heading}>Your data</h2>
+        <ClearLocalData />
       </section>
 
       <section className={styles.section}>

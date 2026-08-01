@@ -21,23 +21,40 @@
 .columns {
   display: grid;
   gap: var(--space-5);
-  grid-template-columns: minmax(22rem, 40%) 1fr;
+  grid-template-columns: minmax(0, 40%) minmax(0, 1fr);
   align-items: start;
 }
 
 .leftColumn {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-5);
   /* Independent scrolling so a long control list never pushes the artwork
      off screen. */
   max-height: calc(100dvh - 12rem);
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: var(--space-2);
+  /*
+   * Grid and flex children default to min-width: auto, which refuses to
+   * shrink below their content. The symbol toolbar is a long row of buttons,
+   * so without this the column is forced wider than its track and everything
+   * in it — editor text included — is clipped at the edge.
+   */
+  min-width: 0;
+}
+
+.leftColumn > * {
+  min-width: 0;
 }
 
 .editorPanel {
   display: grid;
+  /* The symbol toolbar is a long row of buttons. Without a zero-floor track
+     its min-content width sizes the column and stretches the editor with it. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
+  min-width: 0;
 }
 
 .editorWrapper {
@@ -50,8 +67,10 @@
 
 .controlsPanel {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-6);
   padding-bottom: var(--space-4);
+  min-width: 0;
 }
 
 .sectionHeading {
@@ -114,4 +133,39 @@
 .stacked .leftColumn {
   max-height: none;
   overflow: visible;
+}
+
+.parameterActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.secondary {
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.secondary:hover {
+  background: var(--surface-sunken);
+}
+
+.destructive {
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--error);
+  border-radius: var(--radius-md);
+  background: var(--error);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.destructive:hover {
+  background: #9c1e15;
 }
