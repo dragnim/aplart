@@ -39,7 +39,9 @@ test.describe('site navigation', () => {
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('We could not find that');
   });
 
-  test('the skip link is the first thing a keyboard user reaches', async ({ page }) => {
+  test('the skip link is the first thing a keyboard user reaches', async ({ page, isMobile }) => {
+    test.skip(isMobile === true, 'iOS Safari does not tab to links by default.');
+
     await page.goto('./');
 
     await page.keyboard.press('Tab');

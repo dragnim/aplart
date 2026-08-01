@@ -17,16 +17,45 @@ async function runAndWait(page: Page) {
   await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 20_000 });
 }
 
-/** A stable signature of what is actually painted, for before-and-after checks. */
+/**
+ * A signature of what is actually painted, for before-and-after checks.
+ *
+ * Hashes the whole image rather than a prefix of it. On a high-density
+ * viewport the backing store is large and the first few thousand base64
+ * characters are all background, so two visibly different artworks can share
+ * them.
+ */
 async function canvasSignature(page: Page): Promise<string> {
   return page.evaluate(() => {
     const canvas = document.querySelector('canvas');
     if (canvas === null) return 'no-canvas';
-    return canvas.toDataURL().slice(0, 3000);
+    const data = canvas.toDataURL();
+    let hash = 0x811c9dc5;
+    for (let index = 0; index < data.length; index += 1) {
+      hash ^= data.charCodeAt(index);
+      hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    return `${data.length}:${hash.toString(16)}`;
   });
 }
 
+/** Replaces the editor's contents. fill() drives contenteditable reliably; a
+ *  select-all keystroke does not on every browser. */
+async function setCode(page: Page, code: string) {
+  await page.locator('.cm-content').fill(code);
+}
+
+/*
+ * These journeys exercise the two-column layout, so they pin a wide viewport.
+ * Without it the mobile-safari project would run them at phone width, where the
+ * editor and Run control sit behind a tab. Narrow behaviour has its own group
+ * at the bottom of this file.
+ */
+const WIDE = { width: 1440, height: 950 };
+
 test.describe('the artwork journey', () => {
+  test.use({ viewport: WIDE });
+
   test('opens a preset from the gallery and draws it', async ({ page }) => {
     await stubTryApl(page);
     await openModularBloom(page);
@@ -46,9 +75,7 @@ test.describe('the artwork journey', () => {
 
     await expect(page.locator('.cm-content')).toContainText('modulus←17');
 
-    const modulus = page.getByLabel('Modulus');
-    await modulus.focus();
-    for (let press = 0; press < 5; press += 1) await page.keyboard.press('ArrowLeft');
+    await page.getByLabel('Modulus').fill('12');
 
     // The editor shows the change, which is the whole point of the control.
     await expect(page.locator('.cm-content')).toContainText('modulus←12');
@@ -58,7 +85,9 @@ test.describe('the artwork journey', () => {
     expect(await canvasSignature(page)).not.toBe(before);
   });
 
-  test('runs from the keyboard with the shortcut', async ({ page }) => {
+  test('runs from the keyboard with the shortcut', async ({ page, isMobile }) => {
+    test.skip(isMobile === true, 'Emulated mobile Safari does not deliver the modifier chord to the editor.');
+
     await stubTryApl(page);
     await openModularBloom(page);
 
@@ -89,9 +118,7 @@ test.describe('the artwork journey', () => {
     const drawn = await canvasSignature(page);
 
     // Remove the size assignment so the expression cannot resolve.
-    await page.locator('.cm-content').click();
-    await page.keyboard.press('ControlOrMeta+A');
-    await page.keyboard.type('modulus←9\nmodulus|1');
+    await setCode(page, 'modulus←9\nmodulus|1');
 
     await page.getByRole('button', { name: /^Run/ }).click();
     await expect(page.getByRole('alert')).toBeVisible({ timeout: 20_000 });
@@ -104,9 +131,7 @@ test.describe('the artwork journey', () => {
     await stubTryApl(page);
     await openModularBloom(page);
 
-    await page.locator('.cm-content').click();
-    await page.keyboard.press('ControlOrMeta+A');
-    await page.keyboard.type('size←8');
+    await setCode(page, 'size←8');
     await expect(page.getByText('Edited')).toBeVisible();
 
     await page.getByRole('button', { name: 'Reset' }).click();
@@ -139,14 +164,17 @@ test.describe('the artwork journey', () => {
 });
 
 test.describe('sharing and export', () => {
-  test('a share link restores the code and appearance', async ({ page, context }) => {
+  test.use({ viewport: WIDE });
+
+  test('a share link restores the code and appearance', async ({ page, context, browserName }) => {
+    // Granting clipboard access is a Chromium capability; WebKit rejects the
+    // permission name outright, so the copy step cannot be driven there.
+    test.skip(browserName === 'webkit', 'WebKit does not support clipboard permissions.');
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await stubTryApl(page);
     await openModularBloom(page);
 
-    await page.locator('.cm-content').click();
-    await page.keyboard.press('ControlOrMeta+A');
-    await page.keyboard.type('size←24\nmodulus←5\nmultiplier←3\nmodulus|multiplier×∘.×⍨⍳size');
+    await setCode(page, 'size←24\nmodulus←5\nmultiplier←3\nmodulus|multiplier×∘.×⍨⍳size');
     await page.getByRole('radio', { name: /Neon/ }).click();
 
     await page.getByRole('button', { name: 'Share' }).click();
@@ -180,7 +208,14 @@ test.describe('sharing and export', () => {
 });
 
 test.describe('keyboard and screen reader use', () => {
-  test('the whole journey works from the keyboard alone', async ({ page }) => {
+  test.use({ viewport: WIDE });
+
+  test('the whole journey works from the keyboard alone', async ({ page, isMobile }) => {
+    // iOS Safari does not move focus to links with Tab unless the user has
+    // turned that on. That is a platform preference, not something this
+    // application controls.
+    test.skip(isMobile === true, 'iOS Safari does not tab to links by default.');
+
     await stubTryApl(page);
     await page.goto('./');
 
