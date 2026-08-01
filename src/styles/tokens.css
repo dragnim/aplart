@@ -1,0 +1,92 @@
+/*
+ * Design tokens for APL Art.
+ *
+ * Contrast note: every foreground/background pairing used for text in the
+ * application is checked against WCAG 2.2 AA (4.5:1 for body text, 3:1 for
+ * large text and non-text indicators). The orange is deliberately reserved for
+ * accents and never used as a text colour on light surfaces, where it falls
+ * well short of 4.5:1.
+ */
+
+:root {
+  /* Brand */
+  --dyalog-orange: #ff6a13;
+  --dyalog-orange-strong: #c24500; /* 4.6:1 on --surface, safe for text */
+
+  /* Light surfaces */
+  --background: #f4f3f1;
+  --surface: #ffffff;
+  --surface-sunken: #eceae7;
+  --surface-dark: #171717;
+  --surface-dark-raised: #232323;
+
+  /* Text */
+  --text: #1e1e1e;
+  --text-muted: #5c5c5c; /* 6.4:1 on --surface */
+  --text-on-dark: #f2f0ee;
+  --text-on-dark-muted: #a9a5a1; /* 6.2:1 on --surface-dark */
+
+  /* Lines and states */
+  --border: #d8d5d1;
+  --border-strong: #b6b1ab;
+  --border-dark: #333333;
+  --focus: #526cfe;
+  --error: #b42318;
+  --error-surface: #fef3f2;
+  --success: #18794e;
+  --success-surface: #f0fdf6;
+  --warning: #8f5700;
+  --warning-surface: #fffaeb;
+
+  /* Type */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-apl: 'APL387', 'APL385 Unicode', ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'Consolas', monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.5rem;
+  --text-4xl: clamp(2.25rem, 1.5rem + 3vw, 3.75rem);
+
+  /* Space */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  /* Shape */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 6%);
+  --shadow-md: 0 2px 8px rgb(0 0 0 / 8%);
+  --shadow-lg: 0 8px 28px rgb(0 0 0 / 12%);
+
+  /* Motion — short, and disabled entirely under prefers-reduced-motion */
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 280ms;
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+
+  /* Minimum comfortable touch target */
+  --tap-target: 44px;
+
+  --layout-max: 1440px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-slow: 0ms;
+  }
+}

@@ -1,0 +1,123 @@
+@import './tokens.css';
+
+/*
+ * APL387 by Dyalog Ltd, released into the public domain under The Unlicence.
+ * Source: https://github.com/Dyalog/APL387
+ * Subset to Latin, punctuation and the APL glyph ranges by
+ * scripts/subset-font.py — see README, "APL font".
+ *
+ * Imported relatively rather than from public/ so that Vite fingerprints it
+ * and rewrites the URL for the /aplart/ base path.
+ */
+@font-face {
+  font-family: 'APL387';
+  src: url('../assets/fonts/APL387-subset.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--background);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+p {
+  margin: 0;
+  text-wrap: pretty;
+}
+
+img,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--dyalog-orange-strong);
+  text-underline-offset: 0.15em;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+/*
+ * A single visible focus treatment everywhere. :focus-visible keeps it off
+ * mouse clicks but guarantees it for keyboard users.
+ */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Skip link — first tabbable element on every page. */
+.skip-link {
+  position: absolute;
+  left: var(--space-3);
+  top: -100%;
+  z-index: 100;
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface);
+  border: 2px solid var(--focus);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: var(--text);
+  transition: top var(--motion-fast) var(--ease);
+}
+
+.skip-link:focus {
+  top: var(--space-3);
+}
+
+/* Visually hidden but available to assistive technology. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--dyalog-orange) 28%, transparent);
+}

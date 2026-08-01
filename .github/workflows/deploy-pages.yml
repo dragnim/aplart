@@ -1,0 +1,78 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # Allows a deployment to be re-run from the Actions tab without a new commit.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deployment finish rather than cancelling it part-way, but never
+# queue more than one behind it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Validate presets
+        run: npm run validate:presets
+
+      - name: Unit and component tests
+        run: npm test
+
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v6
+
+      - name: Build
+        # configure-pages resolves the published base path, so a rename of the
+        # repository does not need a code change.
+        run: npm run build
+        env:
+          VITE_BASE: ${{ steps.pages.outputs.base_path }}/
+
+      - name: Upload the Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

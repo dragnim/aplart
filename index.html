@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>APL Art — tiny programs, infinite patterns</title>
+    <meta
+      name="description"
+      content="Create patterns, fractals and generative art with Dyalog APL. Choose a piece, change the code and see what happens."
+    />
+    <meta name="colour-scheme" content="light dark" />
+    <meta name="theme-color" content="#ff6a13" />
+
+    <!--
+      The only network destination the application needs at runtime is the APL
+      execution endpoint. Everything else is served from our own origin.
+      connect-src is widened at build time if VITE_APL_EXEC_ENDPOINT points
+      somewhere other than TryAPL.
+
+      frame-ancestors is deliberately absent: browsers ignore it in a meta
+      element and log a console error for it. Blocking framing needs a real
+      response header, which GitHub Pages cannot set.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://tryapl.org; base-uri 'self'; form-action 'none'; object-src 'none'"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>APL Art needs JavaScript to run APL code and draw artwork.</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

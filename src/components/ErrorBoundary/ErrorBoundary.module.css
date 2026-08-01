@@ -1,0 +1,62 @@
+.boundary {
+  max-width: 46rem;
+  margin: var(--space-7) auto;
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--error);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.heading {
+  font-size: var(--text-xl);
+  margin-bottom: var(--space-2);
+}
+
+.body {
+  color: var(--text-muted);
+  margin-bottom: var(--space-4);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.button {
+  min-height: var(--tap-target);
+  padding: var(--space-2) var(--space-4);
+  background: var(--text);
+  color: var(--surface);
+  border: 1px solid var(--text);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease);
+}
+
+.button:hover {
+  background: #000;
+}
+
+.link {
+  min-height: var(--tap-target);
+  display: inline-flex;
+  align-items: center;
+}
+
+.details {
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.pre {
+  overflow-x: auto;
+  padding: var(--space-3);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}

@@ -1,0 +1,55 @@
+.page {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: var(--space-7) var(--space-5) var(--space-8);
+}
+
+.title {
+  font-size: var(--text-3xl);
+  letter-spacing: -0.02em;
+  margin-bottom: var(--space-4);
+}
+
+.lede {
+  font-size: var(--text-lg);
+  color: var(--text-muted);
+  margin-bottom: var(--space-6);
+}
+
+.section {
+  margin-top: var(--space-6);
+}
+
+.heading {
+  font-size: var(--text-xl);
+  margin-bottom: var(--space-3);
+}
+
+.paragraph {
+  margin-bottom: var(--space-3);
+}
+
+.list {
+  margin: 0 0 var(--space-3);
+  padding-left: var(--space-5);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.glyph {
+  font-family: var(--font-apl);
+  font-size: 1.05em;
+  padding: 0 0.15em;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+}
+
+.keys {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}

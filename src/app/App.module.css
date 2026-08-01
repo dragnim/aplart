@@ -1,0 +1,17 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.main {
+  flex: 1;
+}
+
+/*
+ * The main landmark is focused programmatically by the skip link, but it is
+ * not an interactive control, so it should not draw a focus ring when clicked.
+ */
+.main:focus {
+  outline: none;
+}
