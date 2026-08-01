@@ -25,7 +25,8 @@
     "test:watch": "vitest",
     "test:live": "vitest run --config vitest.live.config.ts",
     "test:e2e": "playwright test",
-    "validate:presets": "tsx scripts/validate-presets.ts"
+    "validate:presets": "tsx scripts/validate-presets.ts",
+    "verify:cors": "node scripts/verify-live-cors.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",

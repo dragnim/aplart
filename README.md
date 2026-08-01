@@ -65,6 +65,7 @@ No API keys, accounts or secrets are needed.
 | `npm run test:live`        | Run the suite that calls the **real** TryAPL endpoint (see below). |
 | `npm run test:e2e`         | Build, preview and run the Playwright journeys.                    |
 | `npm run validate:presets` | Validate every preset and fail if any is malformed.                |
+| `npm run verify:cors`      | Check that the **deployed** site can reach the APL endpoint.       |
 
 `npm run test:live` is deliberately excluded from `npm test` and from the required CI checks. It calls
 a shared public service, and a pull request must not fail because that service is momentarily busy.
@@ -168,7 +169,19 @@ Item 0 is the session state (empty string starts a clean workspace) and item 3 i
 ## CORS troubleshooting
 
 TryAPL currently sends `Access-Control-Allow-Origin: *` on both the preflight and the `POST`, so the
-browser can call it directly from any origin and **no proxy is required**.
+browser can call it directly from any origin and **no proxy is required**. This has been confirmed
+end to end: a real Chromium page loaded from `https://dragnim.github.io/aplart/` successfully executed
+`3 3⍴⍳9` against `https://tryapl.org/Exec` and read the result back.
+
+Re-check it at any time with:
+
+```bash
+npm run verify:cors
+```
+
+That script loads the deployed site in a real browser and makes the request from that origin, which is
+the only way to test this — `curl` will happily read a response the browser would forbid, and testing
+from `localhost` proves nothing because the origin is the thing under test.
 
 If that ever changes, the symptom is a browser console error mentioning
 `No 'Access-Control-Allow-Origin' header` while `curl` against the same endpoint still succeeds — CORS
