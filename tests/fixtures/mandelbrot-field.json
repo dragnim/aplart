@@ -1,6 +1,6 @@
 {
   "presetId": "mandelbrot-field",
-  "codeHash": "78c6450c",
+  "codeHash": "0698aedf",
   "rows": 128,
   "columns": 128,
   "values": [
@@ -833,5 +833,5 @@
       2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2
     ]
   ],
-  "generatedAt": "2026-08-01T19:03:27.930Z"
+  "generatedAt": "2026-08-02T07:31:26.558Z"
 }

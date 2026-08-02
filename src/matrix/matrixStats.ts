@@ -4,6 +4,13 @@
  * Used by continuous colour mapping, which needs the range, and by the
  * canvas's accessible description, which needs something honest and short to
  * say about a picture it cannot show.
+ *
+ * A cell holding not-a-number is a cell that has not arrived — a banded run
+ * marks its unfetched region that way — and absence is not a value. Nothing
+ * here counts it: not the range, not the distinct total, not uniformity. The
+ * contract is safe for a partly delivered matrix directly, rather than depending
+ * on every caller remembering to pass only the part that has arrived, because a
+ * caller that forgets gets a plausible wrong answer rather than a crash.
  */
 
 import { type NumericMatrix } from './matrixTypes';
@@ -18,8 +25,10 @@ export interface MatrixStats {
    */
   readonly distinct: number;
   readonly distinctCapped: boolean;
-  /** True when every cell holds the same value; continuous mapping guards on this. */
+  /** True when every value present is the same; continuous mapping guards on this. */
   readonly uniform: boolean;
+  /** How many cells hold a value at all. Below `rows × columns` mid-delivery. */
+  readonly counted: number;
 }
 
 const DEFAULT_DISTINCT_LIMIT = 256;
@@ -27,17 +36,20 @@ const DEFAULT_DISTINCT_LIMIT = 256;
 export function matrixStats(matrix: NumericMatrix, distinctLimit = DEFAULT_DISTINCT_LIMIT): MatrixStats {
   const { values } = matrix;
 
-  if (values.length === 0) {
-    return { min: 0, max: 0, distinct: 0, distinctCapped: false, uniform: true };
-  }
-
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
   const seen = new Set<number>();
   let capped = false;
+  let counted = 0;
 
   for (let index = 0; index < values.length; index += 1) {
     const value = values[index] as number;
+    // Absence, skipped outright. A comparison against it is false either way, so
+    // the range was already safe; the distinct set was not, because a set holds
+    // it as happily as any number.
+    if (!Number.isFinite(value)) continue;
+
+    counted += 1;
     if (value < min) min = value;
     if (value > max) max = value;
     if (!capped) {
@@ -46,12 +58,19 @@ export function matrixStats(matrix: NumericMatrix, distinctLimit = DEFAULT_DISTI
     }
   }
 
+  // Nothing to describe: an empty matrix, or one whose every cell is still on
+  // its way. Zeroes rather than the infinities the loop would otherwise leave.
+  if (counted === 0) {
+    return { min: 0, max: 0, distinct: 0, distinctCapped: false, uniform: true, counted: 0 };
+  }
+
   return {
     min,
     max,
     distinct: seen.size,
     distinctCapped: capped,
     uniform: min === max,
+    counted,
   };
 }
 

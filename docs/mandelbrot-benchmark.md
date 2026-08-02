@@ -30,7 +30,8 @@ Two ways of counting how long each point of a grid stays near the origin under
 `z ← z² + c`.
 
 **Full matrix** iterates every point for the full count, escaped or not. This is
-what the preset ships today.
+what the preset shipped when the benchmark ran; it has since gained a boolean
+escape mask, which changes no output measured here.
 
 **Active points** removes escaped points from later iterations, so the work per
 step shrinks as the exterior falls away. The intuition is that most of a typical
@@ -40,7 +41,7 @@ Both are held in [`scripts/lib/mandelbrotVariants.ts`](../scripts/lib/mandelbrot
 which nothing in the application imports. An experiment cannot reach the artwork
 someone sees until a written recommendation says it should.
 
-### Full matrix, as shipped
+### Full matrix, as benchmarked
 
 ```apl
 ⍝ Controls
@@ -65,6 +66,21 @@ step←{(zr zi n)←⍵ ⋄ m←4>(zr*2)+zi*2 ⋄ (¯9⌈9⌊cr+(zr*2)-zi*2)(¯9
 The clamp is not decoration. An escaped point's magnitude grows without bound;
 an infinity minus an infinity is not-a-number, which compares false against the
 escape test and would start being counted as inside again.
+
+**This is the version that was benchmarked, and it is no longer what ships.**
+Bounding the orbit turned out to allow a different route to the same fault — see
+[Correctness](#correctness) — so the shipped step now carries a boolean mask and
+counts that instead:
+
+```apl
+⍝ Repeat z←z²+c, counting the steps each point survives. `a` marks the
+⍝ points that have not escaped; once one has, it can never count again.
+step←{(zr zi a n)←⍵ ⋄ a←a∧4>(zr*2)+zi*2 ⋄ (¯9⌈9⌊cr+(zr*2)-zi*2)(¯9⌈9⌊ci+2×zr×zi)a(n+a)}
+⊃⌽step⍣iterations⊢(cr×0)(ci×0)((size,size)⍴1)(cr×0)
+```
+
+The timings below are unaffected: the mask costs nothing measurable, and every
+view tested here produces the identical matrix either way.
 
 ### Active points
 
@@ -173,10 +189,33 @@ counting — `|z²| > 4` and `|c| ≲ 2.5` leaves `|z² + c|` as low as about 1.
 is inside. The active-point version removes such a point permanently. The two
 would then differ.
 
-It never happened across 240 comparisons spanning 2,958,960 cells. The
-behaviour is not proven impossible by this evidence — only unobserved at these
-parameters. Anyone reviving the alternative should re-check it rather than trust
-this paragraph.
+It never happened across 240 comparisons spanning 2,958,960 cells.
+
+**It does happen, and the shipped code has since been fixed.** Sweeping the
+clamped map directly rather than only the views tested here found re-entry at
+`c = ¯72.4`: z is counted once from 0, clamps to ¯9 and has escaped, becomes
+8.6, then 1.56 — magnitude 2.43, back inside — and the old code counted it again.
+Confirmed against the live service, which returned 3 where the answer is 1.
+
+The smallest re-entering `c` has magnitude about 72 and the sliders reach about
+4, so no view the controls can produce was ever affected — which is why 240
+comparisons and every committed fixture missed it. The code is editable, though,
+and that is the entire premise of the application, so the count should not have
+rested on nobody typing `centreX←¯72.4`.
+
+The fix keeps the whole-array arithmetic and makes escape monotonic: a boolean
+mask `a` is carried alongside, `a←a∧4>|z|²` each step, and the count accumulates
+`a` rather than a freshly computed test. Output is unchanged everywhere it was
+already correct — 21 view-and-size combinations verified identical, and the
+committed fixture's values are byte-for-byte what they were — and the cost is
+within noise (−10% at 144²×60, three runs each, alternated). See
+[`scripts/verify-escape-mask.ts`](../scripts/verify-escape-mask.ts) and
+`tests/live/escapeMonotonic.test.ts`.
+
+The active-point implementation was, incidentally, right about this by
+construction: it removes an escaped point rather than re-testing it. That is a
+point in its favour and not enough of one to change the recommendation, since
+the same property is available for one boolean array.
 
 ## Results
 

@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { migratePresetCode } from '@/presets/codeMigrations';
 import { bindingStateFor } from '@/editor/parameterBinding';
 import { truchetGrid } from '@/presets/truchet-grid';
+import { mandelbrotField } from '@/presets/mandelbrot-field';
 
 /** A Truchet tiling as it was shared before the rename. */
 const OLD_CODE = [
@@ -163,5 +164,43 @@ describe('migratePresetCode', () => {
       expect(migrated).toContain('classes←2');
       expect(migrated).toContain('⍝ four tile classes look best');
     });
+  });
+});
+
+describe('bringing forward a corrected line', () => {
+  const OLD_STEP = 'step←{(zr zi n)←⍵ ⋄ m←4>(zr*2)+zi*2 ⋄ (¯9⌈9⌊cr+(zr*2)-zi*2)(¯9⌈9⌊ci+2×zr×zi)(n+m)}';
+  const OLD_SEED = '⊃⌽step⍣iterations⊢(cr×0)(ci×0)(cr×0)';
+
+  it('replaces the step that resumed counting after an escape', () => {
+    const before = ['size←128', OLD_STEP, OLD_SEED].join('\n');
+    const after = migratePresetCode('mandelbrot-field', before);
+
+    // The saved artwork gets the correction, so somebody who never edited the
+    // code is not left running a version with a known wrong answer in it.
+    expect(after).toContain('a←a∧4>(zr*2)+zi*2');
+    expect(after).toContain('((size,size)⍴1)');
+    expect(after).not.toContain(OLD_STEP);
+  });
+
+  it('leaves the line alone once it is already current', () => {
+    const current = mandelbrotField.code;
+    expect(migratePresetCode('mandelbrot-field', current)).toBe(current);
+  });
+
+  it('does not touch a step somebody has edited themselves', () => {
+    /*
+     * Matched exactly, so a partial match cannot rewrite half of an edit into
+     * something that no longer runs. Their code is theirs; only an untouched
+     * copy of ours is ours to correct.
+     */
+    const edited = OLD_STEP.replace('4>', '9>');
+    const before = ['size←128', edited, OLD_SEED].join('\n');
+
+    expect(migratePresetCode('mandelbrot-field', before)).toContain(edited);
+  });
+
+  it('says nothing about other presets', () => {
+    const before = ['size←128', OLD_STEP].join('\n');
+    expect(migratePresetCode('truchet-grid', before)).toContain(OLD_STEP);
   });
 });

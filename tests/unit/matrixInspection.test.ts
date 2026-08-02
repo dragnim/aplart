@@ -116,27 +116,81 @@ describe('a partly delivered buffer', () => {
     expect(Number.isNaN(stats.max)).toBe(false);
   });
 
-  it('ignores absence in the range, but would count it as a distinct value', () => {
+  it('leaves absence out of every statistic, not only the range', () => {
     /*
-     * Stated as it is rather than as one might hope. Every comparison against
-     * not-a-number is false, so it can never become the smallest or largest
-     * value and the colour range is safe either way. The distinct count is not:
-     * a set holds it like anything else, and a half-delivered artwork would
-     * describe itself as having one more distinct value than it does.
+     * The range was already safe by accident: every comparison against
+     * not-a-number is false, so it could never become the smallest or largest
+     * value. The distinct count was not — a set holds it like anything else —
+     * and a half-delivered artwork described itself as having one more distinct
+     * value than it did.
      *
-     * Which is why the workspace takes statistics over the cells that have
-     * arrived rather than over the whole buffer. If that ever changes, this
-     * says what will go wrong.
+     * Now absence is skipped outright, so the contract holds for a partial
+     * matrix directly rather than depending on the caller slicing off the part
+     * that has arrived.
      */
-    const polluted = matrixStats({
-      rows: 1,
-      columns: 3,
-      values: Float64Array.from([4, Number.NaN, 9]),
+    const stats = matrixStats({
+      rows: 2,
+      columns: 4,
+      values: Float64Array.from([4, Number.NaN, 9, 4, Number.NaN, Number.NaN, 9, 4]),
     });
 
-    expect(polluted.min).toBe(4);
-    expect(polluted.max).toBe(9);
-    expect(polluted.distinct).toBe(3);
+    expect(stats.min).toBe(4);
+    expect(stats.max).toBe(9);
+    expect(stats.distinct).toBe(2);
+    expect(stats.counted).toBe(5);
+    expect(stats.uniform).toBe(false);
+  });
+
+  it('calls a matrix uniform when every value that has arrived agrees', () => {
+    const stats = matrixStats({
+      rows: 1,
+      columns: 4,
+      values: Float64Array.from([28, 28, Number.NaN, Number.NaN]),
+    });
+
+    expect(stats.uniform).toBe(true);
+    expect(isUniform(stats)).toBe(true);
+    expect(stats.counted).toBe(2);
+  });
+
+  it('describes a matrix that holds nothing yet as empty rather than infinite', () => {
+    const stats = matrixStats({
+      rows: 1,
+      columns: 3,
+      values: Float64Array.from([Number.NaN, Number.NaN, Number.NaN]),
+    });
+
+    // The loop's sentinels are ±Infinity; reporting those as the range would
+    // give the colour mapper a span of infinity to normalise against.
+    expect(stats).toEqual({ min: 0, max: 0, distinct: 0, distinctCapped: false, uniform: true, counted: 0 });
+    expect(isUniform(stats)).toBe(false);
+  });
+
+  it('counts a share against the cells that exist, not the ones on their way', () => {
+    /*
+     * Sharing "3 of 8 cells" while five have not arrived would report a
+     * percentage that fell as the rest landed — a figure describing the
+     * delivery rather than the artwork.
+     */
+    const matrix = {
+      rows: 2,
+      columns: 4,
+      values: Float64Array.from([4, Number.NaN, 9, 4, Number.NaN, Number.NaN, 9, 4]),
+    };
+    const reading = readCell(matrix, matrixStats(matrix), 1, 1);
+
+    expect(reading?.value).toBe(4);
+    expect(reading?.matching).toBe(3);
+    expect(reading?.total).toBe(5);
+  });
+
+  it('refuses to read a cell that has not arrived', () => {
+    const matrix = { rows: 1, columns: 2, values: Float64Array.from([4, Number.NaN]) };
+
+    // There is no value there to describe, and inventing one would be worse
+    // than declining.
+    expect(readCell(matrix, matrixStats(matrix), 1, 2)).toBeNull();
+    expect(readCell(matrix, matrixStats(matrix), 1, 1)?.value).toBe(4);
   });
 
   it('counts matching cells only among real values', () => {

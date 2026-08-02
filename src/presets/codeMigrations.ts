@@ -18,6 +18,30 @@
 
 import { stripComment } from '@/execution/aplSource';
 
+/**
+ * Whole lines a preset has replaced, per preset. Append; never reorder.
+ *
+ * A heavier hammer than a rename and used for one thing only: a line that was
+ * wrong. Matched exactly, so somebody who edited that line keeps what they
+ * wrote — their code is theirs, and only an untouched copy of ours is ours to
+ * correct.
+ */
+const REPLACEMENTS: Readonly<Record<string, readonly (readonly [string, string])[]>> = {
+  /*
+   * Escape was re-tested every step rather than recorded, so a clamped orbit
+   * that fell back inside the escape radius resumed counting. Unreachable with
+   * the sliders and reachable by typing, which is not a distinction the count
+   * should rest on.
+   */
+  'mandelbrot-field': [
+    [
+      'step←{(zr zi n)←⍵ ⋄ m←4>(zr*2)+zi*2 ⋄ (¯9⌈9⌊cr+(zr*2)-zi*2)(¯9⌈9⌊ci+2×zr×zi)(n+m)}',
+      'step←{(zr zi a n)←⍵ ⋄ a←a∧4>(zr*2)+zi*2 ⋄ (¯9⌈9⌊cr+(zr*2)-zi*2)(¯9⌈9⌊ci+2×zr×zi)a(n+a)}',
+    ],
+    ['⊃⌽step⍣iterations⊢(cr×0)(ci×0)(cr×0)', '⊃⌽step⍣iterations⊢(cr×0)(ci×0)((size,size)⍴1)(cr×0)'],
+  ],
+};
+
 /** Old name to new name, per preset. Append; never reorder or remove. */
 const RENAMES: Readonly<Record<string, readonly (readonly [string, string])[]>> = {
   // "density" never described a count of tile shapes; it described nothing.
@@ -104,10 +128,11 @@ function usesIdentifier(code: string, name: string): boolean {
 }
 
 export function migratePresetCode(presetId: string, code: string): string {
-  const renames = RENAMES[presetId];
-  if (renames === undefined) return code;
+  let migrated = replaceLines(presetId, code);
 
-  let migrated = code;
+  const renames = RENAMES[presetId];
+  if (renames === undefined) return migrated;
+
   for (const [from, to] of renames) {
     // Already using the new name: nothing to bring forward, and rewriting could
     // only collide with something the author put there themselves.
@@ -115,4 +140,21 @@ export function migratePresetCode(presetId: string, code: string): string {
     migrated = mapCode(migrated, (text) => text.replace(wholeIdentifier(from), to));
   }
   return migrated;
+}
+
+/**
+ * Swaps whole lines a preset has since corrected.
+ *
+ * Line by line and exact, including leading and trailing space. A partial match
+ * would rewrite half of somebody's edit into something that no longer runs, and
+ * the point of being narrow is that the failure mode is doing nothing.
+ */
+function replaceLines(presetId: string, code: string): string {
+  const replacements = REPLACEMENTS[presetId];
+  if (replacements === undefined) return code;
+
+  return code
+    .split('\n')
+    .map((line) => replacements.find(([from]) => from === line.trim())?.[1] ?? line)
+    .join('\n');
 }

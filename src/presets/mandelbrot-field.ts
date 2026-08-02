@@ -9,6 +9,15 @@ import { type ArtworkPreset } from './schema';
  * has escaped its value grows without bound, and an infinity minus an infinity
  * would become NaN and start being counted as inside again.
  *
+ * Escape is recorded rather than re-tested. Clamping bounds an escaped point's
+ * orbit instead of letting it run to infinity, and a bounded orbit can come
+ * back: at `centreX←¯72.4` the shipped code without the mask counted 3 where
+ * the answer is 1, because the clamped value fell below the escape radius twice
+ * more. No view the sliders can reach does this — the smallest such `c` has
+ * magnitude about 72, and the sliders stop near 4 — but the code is editable,
+ * which is the entire point of the application, so the count must not depend on
+ * nobody typing that.
+ *
  * The only preset that declares high-resolution output. It is worth the extra
  * requests here: the detail is the point of a fractal, and 90 rows is not
  * enough to show it.
@@ -37,10 +46,10 @@ export const mandelbrotField: ArtworkPreset = {
     'cr←(size,size)⍴ax',
     'ci←⍉(size,size)⍴ay',
     '',
-    '⍝ Repeat z←z²+c, counting the steps each point survives.',
-    '⍝ The clamp stops escaped points overflowing to infinity.',
-    'step←{(zr zi n)←⍵ ⋄ m←4>(zr*2)+zi*2 ⋄ (¯9⌈9⌊cr+(zr*2)-zi*2)(¯9⌈9⌊ci+2×zr×zi)(n+m)}',
-    '⊃⌽step⍣iterations⊢(cr×0)(ci×0)(cr×0)',
+    '⍝ Repeat z←z²+c, counting the steps each point survives. `a` marks the',
+    '⍝ points that have not escaped; once one has, it can never count again.',
+    'step←{(zr zi a n)←⍵ ⋄ a←a∧4>(zr*2)+zi*2 ⋄ (¯9⌈9⌊cr+(zr*2)-zi*2)(¯9⌈9⌊ci+2×zr×zi)a(n+a)}',
+    '⊃⌽step⍣iterations⊢(cr×0)(ci×0)((size,size)⍴1)(cr×0)',
   ].join('\n'),
 
   parameters: [
