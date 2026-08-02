@@ -1,0 +1,59 @@
+.group {
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.legend {
+  padding: 0;
+  /* A legend sits outside the grid, so its spacing has to be its own. */
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.mode {
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.mode:hover {
+  border-color: var(--border-strong);
+}
+
+/* Selection is shown by a ring and a bold label, not by colour alone. */
+.mode[data-selected='true'] {
+  border-color: var(--dyalog-orange);
+  box-shadow: inset 0 0 0 1px var(--dyalog-orange);
+  font-weight: 700;
+}
+
+.note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}

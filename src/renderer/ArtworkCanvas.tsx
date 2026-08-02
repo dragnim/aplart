@@ -12,6 +12,7 @@ import { describeMatrix, type MatrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
 import { drawArtwork, drawCellMarker, type DrawRequest } from './CanvasRenderer';
+import { describeTiling, isRepeating, type TilingView } from './tiling';
 import { type SourceCell, type SourceRect } from './displayMapping';
 import { animatePalette, phaseFor, type AnimationSettings } from './paletteAnimation';
 import { paletteFor, transformMatrix, type RenderOptions } from './renderOptions';
@@ -213,7 +214,15 @@ export function ArtworkCanvas({
         className={styles.canvas}
         ref={canvas}
         role="img"
-        aria-label={describeMatrix(displayed, stats, palette.name)}
+        /*
+         * The repeat is part of what is on screen, so it belongs in the
+         * description rather than in a live region of its own. Changing the
+         * setting moves focus through a radio group that announces itself; a
+         * third polite region would talk over that to say the same thing.
+         */
+        aria-label={`${describeMatrix(displayed, stats, palette.name)}${
+          isRepeating(options.tiling) ? ` ${describeTiling(options.tiling as TilingView)}` : ''
+        }`}
         onPointerDown={pointer.onPointerDown}
         onPointerMove={pointer.onPointerMove}
         onPointerUp={pointer.onPointerUp}

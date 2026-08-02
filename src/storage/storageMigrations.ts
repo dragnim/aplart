@@ -8,6 +8,7 @@
 
 import { CUSTOM_PALETTE_ID, parseStops } from '@/renderer/customPalette';
 import { normaliseColouring } from '@/renderer/escapeColouring';
+import { normaliseTiling } from '@/renderer/tiling';
 import { DEFAULT_PALETTE_ID, canonicalPaletteId, paletteExists } from '@/renderer/palettes';
 import { defaultRenderOptions, isRotation, type RenderOptions } from '@/renderer/renderOptions';
 import { PROJECT_SCHEMA_VERSION, type Project, type StoredMatrix } from './ProjectRepository';
@@ -106,6 +107,9 @@ function normaliseRenderOptions(value: unknown, paletteId: string): RenderOption
     mirrorHorizontally: record.mirrorHorizontally === true,
     mirrorVertically: record.mirrorVertically === true,
     smoothScaling: record.smoothScaling === true,
+    // Repaired rather than refused, and absent in everything saved before
+    // repeating existed — which reads as a single copy, exactly as it looked.
+    tiling: normaliseTiling(record.tiling),
     ...(customStops === null ? {} : { customStops }),
     ...(colouring === null ? {} : { colouring }),
   };

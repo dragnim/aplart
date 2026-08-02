@@ -11,10 +11,16 @@ import { config } from '@/app/config';
 import { isRotation, type RenderOptions } from '@/renderer/renderOptions';
 import { CUSTOM_PALETTE_ID, decodeStops } from '@/renderer/customPalette';
 import { normaliseColouring } from '@/renderer/escapeColouring';
+import { normaliseTiling } from '@/renderer/tiling';
 import { DEFAULT_PALETTE_ID, canonicalPaletteId, paletteExists } from '@/renderer/palettes';
 import { fromBase64Url } from './encodeShareState';
 import { migrateShareState } from './migrations';
-import { MAX_DECODED_SHARE_BYTES, SHARE_SCHEMA_VERSION, type SharedArtworkState } from './shareState';
+import {
+  MAX_DECODED_SHARE_BYTES,
+  SHARE_SCHEMA_VERSION,
+  type SharedArtworkState,
+  type SharedTilingState,
+} from './shareState';
 
 export type DecodeResult =
   { readonly ok: true; readonly state: SharedArtworkState } | { readonly ok: false; readonly reason: string };
@@ -115,6 +121,26 @@ export function validateShareState(parsed: unknown): DecodeResult {
       ...(decodeStops(source.stops) === null ? {} : { stops: source.stops as string }),
       ...(normaliseColouring(source.colouring) === null ? {} : { colouring: source.colouring }),
       render: normaliseRender(source.render),
+      /*
+       * Rebuilt rather than passed through, like everything else here: the
+       * validator's job is to construct a state it vouches for, so a field it
+       * does not name is a field that does not survive. Omitted when it comes to
+       * nothing, so a link showing one copy carries no tiling block at all.
+       */
+      ...(() => {
+        const tiling = normaliseTiling(source.tiling);
+        return tiling.mode === 'single'
+          ? {}
+          : {
+              tiling: {
+                mode: tiling.mode,
+                columns: tiling.columns,
+                rows: tiling.rows,
+                scale: tiling.scale,
+                showSeamGuides: tiling.showSeamGuides,
+              },
+            };
+      })(),
       ...(typeof source.seed === 'number' && Number.isFinite(source.seed) ? { seed: source.seed } : {}),
       ...(title === undefined || title === '' ? {} : { title }),
     },
@@ -153,6 +179,9 @@ export function toRenderOptions(state: SharedArtworkState): RenderOptions {
     mirrorHorizontally: state.render.mirrorH,
     mirrorVertically: state.render.mirrorV,
     smoothScaling: state.render.smooth,
+    // Anything unrecognised, including a mode from a later version, falls back
+    // to a single copy rather than to a composition this build cannot draw.
+    tiling: normaliseTiling(state.tiling),
   };
 }
 
@@ -164,5 +193,19 @@ export function fromRenderOptions(options: RenderOptions) {
     mirrorH: options.mirrorHorizontally,
     mirrorV: options.mirrorVertically,
     smooth: options.smoothScaling,
+  };
+}
+
+/** The tiling half of a shared link, omitted entirely when nothing repeats. */
+export function fromTilingOptions(options: RenderOptions): SharedTilingState | undefined {
+  const tiling = options.tiling;
+  if (tiling === undefined || tiling.mode === 'single') return undefined;
+
+  return {
+    mode: tiling.mode,
+    columns: tiling.columns,
+    rows: tiling.rows,
+    scale: tiling.scale,
+    showSeamGuides: tiling.showSeamGuides,
   };
 }

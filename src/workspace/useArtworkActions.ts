@@ -16,7 +16,7 @@ import { downloadBlob, exportArtworkPng, exportFilename, type ExportSize } from 
 import { encodeStops, stopsAreUsable } from '@/renderer/customPalette';
 import { animatePalette, type AnimationSettings } from '@/renderer/paletteAnimation';
 import { paletteFor } from '@/renderer/renderOptions';
-import { fromRenderOptions } from '@/sharing/decodeShareState';
+import { fromRenderOptions, fromTilingOptions } from '@/sharing/decodeShareState';
 import { buildShareUrl, encodeShareState } from '@/sharing/encodeShareState';
 import { SHARE_SCHEMA_VERSION, SHARE_URL_WARNING_LENGTH } from '@/sharing/shareState';
 import { type EscapeSettings } from './escapeSettings';
@@ -70,6 +70,12 @@ export function useArtworkActions(options: {
         : {}),
       ...(state.renderOptions.colouring === undefined ? {} : { colouring: state.renderOptions.colouring }),
       render: fromRenderOptions(state.renderOptions),
+      // Omitted entirely when nothing repeats, so a link to a single copy is
+      // exactly as short as it was before repeating existed.
+      ...(() => {
+        const tiling = fromTilingOptions(state.renderOptions);
+        return tiling === undefined ? {} : { tiling };
+      })(),
       title: preset.title,
       ...(seed === undefined ? {} : { seed }),
     });

@@ -27,8 +27,21 @@ export interface SharedArtworkState {
   /** How escape counts are coloured. Absent unless it differs from the default. */
   readonly colouring?: unknown;
   readonly render: SharedRenderOptions;
+  /**
+   * How the artwork is repeated. Optional, so a link written before repeating
+   * existed is unchanged and opens showing one copy.
+   */
+  readonly tiling?: SharedTilingState;
   readonly seed?: number;
   readonly title?: string;
+}
+
+export interface SharedTilingState {
+  readonly mode: string;
+  readonly columns: number;
+  readonly rows: number;
+  readonly scale?: number;
+  readonly showSeamGuides?: boolean;
 }
 
 export interface SharedRenderOptions {

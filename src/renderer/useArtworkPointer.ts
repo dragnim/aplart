@@ -26,6 +26,7 @@ import {
   type SourceRect,
 } from './displayMapping';
 import { fitArtwork } from './fitArtwork';
+import { tileAt, tileCounts, tileGrid } from './tiling';
 import { type RenderOptions } from './renderOptions';
 
 /** A rectangle in CSS pixels, relative to the element, for drawing the overlay. */
@@ -129,7 +130,16 @@ export function useArtworkPointer(options: {
         onInspect: inspect,
       } = latest.current;
       const shown = displayedShape(sourceRows, sourceColumns, render);
-      const box = fitArtwork(shown.columns, shown.rows, finished.bounds.width, finished.bounds.height);
+      const { columns: across, rows: down } = tileCounts(render.tiling);
+      const grid = tileGrid(
+        shown.columns,
+        shown.rows,
+        across,
+        down,
+        finished.bounds.width,
+        finished.bounds.height,
+      );
+      const box = grid.box;
       if (box.width === 0 || box.height === 0) return;
 
       const moved = Math.max(Math.abs(x1 - finished.x0), Math.abs(y1 - finished.y0));
@@ -140,13 +150,20 @@ export function useArtworkPointer(options: {
        * and a press never also zooms.
        */
       if (moved < MINIMUM_DRAG || !enabled) {
-        // Unclamped, so a press on the mat beside the artwork misses rather than
-        // being rounded onto the nearest edge cell.
-        const exact = {
-          u: (x1 - box.left) / box.width,
-          v: (y1 - box.top) / box.height,
-        };
-        const source = displayToSource(exact, render);
+        /*
+         * Which copy was pressed, and where inside it. Every copy is the same
+         * artwork, so the answer is the same source cell wherever the press
+         * landed — the repeat is a way of looking at one matrix, not a larger
+         * one. Returns null off the composition entirely, so a press on the mat
+         * beside the artwork misses rather than being rounded onto an edge cell.
+         */
+        const hit = tileAt(grid, x1, y1);
+        if (hit === null) {
+          inspect(null);
+          return;
+        }
+
+        const source = displayToSource({ u: hit.u, v: hit.v }, render);
         inspect(sourceCellAt(source, sourceRows, sourceColumns));
         return;
       }

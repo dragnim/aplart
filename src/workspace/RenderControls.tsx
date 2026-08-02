@@ -17,6 +17,8 @@ import { palettes } from '@/renderer/palettes';
 import { paletteFor } from '@/renderer/renderOptions';
 import { type AnimationSettings } from '@/renderer/paletteAnimation';
 import { AnimationControls } from './AnimationControls';
+import { TilingControls } from './TilingControls';
+import { DEFAULT_TILING } from '@/renderer/tiling';
 import { ColouringControls } from './ColouringControls';
 import { type EscapeSettings } from './escapeSettings';
 import { PaletteEditor } from './PaletteEditor';
@@ -190,6 +192,12 @@ export function RenderControls({
           />
         </div>
       </fieldset>
+
+      {/*
+        After orientation, because the base tile is what gets repeated: rotating
+        and mirroring shape the copy, and the repeat is built from the result.
+      */}
+      <TilingControls tiling={options.tiling ?? DEFAULT_TILING} onChange={(tiling) => onChange({ tiling })} />
     </div>
   );
 }

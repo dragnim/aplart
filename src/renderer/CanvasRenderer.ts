@@ -12,7 +12,7 @@ import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
 import { cellBounds, displayedShape, type SourceCell } from './displayMapping';
 import { type Palette } from './palettes';
-import { fitArtwork } from './fitArtwork';
+import { tileCounts, tileGrid, tileRect } from './tiling';
 import { renderArtwork, type RenderArtworkOptions } from './renderArtwork';
 import { paletteFor, transformMatrix, type RenderOptions } from './renderOptions';
 
@@ -86,9 +86,15 @@ export function drawArtwork(
 
   const source = toSourceCanvas(image);
 
-  // Letterbox rather than stretch: an artwork's aspect ratio is part of it.
-  // Shared with the hit-testing, which has to agree with this exactly.
-  const box = fitArtwork(image.width, image.height, pixelWidth, pixelHeight);
+  /*
+   * Letterbox rather than stretch: an artwork's aspect ratio is part of it.
+   * Shared with the hit-testing, which has to agree with this exactly — and now
+   * shared through the tile grid, which reduces to a single letterboxed cell
+   * when nothing is being repeated.
+   */
+  const { columns, rows } = tileCounts(request.options.tiling);
+  const grid = tileGrid(image.width, image.height, columns, rows, pixelWidth, pixelHeight);
+  const box = grid.box;
 
   context.imageSmoothingEnabled = request.options.smoothScaling;
   if (request.options.smoothScaling) context.imageSmoothingQuality = 'high';
@@ -114,7 +120,18 @@ export function drawArtwork(
     context.restore();
   }
 
-  context.drawImage(source, box.left, box.top, box.width, box.height);
+  /*
+   * One rendered tile, drawn once per copy. The matrix is parsed once, the
+   * image is built once and the statistics are computed once however many
+   * copies are on screen — a repeat is a drawing operation, not a re-render.
+   */
+  for (let row = 0; row < grid.rows; row += 1) {
+    for (let column = 0; column < grid.columns; column += 1) {
+      const cell = tileRect(grid, column, row);
+      if (cell.width <= 0 || cell.height <= 0) continue;
+      context.drawImage(source, cell.left, cell.top, cell.width, cell.height);
+    }
+  }
 }
 
 /** The stripe tile, built once and reused for every frame. */
@@ -174,15 +191,42 @@ export function drawCellMarker(
   if (context === null) return;
 
   const shown = displayedShape(matrix.rows, matrix.columns, options);
-  const box = fitArtwork(
+  const { columns, rows } = tileCounts(options.tiling);
+  const grid = tileGrid(
     shown.columns,
     shown.rows,
+    columns,
+    rows,
     Math.round(cssWidth * devicePixelRatio),
     Math.round(cssHeight * devicePixelRatio),
   );
-  if (box.width === 0 || box.height === 0) return;
+  if (grid.box.width === 0 || grid.box.height === 0) return;
 
   const bounds = cellBounds(cell, matrix.rows, matrix.columns, options);
+
+  /*
+   * Marked on every copy rather than on the one that was pressed.
+   *
+   * All of them show the same cell — that is what a repeat is — so marking one
+   * would suggest the others were a different cell, and the inspector goes out
+   * of its way to say they are not. Which copy the press landed on is not
+   * remembered anywhere, and deliberately: it is not part of the artwork.
+   */
+  for (let row = 0; row < grid.rows; row += 1) {
+    for (let column = 0; column < grid.columns; column += 1) {
+      const box = tileRect(grid, column, row);
+      if (box.width <= 0 || box.height <= 0) continue;
+      markCell(context, box, bounds, devicePixelRatio);
+    }
+  }
+}
+
+function markCell(
+  context: CanvasRenderingContext2D,
+  box: { left: number; top: number; width: number; height: number },
+  bounds: { left: number; top: number; width: number; height: number },
+  devicePixelRatio: number,
+): void {
   const left = box.left + bounds.left * box.width;
   const top = box.top + bounds.top * box.height;
   const width = bounds.width * box.width;

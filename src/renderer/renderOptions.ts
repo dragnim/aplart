@@ -10,6 +10,7 @@ import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { CUSTOM_PALETTE_ID, paletteFromStops, stopsAreUsable, type ColourStop } from './customPalette';
 import { type Colouring } from './escapeColouring';
 import { getPalette, type Palette } from './palettes';
+import { DEFAULT_TILING, type TilingView } from './tiling';
 
 export type Rotation = 0 | 90 | 180 | 270;
 
@@ -37,6 +38,13 @@ export interface RenderOptions {
   readonly mirrorVertically: boolean;
   /** Nearest-neighbour keeps cell edges crisp; smoothing blurs them deliberately. */
   readonly smoothScaling: boolean;
+  /**
+   * How the finished artwork is repeated across the viewport.
+   *
+   * Composition, not calculation: the same rendered tile drawn several times.
+   * Absent from everything saved before it existed, which reads as one copy.
+   */
+  readonly tiling?: TilingView;
 }
 
 export function defaultRenderOptions(paletteId: string): RenderOptions {
@@ -47,6 +55,7 @@ export function defaultRenderOptions(paletteId: string): RenderOptions {
     mirrorHorizontally: false,
     mirrorVertically: false,
     smoothScaling: false,
+    tiling: DEFAULT_TILING,
   };
 }
 

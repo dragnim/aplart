@@ -27,6 +27,7 @@ import { type ArtworkParameter, type ArtworkPreset } from '@/presets/schema';
 import { ArtworkCanvas } from '@/renderer/ArtworkCanvas';
 import { DEFAULT_ANIMATION, type AnimationSettings } from '@/renderer/paletteAnimation';
 import { escapeSettingsFor } from './escapeSettings';
+import { isRepeating } from '@/renderer/tiling';
 import { defaultRenderOptions } from '@/renderer/renderOptions';
 import { decodeShareState, toRenderOptions } from '@/sharing/decodeShareState';
 import { numberAssignedTo } from '@/editor/parameterBinding';
@@ -736,7 +737,16 @@ function Workspace({
             : // Off when the code no longer says where the view is. Someone who
               // has rewritten `zoom←` into an expression is not served by a
               // drag that overwrites it.
-              { enabled: viewport !== null, onSelect: handleSelectRegion }
+              {
+                /*
+                 * Not while the artwork is repeated. A rectangle dragged across
+                 * several copies names no single region of the plane, and
+                 * zooming to whichever copy it started in would be a guess. The
+                 * Pan and Zoom buttons still work, and they are unambiguous.
+                 */
+                enabled: viewport !== null && !isRepeating(state.renderOptions.tiling),
+                onSelect: handleSelectRegion,
+              }
         }
         // `reading` rather than `inspected`: a cell remembered from a result of a
         // different shape has already stopped matching, so the outline goes with
