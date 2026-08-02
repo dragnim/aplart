@@ -20,7 +20,9 @@ import {
   tileAt,
   tileCounts,
   tileGrid,
+  tileParity,
   tileRect,
+  unreflect,
   type TilingView,
 } from '@/renderer/tiling';
 
@@ -35,13 +37,17 @@ describe('reading a tiling setting from outside', () => {
     }
   });
 
-  it('falls back to a single copy for a mode this build cannot draw', () => {
+  it('accepts mirrored repeats now that they can be drawn', () => {
+    expect(normaliseTiling({ mode: 'mirror-repeat', columns: 3, rows: 3 }).mode).toBe('mirror-repeat');
+  });
+
+  it('still falls back to a single copy for a mode this build cannot draw', () => {
     /*
-     * A later version may add mirrored composition. A link written by it must
-     * not open here showing an ordinary repeat while claiming to be mirrored —
-     * one copy is never wrong, and a wrong claim is.
+     * The guarantee that let mirrored repeats be added safely, and it has to
+     * keep holding for whatever comes next. A link from a later version must
+     * not open here as something this build can only approximate.
      */
-    expect(normaliseTiling({ mode: 'mirror-repeat', columns: 3, rows: 3 }).mode).toBe('single');
+    expect(normaliseTiling({ mode: 'brick-offset', columns: 3, rows: 3 }).mode).toBe('single');
   });
 
   it('clamps counts into the range the interface can draw', () => {
@@ -341,5 +347,131 @@ describe('a press exactly on a boundary', () => {
     const boundary = tileRect(grid, 1, 0).left;
     const answers = new Set(Array.from({ length: 20 }, () => JSON.stringify(tileAt(grid, boundary, 150))));
     expect(answers.size).toBe(1);
+  });
+});
+
+describe('mirrored composition', () => {
+  it('reflects alternate copies and leaves the rest alone', () => {
+    const grid = tileGrid(64, 64, 3, 3, 300, 300, 1, true);
+
+    /*
+     *   plain   flipX   plain
+     *   flipY   flipXY  flipY
+     *   plain   flipX   plain
+     */
+    expect(tileParity(grid, 0, 0)).toEqual({ mirrorX: false, mirrorY: false });
+    expect(tileParity(grid, 1, 0)).toEqual({ mirrorX: true, mirrorY: false });
+    expect(tileParity(grid, 0, 1)).toEqual({ mirrorX: false, mirrorY: true });
+    expect(tileParity(grid, 1, 1)).toEqual({ mirrorX: true, mirrorY: true });
+    // Odd counts continue the alternation rather than stopping at the 2 × 2.
+    expect(tileParity(grid, 2, 2)).toEqual({ mirrorX: false, mirrorY: false });
+    expect(tileParity(grid, 2, 1)).toEqual({ mirrorX: false, mirrorY: true });
+  });
+
+  it('reflects nothing at all in an ordinary repeat', () => {
+    const grid = tileGrid(64, 64, 3, 3, 300, 300, 1, false);
+    for (let row = 0; row < 3; row += 1) {
+      for (let column = 0; column < 3; column += 1) {
+        expect(tileParity(grid, column, row)).toEqual({ mirrorX: false, mirrorY: false });
+      }
+    }
+  });
+
+  it('gives neighbouring copies a shared edge', () => {
+    /*
+     * The whole point of the mode. A point just inside the right edge of an
+     * unreflected copy and the matching point just inside the left edge of the
+     * reflected copy beside it are the same place in the artwork, so the two
+     * edges show the same thing and the join disappears.
+     */
+    const grid = tileGrid(64, 64, 2, 2, 200, 200, 1, true);
+    const left = tileRect(grid, 0, 0);
+    const right = tileRect(grid, 1, 0);
+
+    const justInsideLeft = tileAt(grid, left.left + left.width - 1, left.top + 10);
+    const justInsideRight = tileAt(grid, right.left + 1, right.top + 10);
+
+    const a = unreflect(justInsideLeft as { u: number; v: number }, tileParity(grid, 0, 0));
+    const b = unreflect(justInsideRight as { u: number; v: number }, tileParity(grid, 1, 0));
+
+    expect(a.u).toBeCloseTo(b.u, 1);
+  });
+
+  it('lays copies out identically whether or not they are reflected', () => {
+    // Reflection happens inside the source image, so the destination
+    // rectangles are untouched and no new seam can appear.
+    const plain = tileGrid(64, 64, 3, 3, 401, 397, 0.75, false);
+    const mirrored = tileGrid(64, 64, 3, 3, 401, 397, 0.75, true);
+
+    expect(mirrored.xs).toEqual(plain.xs);
+    expect(mirrored.ys).toEqual(plain.ys);
+    expect(mirrored.region).toEqual(plain.region);
+  });
+
+  it('leaves no gap between neighbours at any count or scale', () => {
+    for (const count of [2, 3, 5]) {
+      for (const scale of [0.5, 0.75, 1, 1.5, 2]) {
+        for (const box of [401, 499, 1001]) {
+          const grid = tileGrid(64, 64, count, count, box, box - 7, scale, true);
+          for (let column = 0; column + 1 < grid.columns; column += 1) {
+            const a = tileRect(grid, column, 0);
+            const b = tileRect(grid, column + 1, 0);
+            expect(a.left + a.width, `${String(count)} at ${String(scale)}, ${String(box)}px`).toBe(b.left);
+          }
+        }
+      }
+    }
+  });
+});
+
+describe('undoing a copy’s reflection', () => {
+  it('flips only the axes that were flipped', () => {
+    const point = { u: 0.25, v: 0.75 };
+
+    expect(unreflect(point, { mirrorX: false, mirrorY: false })).toEqual(point);
+    expect(unreflect(point, { mirrorX: true, mirrorY: false })).toEqual({ u: 0.75, v: 0.75 });
+    expect(unreflect(point, { mirrorX: false, mirrorY: true })).toEqual({ u: 0.25, v: 0.25 });
+    expect(unreflect(point, { mirrorX: true, mirrorY: true })).toEqual({ u: 0.75, v: 0.25 });
+  });
+
+  it('is its own inverse', () => {
+    for (const parity of [
+      { mirrorX: false, mirrorY: false },
+      { mirrorX: true, mirrorY: false },
+      { mirrorX: false, mirrorY: true },
+      { mirrorX: true, mirrorY: true },
+    ]) {
+      // Compared with a tolerance: subtracting from one twice returns
+      // 0.30000000000000004, which is the same place and not the same double.
+      const point = { u: 0.3, v: 0.8 };
+      const round = unreflect(unreflect(point, parity), parity);
+      expect(round.u).toBeCloseTo(point.u, 12);
+      expect(round.v).toBeCloseTo(point.v, 12);
+    }
+  });
+
+  it('brings all four parities to the same place in the artwork', () => {
+    /*
+     * The property the inspector rests on. The visually corresponding point in
+     * each of the four reflections is a different position within its copy, and
+     * all four have to name one place in the source.
+     */
+    const grid = tileGrid(64, 64, 2, 2, 200, 200, 1, true);
+    const readings = new Set<string>();
+
+    for (let row = 0; row < 2; row += 1) {
+      for (let column = 0; column < 2; column += 1) {
+        const parity = tileParity(grid, column, row);
+        const cell = tileRect(grid, column, row);
+
+        // Where the artwork's point (0.3, 0.8) appears in this copy.
+        const shown = { u: parity.mirrorX ? 0.7 : 0.3, v: parity.mirrorY ? 0.2 : 0.8 };
+        const hit = tileAt(grid, cell.left + cell.width * shown.u, cell.top + cell.height * shown.v);
+        const inside = unreflect(hit as { u: number; v: number }, parity);
+        readings.add(`${inside.u.toFixed(1)},${inside.v.toFixed(1)}`);
+      }
+    }
+
+    expect(readings).toEqual(new Set(['0.3,0.8']));
   });
 });

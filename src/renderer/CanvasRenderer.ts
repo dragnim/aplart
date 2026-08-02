@@ -12,7 +12,7 @@ import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
 import { cellBounds, displayedShape, type SourceCell } from './displayMapping';
 import { type Palette } from './palettes';
-import { tileCounts, tileGrid, tileRect } from './tiling';
+import { tileCounts, tileGrid, tileParity, tileRect } from './tiling';
 import { renderArtwork, type RenderArtworkOptions } from './renderArtwork';
 import { paletteFor, transformMatrix, type RenderOptions } from './renderOptions';
 
@@ -101,6 +101,7 @@ export function drawArtwork(
     pixelWidth,
     pixelHeight,
     request.options.tiling?.scale ?? 1,
+    request.options.tiling?.mode === 'mirror-repeat',
   );
   const box = grid.region;
 
@@ -144,14 +145,74 @@ export function drawArtwork(
   context.rect(box.left, box.top, box.width, box.height);
   context.clip();
 
+  /*
+   * The reflected orientations, built once for the whole frame rather than per
+   * copy — four canvases whatever the count, so a hundred copies cost a hundred
+   * ordinary draws and not a hundred transforms.
+   *
+   * Four separate canvases rather than the single 2 × 2 super-tile the obvious
+   * design suggests. A super-tile would be sampled by sub-rectangle, and with
+   * smooth scaling on, sampling a sub-rectangle bleeds a little of the
+   * neighbouring quadrant across the join — the artefact this whole area exists
+   * to avoid. Separate canvases have no neighbour to bleed from.
+   */
+  const oriented = grid.mirrored ? reflections(source) : null;
+
   for (let row = 0; row < grid.rows; row += 1) {
     for (let column = 0; column < grid.columns; column += 1) {
       const cell = tileRect(grid, column, row);
       if (cell.width <= 0 || cell.height <= 0) continue;
-      context.drawImage(source, cell.left, cell.top, cell.width, cell.height);
+
+      /*
+       * Placed at the same rounded boundaries as an unmirrored repeat. The
+       * reflection happens inside the source, so the destination rectangle is
+       * untouched and mirroring cannot reintroduce the half-pixel seam that
+       * shared boundaries exist to prevent.
+       */
+      const parity = tileParity(grid, column, row);
+      const from = oriented === null ? source : pickReflection(oriented, parity);
+      context.drawImage(from, cell.left, cell.top, cell.width, cell.height);
     }
   }
   context.restore();
+}
+
+/** Whatever `createCanvas` produces here — offscreen where available. */
+type SourceCanvas = ReturnType<typeof createCanvas>;
+
+interface Reflections {
+  readonly plain: SourceCanvas;
+  readonly flipX: SourceCanvas;
+  readonly flipY: SourceCanvas;
+  readonly flipXY: SourceCanvas;
+}
+
+function pickReflection(all: Reflections, parity: { mirrorX: boolean; mirrorY: boolean }) {
+  if (parity.mirrorX && parity.mirrorY) return all.flipXY;
+  if (parity.mirrorX) return all.flipX;
+  if (parity.mirrorY) return all.flipY;
+  return all.plain;
+}
+
+/** The base tile and its three reflections, each on its own canvas. */
+function reflections(source: SourceCanvas): Reflections {
+  const flip = (horizontally: boolean, vertically: boolean) => {
+    const canvas = createCanvas(source.width, source.height);
+    const context = canvas.getContext('2d');
+    if (context === null) return source;
+
+    context.translate(horizontally ? source.width : 0, vertically ? source.height : 0);
+    context.scale(horizontally ? -1 : 1, vertically ? -1 : 1);
+    context.drawImage(source, 0, 0);
+    return canvas;
+  };
+
+  return {
+    plain: source,
+    flipX: flip(true, false),
+    flipY: flip(false, true),
+    flipXY: flip(true, true),
+  };
 }
 
 /** The stripe tile, built once and reused for every frame. */
@@ -220,6 +281,7 @@ export function drawCellMarker(
     Math.round(cssWidth * devicePixelRatio),
     Math.round(cssHeight * devicePixelRatio),
     options.tiling?.scale ?? 1,
+    options.tiling?.mode === 'mirror-repeat',
   );
   if (grid.region.width === 0 || grid.region.height === 0) return;
 
@@ -266,7 +328,20 @@ export function drawCellMarker(
     for (let column = 0; column < grid.columns; column += 1) {
       const box = tileRect(grid, column, row);
       if (box.width <= 0 || box.height <= 0) continue;
-      markCell(context, box, bounds, devicePixelRatio, copies === 1, emphasis);
+
+      /*
+       * Marked where the cell actually appears in this copy. A reflected copy
+       * shows it on the other side, and a marker left at the unreflected
+       * position would point at a different cell of the artwork.
+       */
+      const parity = tileParity(grid, column, row);
+      const placed = {
+        left: parity.mirrorX ? 1 - bounds.left - bounds.width : bounds.left,
+        top: parity.mirrorY ? 1 - bounds.top - bounds.height : bounds.top,
+        width: bounds.width,
+        height: bounds.height,
+      };
+      markCell(context, box, placed, devicePixelRatio, copies === 1, emphasis);
     }
   }
   context.restore();

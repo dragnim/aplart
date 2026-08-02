@@ -26,7 +26,7 @@ import {
   type SourceRect,
 } from './displayMapping';
 import { fitArtwork } from './fitArtwork';
-import { tileAt, tileCounts, tileGrid } from './tiling';
+import { tileAt, tileCounts, tileGrid, tileParity, unreflect } from './tiling';
 import { type RenderOptions } from './renderOptions';
 
 /** A rectangle in CSS pixels, relative to the element, for drawing the overlay. */
@@ -139,6 +139,7 @@ export function useArtworkPointer(options: {
         finished.bounds.width,
         finished.bounds.height,
         render.tiling?.scale ?? 1,
+        render.tiling?.mode === 'mirror-repeat',
       );
       const box = grid.region;
       if (box.width === 0 || box.height === 0) return;
@@ -164,7 +165,16 @@ export function useArtworkPointer(options: {
           return;
         }
 
-        const source = displayToSource({ u: hit.u, v: hit.v }, render);
+        /*
+         * Two layers, unwound outermost first. The composition may have
+         * reflected this copy, so that is undone here; the artwork's own
+         * Rotate and Mirror settings were applied when the tile was rendered
+         * and `displayToSource` undoes those. Reversing them in one step would
+         * let a mirrored copy cancel a mirror the user had chosen, and a press
+         * would read the artwork from the wrong side.
+         */
+        const within = unreflect(hit, tileParity(grid, hit.column, hit.row));
+        const source = displayToSource(within, render);
         inspect(sourceCellAt(source, sourceRows, sourceColumns));
         return;
       }

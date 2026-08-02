@@ -295,15 +295,15 @@ describe('keeping the setting', () => {
       code: modularBloom.code,
       params: {},
       palette: 'ember',
-      tiling: { mode: 'mirror-repeat', columns: 3, rows: 3 } as never,
+      tiling: { mode: 'brick-offset', columns: 3, rows: 3 } as never,
       render: { invert: false, rotation: 0, mirrorH: false, mirrorV: false, smooth: false },
     });
 
     await openAndRun(encoded);
     await screen.findByText(/shared with you/);
 
-    // Reflected composition does not exist yet. Showing an ordinary repeat and
-    // calling it mirrored would be the wrong kind of wrong.
+    // A composition this build has never heard of. Showing an ordinary repeat
+    // and calling it something else would be the wrong kind of wrong.
     expect(singleButton()).toHaveAttribute('aria-checked', 'true');
   });
 
@@ -430,5 +430,158 @@ describe('palette animation across the copies', () => {
     expect(painted?.options.tiling).toMatchObject({ mode: 'repeat', columns: 3, rows: 3 });
 
     await user.click(screen.getByRole('button', { name: 'Pause' }));
+  });
+});
+
+const mirrorButton = () => screen.getByRole('radio', { name: 'Mirror repeat' });
+
+describe('mirror repeat', () => {
+  it('is offered beside the other modes and describes itself honestly', async () => {
+    const { user } = await openAndRun();
+    await user.click(mirrorButton());
+
+    expect(lastTiling()?.mode).toBe('mirror-repeat');
+    // Reflection hides a join; it does not make one. The wording must not
+    // borrow the word the seamless feature will need.
+    const note = screen.getByText(/Alternate copies are reflected/);
+    expect(note.textContent).toContain('The artwork is unchanged');
+    expect(note.textContent).not.toMatch(/seamless/i);
+  });
+
+  it('says so in the artwork’s description', async () => {
+    const { user } = await openAndRun();
+    await user.click(mirrorButton());
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('img', { name: /Mirrored repeat preview, 3 columns by 3 rows/ }),
+      ).toBeInTheDocument(),
+    );
+  });
+
+  it('never runs the APL or touches the code', async () => {
+    const { user, service } = await openAndRun();
+    const before = service.executionCount;
+    const code = screen.getByRole('textbox', { name: /APL/i }).textContent;
+
+    await user.click(mirrorButton());
+    await user.click(screen.getByRole('radio', { name: '5 by 5' }));
+    await user.click(screen.getByRole('radio', { name: '50%' }));
+
+    expect(service.executionCount).toBe(before);
+    expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toBe(code);
+  });
+
+  it('leaves the artwork’s own mirror settings alone', async () => {
+    const { user } = await openAndRun();
+    await user.click(screen.getByLabelText(/Mirror horizontally/));
+    await user.click(mirrorButton());
+
+    /*
+     * Two different mirrors. The artwork's own is part of the base tile and is
+     * applied before anything is repeated; the composition's reflects alternate
+     * copies of the finished result. Turning on the second must not disturb the
+     * first, or a user's appearance choice would be silently overwritten.
+     */
+    expect(screen.getByLabelText(/Mirror horizontally/)).toBeChecked();
+    expect(lastTiling()?.mode).toBe('mirror-repeat');
+  });
+
+  it('reads the same source cell from every parity', async () => {
+    const { user } = await openAndRun();
+    await user.click(mirrorButton());
+    await user.click(screen.getByRole('radio', { name: '2 by 2' }));
+
+    const canvas = screen.getByRole('img', { name: /grid/ });
+    const readings: string[] = [];
+
+    /*
+     * The visually corresponding point in each of the four copies. In a
+     * reflected copy that point sits on the opposite side, which is exactly
+     * what the inspector has to undo.
+     */
+    const intoCell = 2.5 / 8;
+    for (let row = 0; row < 2; row += 1) {
+      for (let column = 0; column < 2; column += 1) {
+        const withinX = column % 2 === 1 ? 1 - intoCell : intoCell;
+        const withinY = row % 2 === 1 ? 1 - intoCell : intoCell;
+        const x = 200 * (column + withinX);
+        const y = 200 * (row + withinY);
+        fireEvent.pointerDown(canvas, { clientX: x, clientY: y, pointerId: 1, button: 0 });
+        fireEvent.pointerUp(canvas, { clientX: x, clientY: y, pointerId: 1 });
+        readings.push((/Row \d+, column \d+/u.exec(announced()) ?? [''])[0]);
+      }
+    }
+
+    expect(new Set(readings).size).toBe(1);
+    expect(readings[0]).toMatch(/Row \d+, column \d+/u);
+  });
+
+  it('reads a different cell from the same absolute point in a reflected copy', async () => {
+    // The counterpart, so the test above cannot pass by the mapping being a
+    // no-op: the same offset into a reflected copy is a different cell.
+    const { user } = await openAndRun();
+    await user.click(mirrorButton());
+    await user.click(screen.getByRole('radio', { name: '2 by 2' }));
+
+    const canvas = screen.getByRole('img', { name: /grid/ });
+    const read = (x: number, y: number) => {
+      fireEvent.pointerDown(canvas, { clientX: x, clientY: y, pointerId: 1, button: 0 });
+      fireEvent.pointerUp(canvas, { clientX: x, clientY: y, pointerId: 1 });
+      return (/Row \d+, column \d+/u.exec(announced()) ?? [''])[0];
+    };
+
+    const plain = read(200 * (2.5 / 8), 20);
+    const reflected = read(200 + 200 * (2.5 / 8), 20);
+    expect(reflected).not.toBe(plain);
+  });
+
+  it('saves and restores locally', async () => {
+    const { user } = await openAndRun();
+    await user.click(mirrorButton());
+    await user.click(screen.getByRole('radio', { name: '5 by 5' }));
+
+    const { readSavedProjectImmediate } = await import('@/workspace/useLocalProject');
+    await waitFor(
+      () => {
+        expect(readSavedProjectImmediate(modularBloom.id)?.renderOptions.tiling).toMatchObject({
+          mode: 'mirror-repeat',
+          columns: 5,
+        });
+      },
+      { timeout: 4000 },
+    );
+  });
+
+  it('survives a shared link, scale and all', async () => {
+    const { encodeShareState } = await import('@/sharing/encodeShareState');
+    const encoded = encodeShareState({
+      v: 1,
+      preset: modularBloom.id,
+      code: modularBloom.code,
+      params: {},
+      palette: 'ember',
+      tiling: { mode: 'mirror-repeat', columns: 2, rows: 2, scale: 1.5 },
+      render: { invert: false, rotation: 0, mirrorH: false, mirrorV: false, smooth: false },
+    });
+
+    await openAndRun(encoded);
+    await screen.findByText(/shared with you/);
+
+    expect(mirrorButton()).toHaveAttribute('aria-checked', 'true');
+    expect(lastTiling()).toMatchObject({ mode: 'mirror-repeat', columns: 2, scale: 1.5 });
+  });
+
+  it('keeps the inspected cell when switching between repeat and mirror', async () => {
+    const { user } = await openAndRun();
+    fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: '4' } });
+    fireEvent.change(screen.getByLabelText(/^Column/), { target: { value: '7' } });
+    await user.click(screen.getByRole('button', { name: /^Inspect$/ }));
+
+    await user.click(repeatButton());
+    await user.click(mirrorButton());
+    await user.click(singleButton());
+
+    expect(announced()).toContain('Row 4, column 7');
   });
 });

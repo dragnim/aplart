@@ -21,13 +21,18 @@ import { fitArtwork, type FittedBox } from './fitArtwork';
 /**
  * How the artwork is repeated.
  *
- * `mirror-repeat` is deliberately absent until the composition that reflects
- * alternate copies exists. A mode the renderer cannot draw would be restored
- * from a shared link as something it is not.
+ * `mirror-repeat` reflects alternate copies so neighbours meet along a shared
+ * edge. That is a composition trick and nothing more: the artwork is unchanged,
+ * its edges still do not join, and a mirrored repeat must never be described as
+ * seamless generation. It hides a seam by reflecting one side onto the other,
+ * which is a different claim from the two sides matching.
+ *
+ * Any mode this build cannot draw still falls back to a single copy, so a link
+ * from a later version is never restored as something it is not.
  */
-export type TilingMode = 'single' | 'repeat';
+export type TilingMode = 'single' | 'repeat' | 'mirror-repeat';
 
-export const TILING_MODES: readonly TilingMode[] = ['single', 'repeat'];
+export const TILING_MODES: readonly TilingMode[] = ['single', 'repeat', 'mirror-repeat'];
 
 export interface TilingView {
   readonly mode: TilingMode;
@@ -122,7 +127,14 @@ export interface TileRect {
   readonly height: number;
 }
 
+export interface TileParity {
+  readonly mirrorX: boolean;
+  readonly mirrorY: boolean;
+}
+
 export interface TileGrid {
+  /** Whether alternate copies are reflected. Read from here by everything. */
+  readonly mirrored: boolean;
   /**
    * The artwork region: where copies may be drawn, and nothing outside it.
    *
@@ -178,6 +190,7 @@ export function tileGrid(
   boxWidth: number,
   boxHeight: number,
   scale = 1,
+  mirrored = false,
 ): TileGrid {
   const across = Math.max(1, Math.round(columns));
   const down = Math.max(1, Math.round(rows));
@@ -200,7 +213,7 @@ export function tileGrid(
   const ys: number[] = [];
   for (let index = 0; index <= tall; index += 1) ys.push(Math.round(originY + drawnHeight * index));
 
-  return { region, box: region, columns: wide, rows: tall, xs, ys };
+  return { mirrored, region, box: region, columns: wide, rows: tall, xs, ys };
 }
 
 /** The rectangle for one copy, in the same units the grid was built in. */
@@ -211,6 +224,34 @@ export function tileRect(grid: TileGrid, column: number, row: number): TileRect 
   const bottom = grid.ys[row + 1] ?? top;
 
   return { left, top, width: right - left, height: bottom - top };
+}
+
+/**
+ * Whether a copy is reflected, by its position in the grid.
+ *
+ * Odd columns are flipped horizontally and odd rows vertically, so every copy
+ * meets its neighbours along an edge each of them shares. Derived from the grid
+ * rather than passed around, because the drawing and the hit-testing have to
+ * agree about it and the surest way is for there to be one answer.
+ */
+export function tileParity(grid: TileGrid, column: number, row: number): TileParity {
+  if (!grid.mirrored) return { mirrorX: false, mirrorY: false };
+  return { mirrorX: column % 2 === 1, mirrorY: row % 2 === 1 };
+}
+
+/**
+ * Undoes a copy's reflection, turning where a point looks into where it is.
+ *
+ * Composition-level only. The artwork's own Rotate and Mirror settings are
+ * applied when the base tile is rendered and are reversed further along by
+ * `displayToSource`; this is the outer layer, and the two must not be confused
+ * — reflecting here would otherwise cancel a mirror the user had chosen.
+ */
+export function unreflect(point: { u: number; v: number }, parity: TileParity) {
+  return {
+    u: parity.mirrorX ? 1 - point.u : point.u,
+    v: parity.mirrorY ? 1 - point.v : point.v,
+  };
 }
 
 export interface TileHit {
@@ -269,7 +310,8 @@ export function tileAt(grid: TileGrid, x: number, y: number): TileHit | null {
 export function describeTiling(tiling: TilingView): string {
   if (!isRepeating(tiling)) return 'Single copy.';
 
-  const grid = `Repeat preview, ${String(tiling.columns)} columns by ${String(tiling.rows)} rows`;
+  const kind = tiling.mode === 'mirror-repeat' ? 'Mirrored repeat preview' : 'Repeat preview';
+  const grid = `${kind}, ${String(tiling.columns)} columns by ${String(tiling.rows)} rows`;
   return tiling.scale === 1
     ? `${grid}.`
     : `${grid}, each copy at ${String(Math.round(tiling.scale * 100))} per cent.`;

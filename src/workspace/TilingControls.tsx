@@ -19,10 +19,11 @@ interface Props {
 const MODE_LABELS: Record<TilingMode, string> = {
   single: 'Single',
   repeat: 'Repeat',
+  'mirror-repeat': 'Mirror repeat',
 };
 
 export function TilingControls({ tiling, onChange }: Props) {
-  const repeating = tiling.mode === 'repeat';
+  const repeating = tiling.mode !== 'single';
 
   return (
     <fieldset className={styles.group}>
@@ -108,8 +109,9 @@ export function TilingControls({ tiling, onChange }: Props) {
 
       {repeating && (
         <p className={styles.note}>
-          A preview of how the artwork repeats. It draws the same result again and does not change the
-          calculation, so the edges join only where the artwork already makes them join.
+          {tiling.mode === 'mirror-repeat'
+            ? 'Alternate copies are reflected so neighbours meet along a shared edge. The artwork is unchanged and its own edges still do not join — the reflection hides the join rather than making one.'
+            : 'A preview of how the artwork repeats. It draws the same result again and does not change the calculation, so the edges join only where the artwork already makes them join.'}
         </p>
       )}
 

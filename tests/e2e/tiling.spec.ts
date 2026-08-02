@@ -16,6 +16,17 @@ function runStatus(page: Page) {
   return page.locator('[role="status"][data-status]');
 }
 
+/**
+ * A tiling control, matched by its whole label.
+ *
+ * Playwright's `name` is a substring match by default, and these labels nest:
+ * "Repeat" is inside "Mirror repeat", and "50%" inside "150%". Going through
+ * one helper means the exactness cannot be forgotten on the next control added.
+ */
+function radio(page: Page, name: string) {
+  return page.getByRole('radio', { name, exact: true });
+}
+
 async function openAndRun(page: Page) {
   await stubTryApl(page);
   await page.goto('./#/art/truchet-grid');
@@ -80,8 +91,8 @@ test.describe('repeating the artwork', () => {
     const sent = stub.requests.length;
 
     for (const count of ['2 by 2', '3 by 3', '5 by 5']) {
-      await page.getByRole('radio', { name: 'Repeat' }).click();
-      await page.getByRole('radio', { name: count }).click();
+      await radio(page, 'Repeat').click();
+      await radio(page, count).click();
       await page.waitForTimeout(300);
 
       /*
@@ -112,10 +123,10 @@ test.describe('repeating the artwork', () => {
     await expect(drawer).toHaveAttribute('data-drawer', 'open');
 
     // The drawer scrolls, and Tiling sits well below its fold.
-    const repeat = page.getByRole('radio', { name: 'Repeat' });
+    const repeat = radio(page, 'Repeat');
     await repeat.scrollIntoViewIfNeeded();
     await repeat.click();
-    const count = page.getByRole('radio', { name: '3 by 3' });
+    const count = radio(page, '3 by 3');
     await count.scrollIntoViewIfNeeded();
     await count.click();
     await page.waitForTimeout(300);
@@ -126,8 +137,8 @@ test.describe('repeating the artwork', () => {
 
   test('reads the same cell from any copy, and keeps it through a change of count', async ({ page }) => {
     await openAndRun(page);
-    await page.getByRole('radio', { name: 'Repeat' }).click();
-    await page.getByRole('radio', { name: '2 by 2' }).click();
+    await radio(page, 'Repeat').click();
+    await radio(page, '2 by 2').click();
     await page.waitForTimeout(300);
 
     const canvas = page.locator('canvas').first();
@@ -163,8 +174,8 @@ test.describe('repeating the artwork', () => {
     // round trip itself is covered without a browser in the integration tests.
     test.skip(browserName === 'webkit', 'WebKit does not support clipboard permissions.');
     await openAndRun(page);
-    await page.getByRole('radio', { name: 'Repeat' }).click();
-    await page.getByRole('radio', { name: '5 by 5' }).click();
+    await radio(page, 'Repeat').click();
+    await radio(page, '5 by 5').click();
 
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.getByRole('button', { name: 'Share' }).click();
@@ -179,8 +190,104 @@ test.describe('repeating the artwork', () => {
     await expect(opened.getByText(/shared with you/)).toBeVisible({ timeout: 15_000 });
 
     // Restored as a repeat, and not into Focus mode.
-    await expect(opened.getByRole('radio', { name: 'Repeat' })).toHaveAttribute('aria-checked', 'true');
-    await expect(opened.getByRole('radio', { name: '5 by 5' })).toHaveAttribute('aria-checked', 'true');
+    await expect(radio(opened, 'Repeat')).toHaveAttribute('aria-checked', 'true');
+    await expect(radio(opened, '5 by 5')).toHaveAttribute('aria-checked', 'true');
     await expect(opened.getByRole('button', { name: 'Focus mode' })).toBeVisible();
+  });
+});
+
+test.describe('mirroring the repeat', () => {
+  test.use({ viewport: WIDE });
+
+  test('leaves no gap, at every count and scale', async ({ page }) => {
+    const stub = await stubTryApl(page);
+    await page.goto('./#/art/truchet-grid');
+    await page.getByRole('button', { name: /^Run/ }).click();
+    await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
+
+    const singleEmpty = await backgroundColumns(page);
+    const sent = stub.requests.length;
+
+    await radio(page, 'Mirror repeat').click();
+    for (const count of ['2 by 2', '3 by 3', '5 by 5']) {
+      await radio(page, count).click();
+      for (const scale of ['50%', '100%', '200%']) {
+        await radio(page, scale).click();
+        await page.waitForTimeout(250);
+        expect(await backgroundColumns(page), `${count} at ${scale}`).toBeLessThanOrEqual(singleEmpty);
+      }
+    }
+
+    // Reflection is a way of drawing the same result, not a reason to fetch it.
+    expect(stub.requests.length).toBe(sent);
+  });
+
+  test('reads one source cell from all four reflections', async ({ page }) => {
+    await openAndRun(page);
+    await radio(page, 'Mirror repeat').click();
+    await radio(page, '2 by 2').click();
+    await page.waitForTimeout(300);
+
+    const canvas = page.locator('canvas').first();
+    const box = await canvas.boundingBox();
+    if (box === null) throw new Error('the canvas has no size');
+    const size = Math.min(box.width, box.height);
+    const left = box.width / 2 - size / 2;
+    const top = box.height / 2 - size / 2;
+
+    const readings: string[] = [];
+    for (let row = 0; row < 2; row += 1) {
+      for (let column = 0; column < 2; column += 1) {
+        /*
+         * The centre of a cell, not a round fraction. Truchet is 20 cells
+         * across, so a fifth of the way in is exactly a cell boundary and the
+         * reflection decides which side of it the point falls — a real
+         * ambiguity, resolved deterministically elsewhere, but not what this
+         * test is about. A cell centre stays a cell centre when reflected.
+         */
+        const intoCell = 4.5 / 20;
+        const withinX = column === 1 ? 1 - intoCell : intoCell;
+        const withinY = row === 1 ? 1 - intoCell : intoCell;
+        await canvas.click({
+          position: {
+            x: left + (size * (column + withinX)) / 2,
+            y: top + (size * (row + withinY)) / 2,
+          },
+        });
+        readings.push(
+          await page
+            .locator('[role="status"]')
+            .filter({ hasText: /Row \d+, column/ })
+            .innerText(),
+        );
+
+        /*
+         * Dismissed between reads. The reading panel sits over the lower-left
+         * of the artwork, so with it open the bottom-left copy cannot be
+         * pressed — by the test or by anybody else.
+         */
+        await page.getByRole('button', { name: 'Clear', exact: true }).click();
+      }
+    }
+
+    const cell = (text: string) => (/Row \d+, column \d+/u.exec(text) ?? [''])[0];
+    expect(new Set(readings.map(cell)).size).toBe(1);
+  });
+
+  test('works in Focus mode and is announced as mirrored', async ({ page }) => {
+    await openAndRun(page);
+    await page.getByRole('button', { name: 'Focus mode' }).click();
+    const drawer = page.locator('[data-drawer]').first();
+    if ((await drawer.getAttribute('data-drawer')) !== 'open') {
+      await page.getByRole('button', { name: 'Controls' }).click();
+    }
+
+    const mirror = radio(page, 'Mirror repeat');
+    await mirror.scrollIntoViewIfNeeded();
+    await mirror.click();
+    await page.waitForTimeout(300);
+
+    await expect(page.getByRole('img', { name: /Mirrored repeat preview/ })).toBeVisible();
+    expect(await backgroundColumns(page)).toBeLessThanOrEqual(2);
   });
 });
