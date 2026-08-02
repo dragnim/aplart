@@ -15,6 +15,8 @@ import {
 } from '@/renderer/customPalette';
 import { palettes } from '@/renderer/palettes';
 import { paletteFor } from '@/renderer/renderOptions';
+import { type AnimationSettings } from '@/renderer/paletteAnimation';
+import { AnimationControls } from './AnimationControls';
 import { PaletteEditor } from './PaletteEditor';
 import { ROTATIONS, type RenderOptions } from '@/renderer/renderOptions';
 import styles from './RenderControls.module.css';
@@ -23,9 +25,21 @@ interface Props {
   readonly options: RenderOptions;
   readonly availablePaletteIds?: readonly string[] | undefined;
   readonly onChange: (options: Partial<RenderOptions>) => void;
+  readonly animation: AnimationSettings;
+  readonly onAnimationChange: (settings: AnimationSettings) => void;
+  readonly onAnimationReset: () => void;
+  readonly reducedMotion: boolean;
 }
 
-export function RenderControls({ options, availablePaletteIds, onChange }: Props) {
+export function RenderControls({
+  options,
+  availablePaletteIds,
+  onChange,
+  animation,
+  onAnimationChange,
+  onAnimationReset,
+  reducedMotion,
+}: Props) {
   const available =
     availablePaletteIds === undefined
       ? palettes
@@ -103,6 +117,18 @@ export function RenderControls({ options, availablePaletteIds, onChange }: Props
             onChange={(customStops) => onChange({ customStops })}
           />
         )}
+
+        {/*
+          Animation belongs with the palette because that is what it moves. It
+          changes nothing that is saved: the stops above stay exactly as they
+          are while it runs, and pausing puts the artwork back to them.
+        */}
+        <AnimationControls
+          settings={animation}
+          onChange={onAnimationChange}
+          onReset={onAnimationReset}
+          reducedMotion={reducedMotion}
+        />
       </fieldset>
 
       <fieldset className={styles.group}>

@@ -10,6 +10,7 @@ import { type MatrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
 import { buildArtworkImage, toSourceCanvas } from './CanvasRenderer';
+import { type Palette } from './palettes';
 import { cellSizeFor } from './renderMotifs';
 import { type RenderOptions } from './renderOptions';
 
@@ -20,6 +21,14 @@ export interface ExportRequest {
   readonly stats: MatrixStats;
   readonly mode: RenderMode;
   readonly options: RenderOptions;
+  /**
+   * The palette to draw with, instead of the one the options describe.
+   *
+   * Passed while an animation is running, so a saved image is the frame that
+   * was on screen. `buildArtworkImage` takes the same field, which is why this
+   * needs no code of its own.
+   */
+  readonly palette?: Palette;
   readonly size: ExportSize;
   /**
    * Lines printed beneath the artwork. Omitted or empty means no caption at

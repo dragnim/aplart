@@ -24,6 +24,7 @@ import { migratePresetCode } from '@/presets/codeMigrations';
 import { getPreset } from '@/presets/presets';
 import { type ArtworkParameter, type ArtworkPreset } from '@/presets/schema';
 import { ArtworkCanvas } from '@/renderer/ArtworkCanvas';
+import { DEFAULT_ANIMATION, type AnimationSettings } from '@/renderer/paletteAnimation';
 import { defaultRenderOptions } from '@/renderer/renderOptions';
 import { decodeShareState, toRenderOptions } from '@/sharing/decodeShareState';
 import { numberAssignedTo } from '@/editor/parameterBinding';
@@ -173,7 +174,25 @@ function Workspace({
   const focusTrigger = useRef<HTMLButtonElement>(null);
   const restoreTrigger = useRef(false);
 
-  const actions = useArtworkActions({ preset, state, seed });
+  /*
+   * Animation, kept in three separate pieces on purpose.
+   *
+   * The base palette is in the render options, saved and shared. These settings
+   * are session-only, which is what makes "never starts on its own" structural
+   * rather than a rule to remember: there is nowhere for `running` to be stored.
+   * And the phase is a ref, so a frame costs a repaint rather than a render of
+   * the whole workspace.
+   */
+  const [animation, setAnimation] = useState<AnimationSettings>(DEFAULT_ANIMATION);
+  const animationPhase = useRef(0);
+  const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+
+  const resetAnimation = useCallback(() => {
+    animationPhase.current = 0;
+    setAnimation({ ...DEFAULT_ANIMATION, running: false });
+  }, []);
+
+  const actions = useArtworkActions({ preset, state, seed, animation, animationPhase });
 
   useLocalProject(preset, state);
 
@@ -572,6 +591,10 @@ function Workspace({
           options={state.renderOptions}
           availablePaletteIds={preset.availablePaletteIds}
           onChange={setRenderOptions}
+          animation={animation}
+          onAnimationChange={setAnimation}
+          onAnimationReset={resetAnimation}
+          reducedMotion={reducedMotion}
         />
       </section>
 
@@ -630,6 +653,9 @@ function Workspace({
           marked: reading === null ? null : { row: reading.row, column: reading.column },
           onInspect: setInspected,
         }}
+        // One instance. Focus mode restyles this same element rather than
+        // mounting another, so there is one loop however the artwork is shown.
+        animation={{ settings: animation, phase: animationPhase }}
       />
 
       <ValueInspector

@@ -9,11 +9,13 @@
  * source of truth for the caption choice as well as the behaviour.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type MutableRefObject } from 'react';
 import { captionLinesFor } from '@/presets/codeMetrics';
 import { type ArtworkPreset } from '@/presets/schema';
 import { downloadBlob, exportArtworkPng, exportFilename, type ExportSize } from '@/renderer/exportPng';
 import { encodeStops, stopsAreUsable } from '@/renderer/customPalette';
+import { animatePalette, type AnimationSettings } from '@/renderer/paletteAnimation';
+import { paletteFor } from '@/renderer/renderOptions';
 import { fromRenderOptions } from '@/sharing/decodeShareState';
 import { buildShareUrl, encodeShareState } from '@/sharing/encodeShareState';
 import { SHARE_SCHEMA_VERSION, SHARE_URL_WARNING_LENGTH } from '@/sharing/shareState';
@@ -37,8 +39,11 @@ export function useArtworkActions(options: {
   readonly preset: ArtworkPreset;
   readonly state: WorkspaceState;
   readonly seed?: number | undefined;
+  readonly animation: AnimationSettings;
+  /** Where the animation has got to, read at the moment an export is asked for. */
+  readonly animationPhase: MutableRefObject<number>;
 }): ArtworkActions {
-  const { preset, state, seed } = options;
+  const { preset, state, seed, animation, animationPhase } = options;
 
   const [notice, setNotice] = useState<string | null>(null);
   const [withCaption, setWithCaption] = useState(false);
@@ -96,11 +101,24 @@ export function useArtworkActions(options: {
         return;
       }
 
+      /*
+       * The frame on screen, not the palette as saved. Exporting a moving
+       * artwork and getting the unanimated one back would be a small betrayal
+       * of what the button appears to do. At rest this is the saved palette
+       * exactly, because that is what `animatePalette` returns at phase zero.
+       */
+      const palette = animatePalette(
+        paletteFor(state.renderOptions),
+        animation.mode,
+        animation.running ? animationPhase.current : 0,
+      );
+
       void exportArtworkPng({
         matrix: state.matrix,
         stats: state.stats,
         mode: preset.renderMode,
         options: state.renderOptions,
+        palette,
         size,
         title: preset.title,
         // Off unless asked for. The caption counts the expression that ran, so
@@ -115,7 +133,17 @@ export function useArtworkActions(options: {
           announce(error instanceof Error ? error.message : 'The image could not be exported.');
         });
     },
-    [state.matrix, state.stats, state.renderOptions, state.code, preset, withCaption, announce],
+    [
+      state.matrix,
+      state.stats,
+      state.renderOptions,
+      state.code,
+      preset,
+      withCaption,
+      announce,
+      animation,
+      animationPhase,
+    ],
   );
 
   return {

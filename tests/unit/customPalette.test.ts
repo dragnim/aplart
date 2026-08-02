@@ -255,6 +255,61 @@ describe('stopsAreUsable', () => {
   });
 });
 
+describe('the invert property', () => {
+  const palette = paletteFromStops([stop('#000000', 0), stop('#ff0000', 10), stop('#ffffff', 100)]);
+  const stats = matrixStats(fromNested([[0, 100]]));
+
+  it('reads the ramp backwards at every point', () => {
+    // The property, not a sample of it: inverted at t is the original at 1-t.
+    const upright = createColourMapper(stats, { mode: 'continuous', palette });
+    const inverted = createColourMapper(stats, { mode: 'continuous', palette, invert: true });
+
+    for (let step = 0; step <= 20; step += 1) {
+      const value = (100 * step) / 20;
+      const mirrored = upright(100 - value);
+      const actual = inverted(value);
+
+      /*
+       * Within one, not exactly equal. The property is exact in real arithmetic
+       * and the blend rounds to whole bytes, so interpolating A to B at t and B
+       * to A at 1-t can land either side of the same half.
+       */
+      for (const channel of ['r', 'g', 'b'] as const) {
+        expect(
+          Math.abs(actual[channel] - mirrored[channel]),
+          `${channel} at ${String(value)}`,
+        ).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it('is its own inverse', () => {
+    // Inverting twice has to give back exactly what was there, or the control
+    // would drift the palette every time it was toggled.
+    const once = paletteFromStops(
+      normaliseStops(
+        (palette.positions ?? []).map((position, index) => ({
+          id: newStopId(),
+          colour: palette.colours[index] as string,
+          position: 100 - position * 100,
+        })),
+      ),
+    );
+    const twice = paletteFromStops(
+      normaliseStops(
+        (once.positions ?? []).map((position, index) => ({
+          id: newStopId(),
+          colour: once.colours[index] as string,
+          position: 100 - position * 100,
+        })),
+      ),
+    );
+
+    expect(twice.colours).toEqual(palette.colours);
+    expect(twice.positions).toEqual(palette.positions);
+  });
+});
+
 describe('inverting a custom palette', () => {
   it('mirrors the positions as well as the colours', () => {
     /*

@@ -7,12 +7,13 @@
  * meaningless to a screen reader but its shape and range are not.
  */
 
-import { useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useRef, type MutableRefObject, type RefObject } from 'react';
 import { describeMatrix, type MatrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
 import { drawArtwork, drawCellMarker } from './CanvasRenderer';
 import { type SourceCell, type SourceRect } from './displayMapping';
+import { animatePalette, phaseFor, type AnimationSettings } from './paletteAnimation';
 import { paletteFor, transformMatrix, type RenderOptions } from './renderOptions';
 import { useArtworkPointer } from './useArtworkPointer';
 import styles from './ArtworkCanvas.module.css';
@@ -50,6 +51,20 @@ interface Props {
   readonly canvasRef?: RefObject<HTMLCanvasElement | null>;
   readonly exploration?: CanvasExploration | undefined;
   readonly inspection?: CanvasInspection | undefined;
+  readonly animation?: CanvasAnimation | undefined;
+}
+
+/**
+ * A running palette animation.
+ *
+ * The phase is a ref rather than state on purpose. Sixty renders a second of
+ * the whole workspace to move a gradient would be absurd, and nothing outside
+ * the canvas needs to know where the animation has got to — except the export,
+ * which reads the same ref at the moment it is asked.
+ */
+export interface CanvasAnimation {
+  readonly settings: AnimationSettings;
+  readonly phase: MutableRefObject<number>;
 }
 
 export function ArtworkCanvas({
@@ -61,6 +76,7 @@ export function ArtworkCanvas({
   canvasRef,
   exploration,
   inspection,
+  animation,
 }: Props) {
   const internalRef = useRef<HTMLCanvasElement>(null);
   const canvas = canvasRef ?? internalRef;
@@ -69,6 +85,12 @@ export function ArtworkCanvas({
   // The caller is responsible for only marking a cell this matrix has; it is
   // the only side that knows whether a remembered cell survived a new result.
   const marked = inspection?.marked ?? null;
+
+  /*
+   * The latest way to paint, so the animation loop can call it without holding
+   * a closure over a matrix or palette that has since been replaced.
+   */
+  const paintRef = useRef<() => void>(() => undefined);
 
   useEffect(() => {
     const element = canvas.current;
@@ -79,12 +101,24 @@ export function ArtworkCanvas({
       const { width, height } = box.getBoundingClientRect();
       if (width === 0 || height === 0) return;
       const ratio = window.devicePixelRatio || 1;
-      drawArtwork(element, { matrix, stats, mode, options }, width, height, ratio);
+
+      /*
+       * The palette for this frame. At rest `animatePalette` returns the base
+       * itself, so a paused artwork is drawn with exactly what was saved.
+       */
+      const base = paletteFor(options);
+      const painted =
+        animation === undefined
+          ? base
+          : animatePalette(base, animation.settings.mode, animation.phase.current);
+
+      drawArtwork(element, { matrix, stats, mode, options, palette: painted }, width, height, ratio);
       // After the artwork, so the outline is not painted over. Repainted with it
       // on every resize, which is why it is inside `paint` rather than beside it.
       if (marked !== null) drawCellMarker(element, marked, matrix, options, width, height, ratio);
     };
 
+    paintRef.current = paint;
     paint();
 
     // Redraw on resize so the artwork stays sharp rather than being stretched
@@ -92,7 +126,47 @@ export function ArtworkCanvas({
     const observer = new ResizeObserver(paint);
     observer.observe(box);
     return () => observer.disconnect();
-  }, [matrix, stats, mode, options, canvas, marked]);
+  }, [matrix, stats, mode, options, canvas, marked, animation]);
+
+  /*
+   * The animation loop.
+   *
+   * Repaints directly rather than through React: there is no state to update,
+   * so nothing else in the tree renders. The phase is derived from elapsed time
+   * rather than counted in frames, so a second of animation covers the same
+   * ground at 60 Hz, at 120 Hz and on a throttled tab.
+   */
+  const running = animation?.settings.running === true;
+  const speed = animation?.settings.speed ?? 0;
+  const phaseRef = animation?.phase;
+
+  useEffect(() => {
+    if (!running || phaseRef === undefined || speed <= 0) return;
+
+    let frameId = 0;
+    // Anchored so that resuming carries on from where it paused rather than
+    // jumping to wherever a fresh clock would have put it.
+    let origin = performance.now() - (phaseRef.current / speed) * 1000;
+
+    const tick = (now: number) => {
+      /*
+       * A hidden tab stops receiving frames anyway; this is for the moment it
+       * comes back. Re-anchoring rather than letting the gap accumulate means
+       * the artwork resumes where it was left instead of leaping forward by
+       * however long somebody was away.
+       */
+      if (document.hidden) {
+        origin = now - (phaseRef.current / speed) * 1000;
+      } else {
+        phaseRef.current = phaseFor(now - origin, speed);
+        paintRef.current();
+      }
+      frameId = requestAnimationFrame(tick);
+    };
+
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [running, speed, phaseRef]);
 
   const palette = paletteFor(options);
 

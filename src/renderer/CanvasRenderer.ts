@@ -11,6 +11,7 @@ import { type MatrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
 import { cellBounds, displayedShape, type SourceCell } from './displayMapping';
+import { type Palette } from './palettes';
 import { fitArtwork } from './fitArtwork';
 import { renderArtwork } from './renderArtwork';
 import { paletteFor, transformMatrix, type RenderOptions } from './renderOptions';
@@ -20,6 +21,15 @@ export interface DrawRequest {
   readonly stats: MatrixStats;
   readonly mode: RenderMode;
   readonly options: RenderOptions;
+  /**
+   * The palette to draw with, instead of the one the options describe.
+   *
+   * Set only while an animation is running, where the palette for a frame is
+   * derived from the saved one and a phase. Everything else leaves it out and
+   * gets the saved palette — which is why pausing draws exactly what was saved
+   * rather than something close to it.
+   */
+  readonly palette?: Palette;
 }
 
 /**
@@ -30,7 +40,7 @@ export interface DrawRequest {
  */
 export function buildArtworkImage(request: DrawRequest) {
   const transformed = transformMatrix(request.matrix, request.options);
-  const palette = paletteFor(request.options);
+  const palette = request.palette ?? paletteFor(request.options);
 
   return {
     image: renderArtwork(transformed, request.stats, {
