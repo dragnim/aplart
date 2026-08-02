@@ -33,7 +33,9 @@
     "preset:variants": "tsx scripts/preview-variants.ts",
     "preset:sheet": "tsx scripts/contact-sheet.ts",
     "preset:debug": "tsx scripts/debug-preset.ts",
-    "verify:deployment": "node scripts/verify-deployment.mjs"
+    "verify:deployment": "node scripts/verify-deployment.mjs",
+    "benchmark:mandelbrot": "tsx scripts/benchmark-mandelbrot.ts",
+    "benchmark:report": "tsx scripts/report-mandelbrot-benchmark.ts"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",
