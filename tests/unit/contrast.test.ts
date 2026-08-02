@@ -126,12 +126,23 @@ describe('the APL editor theme', () => {
 
 describe('palette backgrounds', () => {
   it('every palette can show its own lightest colour against its background', () => {
-    // Not a text requirement, but a palette whose top end vanishes into its own
-    // backdrop would render artwork that appears to be missing its highlights.
+    /*
+     * Not a text requirement, but a palette whose top end vanishes into its own
+     * backdrop would render artwork that appears to be missing its highlights.
+     *
+     * The lightest colour is found rather than assumed to be the last one. It
+     * was the last one in every ramp that ran dark to light, but Abyss ends at
+     * black on purpose — its highlight is near the top rather than at it, and
+     * checking the final stop would have measured black against black and
+     * failed a palette that has no such problem.
+     */
     for (const palette of palettes) {
       const background = palette.background;
       if (background === undefined) continue;
-      const lightest = palette.colours[palette.colours.length - 1] as string;
+
+      const lightest = [...palette.colours].sort(
+        (first, second) => contrastRatio(second, '#000000') - contrastRatio(first, '#000000'),
+      )[0] as string;
       const ratio = contrastRatio(lightest, background);
       expect(ratio, `${palette.id}: ${lightest} on ${background}`).toBeGreaterThan(AA_LARGE);
     }

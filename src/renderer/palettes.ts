@@ -77,6 +77,32 @@ export const palettes: readonly Palette[] = [
     colours: ['#000004', '#2c1160', '#711f81', '#b6377a', '#ee605e', '#fb9d3f', '#fbd424', '#fcfea4'],
     background: '#000004',
   },
+  {
+    id: 'abyss',
+    name: 'Abyss',
+    /*
+     * The one ramp that does not run dark to light, and deliberately.
+     *
+     * An escape count is mapped by position, so the top of the ramp is where
+     * points that never escaped land — and in the traditional rendering of an
+     * escape-time fractal, that is a void rather than a highlight. Black last
+     * puts the void there using the ordinary mapping, with no interior colour
+     * of its own and nothing specific to any one artwork.
+     *
+     * Which sets the rest of the shape. It opens at a blue light enough to read
+     * against that black, because the "reached the limit or not" mode shows only
+     * the two ends and would otherwise be black on black. It spends most of its
+     * length in deep blues, brightens to cyan and a brief pale highlight where
+     * the interesting counts are, and returns through dark navy before the
+     * void — that navy is doing real work, since pale straight to black
+     * interpolates through grey and puts a dirty rim around the set.
+     */
+    colours: ['#1d5fa8', '#123258', '#0d2440', '#1f7fa8', '#4fc3d9', '#cbeaff', '#0a1830', '#000000'],
+    positions: [0, 0.22, 0.46, 0.68, 0.84, 0.93, 0.97, 1],
+    // Not `colours[0]`, as the others are: that is this ramp's brightest end,
+    // and a letterbox in it would glare. The void is the better backdrop.
+    background: '#05070f',
+  },
 ];
 
 const byId = new Map(palettes.map((palette) => [palette.id, palette]));
