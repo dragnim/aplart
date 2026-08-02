@@ -12,7 +12,7 @@ import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
 import { cellBounds, displayedShape, type SourceCell } from './displayMapping';
 import { type Palette } from './palettes';
-import { tileCounts, tileGrid, tileParity, tileRect } from './tiling';
+import { tileCounts, tileGrid, tileParity, tileRect, type TileGrid } from './tiling';
 import { renderArtwork, type RenderArtworkOptions } from './renderArtwork';
 import { paletteFor, transformMatrix, type RenderOptions } from './renderOptions';
 
@@ -145,35 +145,7 @@ export function drawArtwork(
   context.rect(box.left, box.top, box.width, box.height);
   context.clip();
 
-  /*
-   * The reflected orientations, built once for the whole frame rather than per
-   * copy — four canvases whatever the count, so a hundred copies cost a hundred
-   * ordinary draws and not a hundred transforms.
-   *
-   * Four separate canvases rather than the single 2 × 2 super-tile the obvious
-   * design suggests. A super-tile would be sampled by sub-rectangle, and with
-   * smooth scaling on, sampling a sub-rectangle bleeds a little of the
-   * neighbouring quadrant across the join — the artefact this whole area exists
-   * to avoid. Separate canvases have no neighbour to bleed from.
-   */
-  const oriented = grid.mirrored ? reflections(source) : null;
-
-  for (let row = 0; row < grid.rows; row += 1) {
-    for (let column = 0; column < grid.columns; column += 1) {
-      const cell = tileRect(grid, column, row);
-      if (cell.width <= 0 || cell.height <= 0) continue;
-
-      /*
-       * Placed at the same rounded boundaries as an unmirrored repeat. The
-       * reflection happens inside the source, so the destination rectangle is
-       * untouched and mirroring cannot reintroduce the half-pixel seam that
-       * shared boundaries exist to prevent.
-       */
-      const parity = tileParity(grid, column, row);
-      const from = oriented === null ? source : pickReflection(oriented, parity);
-      context.drawImage(from, cell.left, cell.top, cell.width, cell.height);
-    }
-  }
+  composeTiles(context, source, grid);
 
   /*
    * Guides last, over the finished composition and inside the same clip.
@@ -236,6 +208,52 @@ function drawSeamGuides(
 
 /** Whatever `createCanvas` produces here — offscreen where available. */
 type SourceCanvas = ReturnType<typeof createCanvas>;
+
+/**
+ * Draws one prepared tile across a grid, reflecting alternate copies.
+ *
+ * Shared by the screen and the export so a saved composition cannot drift from
+ * the one on screen. Clipped to the artwork region, so a tile scale above 100%
+ * overhangs and is trimmed rather than spilling onto the mat.
+ *
+ * The reflected orientations are built once for the whole composition — four
+ * canvases whatever the count, so a hundred copies cost a hundred ordinary
+ * draws and not a hundred transforms.
+ *
+ * Four separate canvases rather than the single 2 × 2 super-tile the obvious
+ * design suggests. A super-tile would be sampled by sub-rectangle, and with
+ * smooth scaling on, sampling a sub-rectangle bleeds a little of the
+ * neighbouring quadrant across the join — the artefact this whole area exists
+ * to avoid. Separate canvases have no neighbour to bleed from.
+ */
+export function composeTiles(context: CanvasRenderingContext2D, source: SourceCanvas, grid: TileGrid): void {
+  const { region } = grid;
+
+  context.save();
+  context.beginPath();
+  context.rect(region.left, region.top, region.width, region.height);
+  context.clip();
+
+  const oriented = grid.mirrored ? reflections(source) : null;
+
+  for (let row = 0; row < grid.rows; row += 1) {
+    for (let column = 0; column < grid.columns; column += 1) {
+      const cell = tileRect(grid, column, row);
+      if (cell.width <= 0 || cell.height <= 0) continue;
+
+      /*
+       * Placed at the grid's rounded boundaries, whether reflected or not. The
+       * reflection happens inside the source, so the destination rectangle is
+       * untouched and mirroring cannot reintroduce a half-pixel seam.
+       */
+      const parity = tileParity(grid, column, row);
+      const from = oriented === null ? source : pickReflection(oriented, parity);
+      context.drawImage(from, cell.left, cell.top, cell.width, cell.height);
+    }
+  }
+
+  context.restore();
+}
 
 interface Reflections {
   readonly plain: SourceCanvas;

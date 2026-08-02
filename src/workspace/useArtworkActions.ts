@@ -16,6 +16,7 @@ import { downloadBlob, exportArtworkPng, exportFilename, type ExportSize } from 
 import { encodeStops, stopsAreUsable } from '@/renderer/customPalette';
 import { animatePalette, type AnimationSettings } from '@/renderer/paletteAnimation';
 import { paletteFor } from '@/renderer/renderOptions';
+import { isRepeating } from '@/renderer/tiling';
 import { fromRenderOptions, fromTilingOptions } from '@/sharing/decodeShareState';
 import { buildShareUrl, encodeShareState } from '@/sharing/encodeShareState';
 import { SHARE_SCHEMA_VERSION, SHARE_URL_WARNING_LENGTH } from '@/sharing/shareState';
@@ -33,6 +34,11 @@ export interface ArtworkActions {
   readonly captionPreview: string;
   readonly copyApl: () => void;
   readonly share: () => void;
+  /** Whether Export writes one tile or the composition on screen. */
+  readonly exportTiling: boolean;
+  readonly setExportTiling: (on: boolean) => void;
+  /** Only true when the artwork is actually repeated; otherwise the choice is moot. */
+  readonly canExportTiling: boolean;
   readonly exportAt: (size: ExportSize) => void;
 }
 
@@ -49,6 +55,14 @@ export function useArtworkActions(options: {
 
   const [notice, setNotice] = useState<string | null>(null);
   const [withCaption, setWithCaption] = useState(false);
+  const [exportTiling, setExportTiling] = useState(false);
+
+  /*
+   * The composition choice only means something while something is repeated.
+   * Offering it against a single copy would be two buttons that do the same
+   * thing, which reads as a fault rather than a choice.
+   */
+  const canExportTiling = isRepeating(state.renderOptions.tiling);
 
   const announce = useCallback((message: string) => {
     setNotice(message);
@@ -131,6 +145,9 @@ export function useArtworkActions(options: {
         options: state.renderOptions,
         palette,
         ...(escape === undefined ? {} : { escape }),
+        // The composition already chosen in the Tiling section, never a second
+        // set of controls asking the same question again.
+        composition: exportTiling && canExportTiling ? 'tiling' : 'tile',
         size,
         title: preset.title,
         // Off unless asked for. The caption counts the expression that ran, so
@@ -138,7 +155,15 @@ export function useArtworkActions(options: {
         ...(withCaption ? { caption: captionLinesFor(preset.title, state.code) } : {}),
       })
         .then((blob) => {
-          downloadBlob(blob, exportFilename(preset.title, size));
+          const tiling = state.renderOptions.tiling;
+          downloadBlob(
+            blob,
+            exportFilename(
+              preset.title,
+              size,
+              exportTiling && canExportTiling && tiling !== undefined ? tiling : undefined,
+            ),
+          );
           announce(withCaption ? 'Image exported with its caption.' : 'Image exported.');
         })
         .catch((error: unknown) => {
@@ -151,6 +176,9 @@ export function useArtworkActions(options: {
       state.code,
       preset,
       withCaption,
+      // Both, or Export writes whatever the choice was the time before.
+      exportTiling,
+      canExportTiling,
       announce,
       animation,
       animationPhase,
@@ -159,6 +187,9 @@ export function useArtworkActions(options: {
   );
 
   return {
+    exportTiling,
+    setExportTiling,
+    canExportTiling,
     notice,
     withCaption,
     setWithCaption,

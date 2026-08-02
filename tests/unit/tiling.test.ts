@@ -496,3 +496,64 @@ describe('where the reading sits', () => {
     expect(furthestCorner(null)).toBe('bottom-left');
   });
 });
+
+describe('composing into an export of a given size', () => {
+  /*
+   * The export sets its canvas to the requested pixels directly, so exactness
+   * is never in doubt there. What could go wrong is the grid inside it: the
+   * boundaries are recomputed for those dimensions rather than scaled from the
+   * ones on screen, and a wallpaper one pixel short is a strip of desktop.
+   */
+  const sizes = [
+    [512, 512],
+    [1001, 499],
+    [1920, 1080],
+    [333, 1000],
+    [2048, 2048],
+  ] as const;
+
+  it('covers its region exactly at any output size', () => {
+    for (const [width, height] of sizes) {
+      for (const count of [2, 3, 5]) {
+        for (const mirrored of [false, true]) {
+          const grid = tileGrid(64, 64, count, count, width, height, 1, mirrored);
+          const first = tileRect(grid, 0, 0);
+          const last = tileRect(grid, grid.columns - 1, grid.rows - 1);
+          const where = `${String(width)}x${String(height)} at ${String(count)}`;
+
+          expect(first.left, where).toBe(Math.round(grid.region.left));
+          expect(last.left + last.width, where).toBe(Math.round(grid.region.left + grid.region.width));
+          expect(first.top, where).toBe(Math.round(grid.region.top));
+          expect(last.top + last.height, where).toBe(Math.round(grid.region.top + grid.region.height));
+        }
+      }
+    }
+  });
+
+  it('never leaves a gap between copies at any output size or scale', () => {
+    for (const [width, height] of sizes) {
+      for (const scale of [0.5, 0.75, 1, 1.5, 2]) {
+        const grid = tileGrid(64, 64, 3, 3, width, height, scale, true);
+        for (let column = 0; column + 1 < grid.columns; column += 1) {
+          const a = tileRect(grid, column, 0);
+          const b = tileRect(grid, column + 1, 0);
+          expect(a.left + a.width, `${String(width)}x${String(height)} at ${String(scale)}`).toBe(b.left);
+        }
+        for (let row = 0; row + 1 < grid.rows; row += 1) {
+          const a = tileRect(grid, 0, row);
+          const b = tileRect(grid, 0, row + 1);
+          expect(a.top + a.height).toBe(b.top);
+        }
+      }
+    }
+  });
+
+  it('keeps the tile’s aspect ratio in a very non-square output', () => {
+    // 1920 by 1080 with a square tile: the composition is letterboxed, so the
+    // copies stay square rather than being stretched into the shape asked for.
+    const grid = tileGrid(64, 64, 3, 3, 1920, 1080, 1);
+    const cell = tileRect(grid, 1, 1);
+    expect(cell.width / cell.height).toBeCloseTo(1, 1);
+    expect(grid.region.width).toBeLessThan(1920);
+  });
+});

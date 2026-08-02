@@ -209,3 +209,23 @@ describe('cells that have not arrived, under every orientation', () => {
     }
   });
 });
+
+describe('naming a tiled export', () => {
+  it('leaves a single tile named exactly as it always was', () => {
+    // Somebody with a folder of these should not find the next one filed
+    // differently because a feature they did not use now exists.
+    expect(exportFilename('Truchet Grid', 512)).toBe('apl-art-truchet-grid-512px.png');
+    expect(exportFilename('Truchet Grid', 512, { mode: 'single', columns: 3, rows: 3 })).toBe(
+      'apl-art-truchet-grid-512px.png',
+    );
+  });
+
+  it('says what the composition was, so a folder can be told apart', () => {
+    expect(exportFilename('Truchet Grid', 512, { mode: 'repeat', columns: 3, rows: 3 })).toBe(
+      'apl-art-truchet-grid-repeat-3x3-512px.png',
+    );
+    expect(exportFilename('Wave Interference', 1024, { mode: 'mirror-repeat', columns: 2, rows: 4 })).toBe(
+      'apl-art-wave-interference-mirror-repeat-2x4-1024px.png',
+    );
+  });
+});

@@ -55,6 +55,32 @@ export function ExportMenu({ actions, triggerClassName, label = 'Export' }: Prop
               </span>
             </button>
           </li>
+          {/*
+            Offered only while something is repeated. The composition itself was
+            chosen in the Tiling section and is not asked about again here.
+          */}
+          {actions.canExportTiling && (
+            <li role="none">
+              <button
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={actions.exportTiling}
+                className={styles.toggle}
+                onClick={() => actions.setExportTiling(!actions.exportTiling)}
+              >
+                <span aria-hidden="true" className={styles.tick}>
+                  {actions.exportTiling ? '✓' : ''}
+                </span>
+                <span>
+                  Export the repeat
+                  <span className={styles.preview}>
+                    Off writes one tile, as before. On writes the composition on screen.
+                  </span>
+                </span>
+              </button>
+            </li>
+          )}
+
           <li role="separator" className={styles.separator} />
 
           {EXPORT_SIZES.map((size) => (

@@ -9,7 +9,8 @@
 import { type MatrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
-import { buildArtworkImage, toSourceCanvas, type DrawRequest } from './CanvasRenderer';
+import { buildArtworkImage, composeTiles, toSourceCanvas, type DrawRequest } from './CanvasRenderer';
+import { isRepeating, tileCounts, tileGrid, type TilingMode } from './tiling';
 import { type Palette } from './palettes';
 import { cellSizeFor } from './renderMotifs';
 import { type RenderOptions } from './renderOptions';
@@ -31,6 +32,16 @@ export interface ExportRequest {
   readonly palette?: Palette;
   /** As on the canvas, so a saved image is coloured the same way. */
   readonly escape?: DrawRequest['escape'];
+  /**
+   * One tile, or the composition currently on screen.
+   *
+   * `tile` is the behaviour that has always been here and stays exactly as it
+   * was. `tiling` repeats the same finished tile using the settings already
+   * chosen in the Tiling section — the export panel does not ask again.
+   */
+  readonly composition?: 'tile' | 'tiling';
+  /** Exact output pixels, overriding `size`. Square sizes come from `size`. */
+  readonly output?: { readonly width: number; readonly height: number };
   readonly size: ExportSize;
   /**
    * Lines printed beneath the artwork. Omitted or empty means no caption at
@@ -48,7 +59,11 @@ export interface ExportRequest {
  * can contain whatever a user typed, and it must not be able to produce a path
  * separator, a leading dot, or a name a filesystem will refuse.
  */
-export function exportFilename(title: string, size: ExportSize): string {
+export function exportFilename(
+  title: string,
+  size: ExportSize,
+  composition?: { readonly mode: TilingMode; readonly columns: number; readonly rows: number },
+): string {
   const slug =
     title
       .normalize('NFKD')
@@ -58,6 +73,18 @@ export function exportFilename(title: string, size: ExportSize): string {
       .slice(0, 60) || 'artwork';
 
   const suffix = size === 'original' ? 'original' : `${size}px`;
+
+  /*
+   * The composition in the name, but only when there is one. A single tile
+   * keeps the name it has always had — somebody with a folder of these should
+   * not find the next one filed differently for no reason they asked for.
+   */
+  if (composition !== undefined && composition.mode !== 'single') {
+    const kind = composition.mode === 'mirror-repeat' ? 'mirror-repeat' : 'repeat';
+    const grid = `${String(composition.columns)}x${String(composition.rows)}`;
+    return `apl-art-${slug}-${kind}-${grid}-${suffix}.png`;
+  }
+
   return `apl-art-${slug}-${suffix}.png`;
 }
 
@@ -108,9 +135,23 @@ function scaleFor(width: number, height: number, target: number): number {
 export async function exportArtworkPng(request: ExportRequest): Promise<Blob> {
   const { image, palette } = buildArtworkImage(request);
 
+  const tiled = request.composition === 'tiling' && isRepeating(request.options.tiling);
+
+  /*
+   * The requested size, honoured exactly.
+   *
+   * Boundaries are worked out afresh for these dimensions rather than scaled
+   * from the ones on screen: the canvas is a different size, and reusing its
+   * positions would land the joins fractionally off and put back the seam that
+   * shared rounding exists to prevent.
+   */
+  const requested =
+    request.output ??
+    (tiled && request.size !== 'original' ? { width: request.size, height: request.size } : null);
+
   const scale = request.size === 'original' ? 1 : scaleFor(image.width, image.height, request.size);
-  const artworkWidth = Math.round(image.width * scale);
-  const artworkHeight = Math.round(image.height * scale);
+  const artworkWidth = requested?.width ?? Math.round(image.width * scale);
+  const artworkHeight = requested?.height ?? Math.round(image.height * scale);
 
   const caption = (request.caption ?? []).map((line) => line.trim()).filter((line) => line !== '');
 
@@ -140,7 +181,28 @@ export async function exportArtworkPng(request: ExportRequest): Promise<Blob> {
   const reducing = scale < 1;
   context.imageSmoothingEnabled = reducing || request.options.smoothScaling;
   if (context.imageSmoothingEnabled) context.imageSmoothingQuality = 'high';
-  context.drawImage(toSourceCanvas(image), 0, 0, artworkWidth, artworkHeight);
+
+  const source = toSourceCanvas(image);
+  if (tiled) {
+    /*
+     * The same grid arithmetic and the same composition as the screen, applied
+     * to the export's own pixels. Nothing is copied from the visible canvas.
+     */
+    const { columns, rows } = tileCounts(request.options.tiling);
+    const grid = tileGrid(
+      image.width,
+      image.height,
+      columns,
+      rows,
+      artworkWidth,
+      artworkHeight,
+      request.options.tiling?.scale ?? 1,
+      request.options.tiling?.mode === 'mirror-repeat',
+    );
+    composeTiles(context, source, grid);
+  } else {
+    context.drawImage(source, 0, 0, artworkWidth, artworkHeight);
+  }
 
   if (caption.length > 0) {
     context.imageSmoothingEnabled = true;
