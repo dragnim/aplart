@@ -6,7 +6,7 @@ import {
   transformMatrix,
   type RenderOptions,
 } from '@/renderer/renderOptions';
-import { exportDimensions, exportFilename } from '@/renderer/exportPng';
+import { drawnTileScale, exportDimensions, exportFilename } from '@/renderer/exportPng';
 
 /**
  * Deliberately not square and not symmetric, so a rotation that is transposed,
@@ -227,5 +227,39 @@ describe('naming a tiled export', () => {
     expect(exportFilename('Wave Interference', 1024, { mode: 'mirror-repeat', columns: 2, rows: 4 })).toBe(
       'apl-art-wave-interference-mirror-repeat-2x4-1024px.png',
     );
+  });
+});
+
+describe('choosing whether a tiled export smooths', () => {
+  /*
+   * The decision follows the copy, not the whole image. Both directions matter
+   * and both are easy to get wrong in opposite ways: a reduced motif drawn
+   * without smoothing comes out ragged, and an enlarged one drawn with it
+   * loses the hard cell edges that the Pixel setting exists to keep.
+   */
+  const grid = (regionWidth: number, columns: number) => ({ region: { width: regionWidth }, columns });
+
+  it('reduces substantially when a large motif tile is repeated small', () => {
+    // An 800-pixel Truchet tile, nine across a 512-pixel export: each copy is
+    // about 170 pixels, a fifth of its own size.
+    const scale = drawnTileScale(800, grid(512, 3), 0.64);
+    expect(scale).toBeLessThan(0.25);
+  });
+
+  it('enlarges when a small tile is repeated into a large export', () => {
+    // A 64-pixel tile, twice across 2048: each copy is 1024, sixteen times over.
+    const scale = drawnTileScale(64, grid(2048, 2), 32);
+    expect(scale).toBeGreaterThan(1);
+    expect(scale).toBeCloseTo(16, 5);
+  });
+
+  it('agrees with a single copy when nothing is repeated', () => {
+    expect(drawnTileScale(800, grid(800, 1), 1)).toBe(1);
+    expect(drawnTileScale(800, null, 0.64)).toBe(0.64);
+  });
+
+  it('does not divide by nothing', () => {
+    expect(drawnTileScale(0, grid(512, 3), 2)).toBe(2);
+    expect(drawnTileScale(800, grid(512, 0), 2)).toBe(2);
   });
 });

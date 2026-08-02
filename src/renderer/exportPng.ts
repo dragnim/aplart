@@ -132,6 +132,24 @@ function scaleFor(width: number, height: number, target: number): number {
   return exact >= 1 ? Math.floor(exact) : exact;
 }
 
+/**
+ * How large one copy actually ends up, as a multiple of the tile's own width.
+ *
+ * Judged on the copy rather than on the whole image, because they differ: a
+ * tile drawn nine times into a 512-pixel square is reduced to a fifth even
+ * where one copy of it would have been enlarged four times over. Reducing a
+ * drawn motif without smoothing loses parts of its strokes, so getting this
+ * wrong makes a tiled Truchet ragged at exactly the sizes people export.
+ */
+export function drawnTileScale(
+  tileWidth: number,
+  grid: { readonly region: { readonly width: number }; readonly columns: number } | null,
+  singleScale: number,
+): number {
+  if (grid === null || tileWidth <= 0 || grid.columns <= 0) return singleScale;
+  return grid.region.width / (grid.columns * tileWidth);
+}
+
 export async function exportArtworkPng(request: ExportRequest): Promise<Blob> {
   const { image, palette } = buildArtworkImage(request);
 

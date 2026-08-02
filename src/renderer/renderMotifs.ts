@@ -65,9 +65,9 @@ export function strokeFor(cell: number): number {
  * would be the honest way to extend the range — is a change to make
  * deliberately, not by widening a slider.
  */
-type Motif = 'arcsNwSe' | 'arcsNeSw' | 'diagonalNwSe' | 'diagonalNeSw';
+export type Motif = 'arcsNwSe' | 'arcsNeSw' | 'diagonalNwSe' | 'diagonalNeSw';
 
-const MOTIFS: readonly Motif[] = ['arcsNwSe', 'arcsNeSw', 'diagonalNwSe', 'diagonalNeSw'];
+export const MOTIFS: readonly Motif[] = ['arcsNwSe', 'arcsNeSw', 'diagonalNwSe', 'diagonalNeSw'];
 
 /**
  * Whether a point inside a tile is on the drawn line.
@@ -76,7 +76,7 @@ const MOTIFS: readonly Motif[] = ['arcsNwSe', 'arcsNeSw', 'diagonalNwSe', 'diago
  * radius one half centred on opposite corners, which is what makes them meet
  * exactly at the midpoint of each edge and join up with the neighbouring tile.
  */
-function onStroke(motif: Motif, u: number, v: number, stroke: number): boolean {
+export function onStroke(motif: Motif, u: number, v: number, stroke: number): boolean {
   switch (motif) {
     case 'arcsNwSe':
       return nearRing(u, v, 0, 0, stroke) || nearRing(u, v, 1, 1, stroke);
