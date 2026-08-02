@@ -1,3 +1,5 @@
+import source from './apl/modular-bloom.apl?raw';
+import { artworkSource } from './artworkSource';
 import { type ArtworkPreset } from './schema';
 
 /**
@@ -18,15 +20,7 @@ export const modularBloom: ArtworkPreset = {
   category: 'geometry',
   difficulty: 'beginner',
 
-  code: [
-    '⍝ Controls',
-    'size←64',
-    'modulus←17',
-    'multiplier←1',
-    '',
-    '⍝ Multiply every number by every other, then fold by the modulus',
-    'modulus|multiplier×∘.×⍨⍳size',
-  ].join('\n'),
+  code: artworkSource(source),
 
   parameters: [
     {

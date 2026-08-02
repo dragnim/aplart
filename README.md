@@ -242,8 +242,8 @@ to work around CORS with browser flags or public CORS-anywhere services.
 
 ## Adding a new artwork preset
 
-1. **Write the APL.** Named parameter assignments at the top, one per line, then the expression that
-   returns the matrix:
+1. **Write the APL** in `src/presets/apl/<preset-id>.apl`. Named parameter assignments at the top, one
+   per line, then the expression that returns the matrix:
 
    ```apl
    ⍝ Controls
@@ -256,8 +256,33 @@ to work around CORS with browser flags or public CORS-anywhere services.
 
    Keep the result within 90 rows unless the preset declares `highResolution`.
 
+   The `.apl` file is the source of truth for the program: it is what the editor shows, what is sent
+   to TryAPL, and what a saved project is compared against to decide whether it has been edited. There
+   is deliberately no second copy in TypeScript.
+
 2. **Create the module** in `src/presets/`, exporting an `ArtworkPreset`. The type is defined in
-   [`src/presets/schema.ts`](src/presets/schema.ts).
+   [`src/presets/schema.ts`](src/presets/schema.ts). It holds the metadata — parameters, prose,
+   palettes, capabilities — and imports the program rather than restating it:
+
+   ```ts
+   import source from './apl/your-preset.apl?raw';
+   import { artworkSource } from './artworkSource';
+
+   export const yourPreset: ArtworkPreset = {
+     code: artworkSource(source),
+     // …
+   };
+   ```
+
+   `artworkSource` removes the file's single trailing newline and nothing else, so the program is the
+   same whether or not an editor re-adds one.
+
+   A script that imports a preset must be run with the `?raw` loader, because `tsx` is esbuild and
+   does not understand the suffix that Vite and Vitest do:
+
+   ```json
+   "your:script": "tsx --import ./scripts/lib/registerRaw.mjs scripts/your-script.ts"
+   ```
 
 3. **Bind the parameters.** Each `ArtworkParameter` names the `variable` it controls. The binder
    rewrites only an anchored, top-level assignment line — `^(\s*size\s*←\s*).*$` — so a variable used

@@ -1,3 +1,5 @@
+import source from './apl/sierpinski-array.apl?raw';
+import { artworkSource } from './artworkSource';
 import { type ArtworkPreset } from './schema';
 
 /**
@@ -20,21 +22,7 @@ export const sierpinskiArray: ArtworkPreset = {
   category: 'fractal',
   difficulty: 'intermediate',
 
-  code: [
-    '⍝ Controls',
-    'size←64',
-    'repeats←1',
-    'invert←0',
-    '',
-    '⍝ Row and column numbers, counting from zero',
-    'n←¯1+⍳size',
-    '',
-    '⍝ Every number written out in binary',
-    'bits←(16⍴2)⊤repeats×n',
-    '',
-    '⍝ Filled where no binary digit is shared',
-    'invert≠0=(⍉bits)+.×bits',
-  ].join('\n'),
+  code: artworkSource(source),
 
   parameters: [
     {

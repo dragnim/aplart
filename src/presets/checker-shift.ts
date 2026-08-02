@@ -1,3 +1,5 @@
+import source from './apl/checker-shift.apl?raw';
+import { artworkSource } from './artworkSource';
 import { type ArtworkPreset } from './schema';
 
 /**
@@ -15,15 +17,7 @@ export const checkerShift: ArtworkPreset = {
   category: 'pattern',
   difficulty: 'beginner',
 
-  code: [
-    '⍝ Controls',
-    'size←32',
-    'repeat←8',
-    'offset←3',
-    '',
-    '⍝ Add each row number to each column number, then fold by the repeat',
-    'repeat|(⍳size)∘.+offset×⍳size',
-  ].join('\n'),
+  code: artworkSource(source),
 
   parameters: [
     {
