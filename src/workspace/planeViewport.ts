@@ -11,12 +11,7 @@
  * it lays its axes out the way `planeAt` assumes.
  */
 
-import {
-  findAssignment,
-  parseAplLiteral,
-  setParameterValue,
-  type ParameterValue,
-} from '@/editor/parameterBinding';
+import { numberAssignedTo, setParameterValue } from '@/editor/parameterBinding';
 import { type ArtworkParameter, type PlaneExploration } from '@/presets/schema';
 import { type SourceRect } from '@/renderer/displayMapping';
 
@@ -148,14 +143,6 @@ export function panViewport(
   );
 }
 
-function numberAt(code: string, variable: string): number | null {
-  const location = findAssignment(code, variable);
-  if (location === null) return null;
-
-  const literal: ParameterValue | null = parseAplLiteral(location.valueText);
-  return typeof literal === 'number' ? literal : null;
-}
-
 /**
  * The view the code currently describes, or null if it no longer describes one.
  *
@@ -165,9 +152,9 @@ function numberAt(code: string, variable: string): number | null {
  * stop responding at the exact moment someone was getting somewhere.
  */
 export function readViewport(code: string, spec: PlaneExploration): Viewport | null {
-  const centreX = numberAt(code, spec.centreXVariable);
-  const centreY = numberAt(code, spec.centreYVariable);
-  const span = numberAt(code, spec.spanVariable);
+  const centreX = numberAssignedTo(code, spec.centreXVariable);
+  const centreY = numberAssignedTo(code, spec.centreYVariable);
+  const span = numberAssignedTo(code, spec.spanVariable);
 
   if (centreX === null || centreY === null || span === null) return null;
   // A view with no width is not a view, and would make every later fraction

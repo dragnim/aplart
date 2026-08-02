@@ -136,6 +136,19 @@ export const mandelbrotField: ArtworkPreset = {
   // which is what lets a dragged region be turned back into three assignments.
   planeExploration: { centreXVariable: 'centreX', centreYVariable: 'centreY', spanVariable: 'zoom' },
 
+  /*
+   * A cell holding the iteration count never escaped, so far as the count could
+   * tell — the point is inside the set, or close enough to it. The interior is a
+   * single value by definition, so a view entirely inside it is one flat colour:
+   * correct, and indistinguishable from a fault unless something says so.
+   */
+  valueNotes: {
+    ceilingVariable: 'iterations',
+    cellAtCeiling: 'This point reached the maximum of {ceiling} iterations.',
+    viewAtCeiling:
+      'Every point in this view reached the current iteration limit. Try moving towards an edge of the set or increasing the iteration value.',
+  },
+
   primitives: [
     {
       glyph: '⍣',

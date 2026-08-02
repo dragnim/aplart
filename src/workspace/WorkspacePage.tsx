@@ -19,19 +19,22 @@ import { Dialog } from '@/components/Dialog/Dialog';
 import { WIDE_LAYOUT_QUERY, useMediaQuery } from '@/app/useMediaQuery';
 import { type AplExecutionService } from '@/execution/AplExecutionService';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import { isUniform, readCell } from '@/matrix/matrixInspection';
 import { migratePresetCode } from '@/presets/codeMigrations';
 import { getPreset } from '@/presets/presets';
 import { type ArtworkParameter, type ArtworkPreset } from '@/presets/schema';
 import { ArtworkCanvas } from '@/renderer/ArtworkCanvas';
 import { defaultRenderOptions } from '@/renderer/renderOptions';
 import { decodeShareState, toRenderOptions } from '@/sharing/decodeShareState';
+import { numberAssignedTo } from '@/editor/parameterBinding';
 import { ParameterControls } from './ParameterControls';
+import { ValueInspector } from './ValueInspector';
 import { PrimitivePanel } from './PrimitivePanel';
 import { TryChangingThis } from './TryChangingThis';
 import { randomiseParameters } from './randomise';
 import { readSavedProjectImmediate, useLocalProject } from './useLocalProject';
 import { FocusToolbar } from './FocusToolbar';
-import { type SourceRect } from '@/renderer/displayMapping';
+import { type SourceCell, type SourceRect } from '@/renderer/displayMapping';
 import {
   readViewport,
   panViewport,
@@ -374,6 +377,57 @@ function Workspace({
     applyViewport(previous, { remember: false });
   }, [viewHistory, applyViewport]);
 
+  /*
+   * Inspecting a cell.
+   *
+   * The chosen cell is remembered in the matrix's own coordinates, so recolouring
+   * or turning the artwork leaves it pointing at the same cell — and a new result
+   * of a different shape simply stops matching, without an effect having to
+   * reach in and clear it.
+   *
+   * The reading counts every cell sharing the value, so it is computed only when
+   * the cell or the matrix changes. Never while the pointer is moving.
+   */
+  const [inspected, setInspected] = useState<SourceCell | null>(null);
+  const clearInspection = useCallback(() => setInspected(null), []);
+
+  /*
+   * Escape puts the reading away before it means anything else.
+   *
+   * On `document` and stopped from propagating, like the drag it sits beside, so
+   * it reaches this before the window handler that would leave Focus mode. The
+   * innermost thing open is the innermost thing the key should close.
+   */
+  useEffect(() => {
+    if (inspected === null) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.stopPropagation();
+      setInspected(null);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [inspected]);
+
+  const reading = useMemo(() => {
+    if (inspected === null || state.matrix === null || state.stats === null) return null;
+    return readCell(state.matrix, state.stats, inspected.row, inspected.column);
+  }, [inspected, state.matrix, state.stats]);
+
+  /** The ceiling as the visible code sets it, so a note cannot claim another. */
+  const ceiling =
+    preset.valueNotes === undefined ? null : numberAssignedTo(state.code, preset.valueNotes.ceilingVariable);
+
+  /*
+   * Only when nothing is chosen: pressing a cell answers the same question more
+   * precisely, and repeating the general note over every press would be noise.
+   */
+  const viewNote =
+    reading === null && state.stats !== null && preset.valueNotes !== undefined && isUniform(state.stats)
+      ? preset.valueNotes.viewAtCeiling
+      : null;
+
   const handleRandomise = useCallback(() => {
     analytics.track({ name: 'randomise_used', presetId: preset.id });
     const { values, seed } = randomiseParameters(preset.parameters);
@@ -545,6 +599,23 @@ function Workspace({
               // drag that overwrites it.
               { enabled: viewport !== null, onSelect: handleSelectRegion }
         }
+        // `reading` rather than `inspected`: a cell remembered from a result of a
+        // different shape has already stopped matching, so the outline goes with
+        // it rather than pointing somewhere that no longer exists.
+        inspection={{
+          marked: reading === null ? null : { row: reading.row, column: reading.column },
+          onInspect: setInspected,
+        }}
+      />
+
+      <ValueInspector
+        reading={reading}
+        viewNote={viewNote}
+        notes={preset.valueNotes}
+        ceiling={ceiling}
+        // A tiling's values choose a shape rather than measure anything.
+        categorical={preset.renderMode === 'tiles'}
+        onDismiss={clearInspection}
       />
     </div>
   );

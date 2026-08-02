@@ -1,9 +1,15 @@
 /**
- * Dragging a region out of the artwork.
+ * Pressing and dragging on the artwork.
  *
- * Reports the region in fractions of the *source* matrix, not of the screen, so
- * the caller never has to know how the artwork happened to be laid out, scaled,
- * rotated or mirrored when it was pressed.
+ * Two gestures, told apart by how far the pointer moved: a press picks out a
+ * single cell, and a drag picks out a region. A gesture is only ever one of the
+ * two — a drag that ends must not also be read as a press on the cell it
+ * happened to finish over, which would zoom and then immediately report a value
+ * from the view being left behind.
+ *
+ * Everything is reported in the coordinates of the *source* matrix, not of the
+ * screen, so the caller never has to know how the artwork happened to be laid
+ * out, scaled, rotated or mirrored when it was pressed.
  *
  * Pointer events rather than mouse events, so a finger and a stylus work
  * without a second code path, and the pointer is captured so a drag that leaves
@@ -11,7 +17,14 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { clampFraction, displayToSource, type SourceRect } from './displayMapping';
+import {
+  clampFraction,
+  displayToSource,
+  displayedShape,
+  sourceCellAt,
+  type SourceCell,
+  type SourceRect,
+} from './displayMapping';
 import { fitArtwork } from './fitArtwork';
 import { type RenderOptions } from './renderOptions';
 
@@ -39,13 +52,21 @@ interface Drag {
   readonly y1: number;
 }
 
-export function useArtworkSelection(options: {
+export function useArtworkPointer(options: {
+  /** Whether a drag may select a region. Pressing to inspect is separate. */
   readonly enabled: boolean;
-  /** Dimensions of the drawn image, which set the letterboxing. */
-  readonly imageWidth: number;
-  readonly imageHeight: number;
+  /*
+   * The shape of the *source* matrix in cells — not rendered pixels, and not the
+   * displayed shape. A quarter turn transposes what the viewer sees, and the
+   * displayed shape is worked out from this rather than passed in, so a caller
+   * cannot supply one where the other was wanted.
+   */
+  readonly rows: number;
+  readonly columns: number;
   readonly renderOptions: RenderOptions;
   readonly onSelect: (rect: SourceRect) => void;
+  /** A press on a cell, or null for a press that missed the artwork. */
+  readonly onInspect: (cell: SourceCell | null) => void;
 }): {
   readonly overlay: OverlayRect | null;
   readonly onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
@@ -53,32 +74,29 @@ export function useArtworkSelection(options: {
   readonly onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void;
   readonly onPointerCancel: () => void;
 } {
-  const { enabled, imageWidth, imageHeight, renderOptions, onSelect } = options;
+  const { enabled, rows, columns, renderOptions, onSelect, onInspect } = options;
   const [drag, setDrag] = useState<Drag | null>(null);
 
   // Read inside the handlers so they can stay stable across a drag.
-  const latest = useRef({ imageWidth, imageHeight, renderOptions, onSelect });
+  const latest = useRef({ rows, columns, renderOptions, onSelect, onInspect });
   useEffect(() => {
-    latest.current = { imageWidth, imageHeight, renderOptions, onSelect };
-  }, [imageWidth, imageHeight, renderOptions, onSelect]);
+    latest.current = { rows, columns, renderOptions, onSelect, onInspect };
+  }, [rows, columns, renderOptions, onSelect, onInspect]);
 
-  const onPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLElement>) => {
-      // Primary button only: a right-press opens a menu, and a middle-press
-      // scrolls. Neither should start a selection.
-      if (!enabled || event.button !== 0) return;
+  const onPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+    // Primary button only: a right-press opens a menu, and a middle-press
+    // scrolls. Neither should start a selection.
+    if (event.button !== 0) return;
 
-      const bounds = event.currentTarget.getBoundingClientRect();
-      // Measured once, at the start. Re-measuring on every move would let a
-      // layout change part-way through a drag move the region under the finger.
-      const x = event.clientX - bounds.left;
-      const y = event.clientY - bounds.top;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    // Measured once, at the start. Re-measuring on every move would let a
+    // layout change part-way through a drag move the region under the finger.
+    const x = event.clientX - bounds.left;
+    const y = event.clientY - bounds.top;
 
-      event.currentTarget.setPointerCapture(event.pointerId);
-      setDrag({ bounds, x0: x, y0: y, x1: x, y1: y });
-    },
-    [enabled],
-  );
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDrag({ bounds, x0: x, y0: y, x1: x, y1: y });
+  }, []);
 
   const onPointerMove = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     setDrag((current) =>
@@ -102,16 +120,36 @@ export function useArtworkSelection(options: {
 
       const x1 = event.clientX - finished.bounds.left;
       const y1 = event.clientY - finished.bounds.top;
-      if (Math.max(Math.abs(x1 - finished.x0), Math.abs(y1 - finished.y0)) < MINIMUM_DRAG) return;
 
       const {
-        imageWidth: width,
-        imageHeight: height,
+        rows: sourceRows,
+        columns: sourceColumns,
         renderOptions: render,
         onSelect: select,
+        onInspect: inspect,
       } = latest.current;
-      const box = fitArtwork(width, height, finished.bounds.width, finished.bounds.height);
+      const shown = displayedShape(sourceRows, sourceColumns, render);
+      const box = fitArtwork(shown.columns, shown.rows, finished.bounds.width, finished.bounds.height);
       if (box.width === 0 || box.height === 0) return;
+
+      const moved = Math.max(Math.abs(x1 - finished.x0), Math.abs(y1 - finished.y0));
+
+      /*
+       * A press, not a drag: report the cell under it and stop. Returning here
+       * is what keeps the two gestures exclusive — a drag never also inspects,
+       * and a press never also zooms.
+       */
+      if (moved < MINIMUM_DRAG || !enabled) {
+        // Unclamped, so a press on the mat beside the artwork misses rather than
+        // being rounded onto the nearest edge cell.
+        const exact = {
+          u: (x1 - box.left) / box.width,
+          v: (y1 - box.top) / box.height,
+        };
+        const source = displayToSource(exact, render);
+        inspect(sourceCellAt(source, sourceRows, sourceColumns));
+        return;
+      }
 
       const toFraction = (x: number, y: number) => ({
         u: clampFraction((x - box.left) / box.width),
@@ -125,7 +163,7 @@ export function useArtworkSelection(options: {
       const b = displayToSource(toFraction(x1, y1), render);
       select({ u0: a.u, v0: a.v, u1: b.u, v1: b.v });
     },
-    [drag],
+    [drag, enabled],
   );
 
   // Escape abandons a drag in progress. Stopped from propagating so it does not
@@ -142,8 +180,10 @@ export function useArtworkSelection(options: {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [drag]);
 
+  const shown = displayedShape(rows, columns, renderOptions);
+
   return {
-    overlay: drag === null ? null : overlayFor(drag, imageWidth, imageHeight),
+    overlay: drag === null ? null : overlayFor(drag, shown.columns, shown.rows),
     onPointerDown,
     onPointerMove,
     onPointerUp,

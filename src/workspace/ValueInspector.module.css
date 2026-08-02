@@ -1,0 +1,68 @@
+/*
+ * Pinned to the foot of the artwork, over the picture.
+ *
+ * Opaque enough to be read against any artwork, and narrow enough that most of
+ * the piece is still visible while it is open — the point of pressing a cell is
+ * to understand what is around it.
+ */
+.panel {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: var(--space-3);
+  max-width: 24rem;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: var(--radius-md);
+  background: rgb(0 0 0 / 82%);
+  color: var(--text-on-dark);
+  backdrop-filter: blur(8px);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.position {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-on-dark-muted);
+}
+
+/* The answer, given the weight of an answer. */
+.value {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: 650;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail,
+.note {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-on-dark-muted);
+}
+
+.note {
+  margin: 0;
+}
+
+.dismiss {
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+  border: 1px solid rgb(255 255 255 / 30%);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-on-dark);
+  cursor: pointer;
+  font-size: var(--text-xs);
+}
+
+.dismiss:hover {
+  background: rgb(255 255 255 / 14%);
+}

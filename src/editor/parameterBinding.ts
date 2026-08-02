@@ -94,6 +94,22 @@ export function parseAplLiteral(text: string): ParameterValue | null {
   return null;
 }
 
+/**
+ * The plain number a variable is assigned, or null if it is not one.
+ *
+ * Deliberately simpler than `bindingStateFor`, which also judges whether a
+ * control could show the value. A caller that only wants to know what the code
+ * says — to quote a limit back, or to read a viewport — has no use for that
+ * judgement and should not have to unpack a discriminated union to get past it.
+ */
+export function numberAssignedTo(code: string, variable: string): number | null {
+  const location = findAssignment(code, variable);
+  if (location === null) return null;
+
+  const literal = parseAplLiteral(location.valueText);
+  return typeof literal === 'number' ? literal : null;
+}
+
 export type BindingState =
   | { readonly status: 'bound'; readonly value: ParameterValue; readonly location: AssignmentLocation }
   /** The line is there but holds an expression a control cannot represent. */

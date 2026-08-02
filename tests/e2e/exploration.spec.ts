@@ -176,18 +176,23 @@ test.describe('exploring the Mandelbrot set', () => {
     expect(await settledSignature(page)).toBe(original);
   });
 
-  test('a press without a drag changes nothing', async ({ page }) => {
+  test('a press without a drag reads a value instead of moving the view', async ({ page }) => {
     await openMandelbrot(page);
     await runAndWait(page);
-    const before = await settledSignature(page);
 
     const box = await page.locator('canvas').boundingBox();
     if (box === null) throw new Error('the canvas is not on screen');
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 
-    await page.waitForTimeout(400);
+    /*
+     * This used to assert the canvas was byte-identical afterwards, on the
+     * grounds that a press did nothing at all. It does something now — it marks
+     * the cell it read — so the canvas legitimately changes. What still has to
+     * hold is that the *view* did not: the code is untouched and nothing ran.
+     */
+    await expect(page.getByText(/^Row \d+, column \d+$/u)).toBeVisible();
     expect(await code(page)).toContain('zoom←1.4');
-    expect(await settledSignature(page)).toBe(before);
+    await expect(runStatus(page)).not.toHaveText(/Running/);
   });
 
   test('Escape abandons a drag in progress without leaving Focus mode', async ({ page }) => {
@@ -217,6 +222,81 @@ test.describe('exploring the Mandelbrot set', () => {
 
     await expect(page.getByRole('button', { name: 'Zoom out' })).toHaveCount(0);
     await expect(page.getByText(/Drag a region/)).toHaveCount(0);
+  });
+});
+
+test.describe('reading a value off the artwork', () => {
+  test.use({ viewport: WIDE });
+
+  /** Presses a point given as fractions of the canvas box. */
+  async function pressAt(page: Page, u: number, v: number) {
+    const box = await page.locator('canvas').boundingBox();
+    if (box === null) throw new Error('the canvas is not on screen');
+    await page.mouse.click(box.x + box.width * u, box.y + box.height * v);
+  }
+
+  test('names a cell, and lets go of it', async ({ page }) => {
+    await openMandelbrot(page);
+    await runAndWait(page);
+
+    await pressAt(page, 0.5, 0.5);
+    // The middle of a 128-wide view, so around the middle of the matrix.
+    await expect(page.getByText(/^Row 6[0-9], column 6[0-9]$/u)).toBeVisible();
+
+    await page.getByRole('button', { name: 'Clear' }).click();
+    await expect(page.getByText(/^Row \d+, column \d+$/u)).toHaveCount(0);
+  });
+
+  test('ignores a press on the mat beside the artwork', async ({ page }) => {
+    await openMandelbrot(page);
+    await runAndWait(page);
+
+    /*
+     * In Focus mode, where the mat actually exists. The workspace panel is
+     * square and so is this artwork, so there is no letterbox to press on there
+     * — an earlier version of this test pressed the far left of the workspace
+     * canvas and got column 3, correctly.
+     */
+    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await page.getByRole('button', { name: 'Controls', exact: true }).click();
+    await page.waitForTimeout(500);
+
+    // A fifth of the canvas either side is bare background at this window size.
+    await pressAt(page, 0.02, 0.5);
+    await expect(page.getByText(/^Row \d+, column \d+$/u)).toHaveCount(0);
+
+    // The middle of the same canvas is on the artwork, so the press works there.
+    await pressAt(page, 0.5, 0.5);
+    await expect(page.getByText(/^Row \d+, column \d+$/u)).toBeVisible();
+  });
+
+  test('works in Focus mode, where the artwork is letterboxed differently', async ({ page }) => {
+    await openMandelbrot(page);
+    await runAndWait(page);
+    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await page.getByRole('button', { name: 'Controls', exact: true }).click();
+    await page.waitForTimeout(500);
+
+    await pressAt(page, 0.5, 0.5);
+    await expect(page.getByText(/^Row \d+, column \d+$/u)).toBeVisible();
+
+    // Escape puts the reading away before it means anything else, so Focus mode
+    // is still on afterwards.
+    await page.keyboard.press('Escape');
+    await expect(page.getByText(/^Row \d+, column \d+$/u)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Exit focus' })).toBeVisible();
+  });
+
+  test('reports a tile class on an artwork made of motifs', async ({ page }) => {
+    await stubTryApl(page);
+    await page.goto('./#/art/truchet-grid');
+    await expect(page.getByRole('heading', { level: 1, name: 'Truchet Grid' })).toBeVisible();
+    await runAndWait(page);
+
+    // Each tile is many pixels; the answer has to be the logical cell.
+    await pressAt(page, 0.5, 0.5);
+    await expect(page.getByText(/^Row \d+, column \d+$/u)).toBeVisible();
+    await expect(page.getByText(/cells share it/)).toBeVisible();
   });
 });
 

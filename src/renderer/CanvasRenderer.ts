@@ -10,6 +10,7 @@
 import { type MatrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
+import { cellBounds, displayedShape, type SourceCell } from './displayMapping';
 import { fitArtwork } from './fitArtwork';
 import { renderArtwork } from './renderArtwork';
 import { getPalette } from './palettes';
@@ -81,6 +82,67 @@ export function drawArtwork(
   if (request.options.smoothScaling) context.imageSmoothingQuality = 'high';
 
   context.drawImage(source, box.left, box.top, box.width, box.height);
+}
+
+/**
+ * Outlines one cell on an already-drawn canvas.
+ *
+ * Drawn onto the canvas rather than positioned over it as an element: the
+ * letterbox geometry is already worked out here, and a DOM overlay would have to
+ * measure the frame and rediscover it. Deliberately a separate call from
+ * `drawArtwork` so it cannot reach the export, which renders from the matrix and
+ * never reads the screen — a marker in a saved image would be a surprise.
+ *
+ * Two strokes, light over dark, so the cell is findable on a pale artwork and a
+ * dark one without tinting what is inside it.
+ */
+export function drawCellMarker(
+  canvas: HTMLCanvasElement,
+  cell: SourceCell,
+  matrix: NumericMatrix,
+  options: RenderOptions,
+  cssWidth: number,
+  cssHeight: number,
+  devicePixelRatio = 1,
+): void {
+  const context = canvas.getContext('2d');
+  if (context === null) return;
+
+  const shown = displayedShape(matrix.rows, matrix.columns, options);
+  const box = fitArtwork(
+    shown.columns,
+    shown.rows,
+    Math.round(cssWidth * devicePixelRatio),
+    Math.round(cssHeight * devicePixelRatio),
+  );
+  if (box.width === 0 || box.height === 0) return;
+
+  const bounds = cellBounds(cell, matrix.rows, matrix.columns, options);
+  const left = box.left + bounds.left * box.width;
+  const top = box.top + bounds.top * box.height;
+  const width = bounds.width * box.width;
+  const height = bounds.height * box.height;
+
+  /*
+   * A minimum size in pixels. At two hundred cells across a single cell is a
+   * couple of pixels, and an outline of a two-pixel square is a dot that cannot
+   * be told from a stray mark; the marker grows around the cell's centre instead.
+   */
+  const minimum = 10 * devicePixelRatio;
+  const grow = Math.max(0, (minimum - Math.min(width, height)) / 2);
+
+  context.save();
+  context.lineWidth = Math.max(1, devicePixelRatio);
+  context.strokeStyle = 'rgb(0 0 0 / 70%)';
+  context.strokeRect(
+    left - grow - context.lineWidth,
+    top - grow - context.lineWidth,
+    width + 2 * grow + 2 * context.lineWidth,
+    height + 2 * grow + 2 * context.lineWidth,
+  );
+  context.strokeStyle = 'rgb(255 255 255 / 95%)';
+  context.strokeRect(left - grow, top - grow, width + 2 * grow, height + 2 * grow);
+  context.restore();
 }
 
 /**

@@ -11,11 +11,11 @@ import { useEffect, useRef, type RefObject } from 'react';
 import { describeMatrix, type MatrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
-import { drawArtwork } from './CanvasRenderer';
-import { type SourceRect } from './displayMapping';
+import { drawArtwork, drawCellMarker } from './CanvasRenderer';
+import { type SourceCell, type SourceRect } from './displayMapping';
 import { getPalette } from './palettes';
 import { transformMatrix, type RenderOptions } from './renderOptions';
-import { useArtworkSelection } from './useArtworkSelection';
+import { useArtworkPointer } from './useArtworkPointer';
 import styles from './ArtworkCanvas.module.css';
 
 /**
@@ -29,6 +29,18 @@ export interface CanvasExploration {
   readonly onSelect: (rect: SourceRect) => void;
 }
 
+/**
+ * Pressing a cell to read its value.
+ *
+ * Offered for every artwork, not only the explorable ones: any matrix has cells
+ * worth asking about. `marked` is a cell of the *source* matrix, so turning or
+ * mirroring the artwork moves the outline to wherever that cell has gone.
+ */
+export interface CanvasInspection {
+  readonly marked: SourceCell | null;
+  readonly onInspect: (cell: SourceCell | null) => void;
+}
+
 interface Props {
   readonly matrix: NumericMatrix | null;
   readonly stats: MatrixStats | null;
@@ -38,12 +50,26 @@ interface Props {
   readonly busy: boolean;
   readonly canvasRef?: RefObject<HTMLCanvasElement | null>;
   readonly exploration?: CanvasExploration | undefined;
+  readonly inspection?: CanvasInspection | undefined;
 }
 
-export function ArtworkCanvas({ matrix, stats, mode, options, busy, canvasRef, exploration }: Props) {
+export function ArtworkCanvas({
+  matrix,
+  stats,
+  mode,
+  options,
+  busy,
+  canvasRef,
+  exploration,
+  inspection,
+}: Props) {
   const internalRef = useRef<HTMLCanvasElement>(null);
   const canvas = canvasRef ?? internalRef;
   const frame = useRef<HTMLDivElement>(null);
+
+  // The caller is responsible for only marking a cell this matrix has; it is
+  // the only side that knows whether a remembered cell survived a new result.
+  const marked = inspection?.marked ?? null;
 
   useEffect(() => {
     const element = canvas.current;
@@ -53,7 +79,11 @@ export function ArtworkCanvas({ matrix, stats, mode, options, busy, canvasRef, e
     const paint = () => {
       const { width, height } = box.getBoundingClientRect();
       if (width === 0 || height === 0) return;
-      drawArtwork(element, { matrix, stats, mode, options }, width, height, window.devicePixelRatio || 1);
+      const ratio = window.devicePixelRatio || 1;
+      drawArtwork(element, { matrix, stats, mode, options }, width, height, ratio);
+      // After the artwork, so the outline is not painted over. Repainted with it
+      // on every resize, which is why it is inside `paint` rather than beside it.
+      if (marked !== null) drawCellMarker(element, marked, matrix, options, width, height, ratio);
     };
 
     paint();
@@ -63,7 +93,7 @@ export function ArtworkCanvas({ matrix, stats, mode, options, busy, canvasRef, e
     const observer = new ResizeObserver(paint);
     observer.observe(box);
     return () => observer.disconnect();
-  }, [matrix, stats, mode, options, canvas]);
+  }, [matrix, stats, mode, options, canvas, marked]);
 
   const palette = getPalette(options.paletteId);
 
@@ -77,12 +107,13 @@ export function ArtworkCanvas({ matrix, stats, mode, options, busy, canvasRef, e
    * first has been drawn would queue runs against the public service and land
    * the person somewhere they never chose.
    */
-  const selection = useArtworkSelection({
+  const pointer = useArtworkPointer({
     enabled: exploration?.enabled === true && !busy && displayed !== null,
-    imageWidth: displayed?.columns ?? 0,
-    imageHeight: displayed?.rows ?? 0,
+    rows: matrix?.rows ?? 0,
+    columns: matrix?.columns ?? 0,
     renderOptions: options,
     onSelect: exploration?.onSelect ?? ignore,
+    onInspect: inspection?.onInspect ?? ignore,
   });
 
   if (matrix === null || stats === null || displayed === null) {
@@ -108,21 +139,21 @@ export function ArtworkCanvas({ matrix, stats, mode, options, busy, canvasRef, e
         ref={canvas}
         role="img"
         aria-label={describeMatrix(displayed, stats, palette.name)}
-        onPointerDown={selection.onPointerDown}
-        onPointerMove={selection.onPointerMove}
-        onPointerUp={selection.onPointerUp}
-        onPointerCancel={selection.onPointerCancel}
+        onPointerDown={pointer.onPointerDown}
+        onPointerMove={pointer.onPointerMove}
+        onPointerUp={pointer.onPointerUp}
+        onPointerCancel={pointer.onPointerCancel}
       />
 
-      {selection.overlay !== null && (
+      {pointer.overlay !== null && (
         <div
           className={styles.selection}
           aria-hidden="true"
           style={{
-            left: `${selection.overlay.left}px`,
-            top: `${selection.overlay.top}px`,
-            width: `${selection.overlay.width}px`,
-            height: `${selection.overlay.height}px`,
+            left: `${pointer.overlay.left}px`,
+            top: `${pointer.overlay.top}px`,
+            width: `${pointer.overlay.width}px`,
+            height: `${pointer.overlay.height}px`,
           }}
         />
       )}

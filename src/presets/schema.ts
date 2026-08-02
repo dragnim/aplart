@@ -91,6 +91,26 @@ export interface PlaneExploration {
   readonly spanVariable: string;
 }
 
+/**
+ * What a preset can add to the value inspector.
+ *
+ * The inspector is generic: it reports a number, where it sits in the range, and
+ * how many cells share it. Only the preset knows that its largest value means
+ * "never escaped", so only the preset can say so — and it says it as text with a
+ * placeholder rather than as code, because a preset is data.
+ *
+ * `{ceiling}` is replaced with the value of `ceilingVariable` as the visible APL
+ * currently sets it, so the sentence cannot claim a limit the code is not using.
+ */
+export interface ValueNotes {
+  /** The assignment that sets the largest value the calculation can produce. */
+  readonly ceilingVariable: string;
+  /** Shown for a selected cell holding that value. */
+  readonly cellAtCeiling: string;
+  /** Shown when every cell in the result holds it, and nothing is selected. */
+  readonly viewAtCeiling: string;
+}
+
 export interface ArtworkPreset {
   readonly id: string;
   readonly title: string;
@@ -105,6 +125,8 @@ export interface ArtworkPreset {
   readonly outputLimits?: PresetOutputLimits;
   /** Set only by presets whose matrix is a patch of a plane. */
   readonly planeExploration?: PlaneExploration;
+  /** Set by presets whose largest value means something worth saying. */
+  readonly valueNotes?: ValueNotes;
   readonly primitives: readonly PrimitiveReference[];
   readonly thumbnailPath: string;
   readonly fixturePath: string;
