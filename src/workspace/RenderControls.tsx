@@ -7,7 +7,15 @@
  * picture" is one of the main things this application is trying to teach.
  */
 
+import {
+  CUSTOM_PALETTE_ID,
+  paletteFromStops,
+  stopsAreUsable,
+  stopsFromPalette,
+} from '@/renderer/customPalette';
 import { palettes } from '@/renderer/palettes';
+import { paletteFor } from '@/renderer/renderOptions';
+import { PaletteEditor } from './PaletteEditor';
 import { ROTATIONS, type RenderOptions } from '@/renderer/renderOptions';
 import styles from './RenderControls.module.css';
 
@@ -22,6 +30,13 @@ export function RenderControls({ options, availablePaletteIds, onChange }: Props
     availablePaletteIds === undefined
       ? palettes
       : palettes.filter((palette) => availablePaletteIds.includes(palette.id));
+
+  const custom = options.paletteId === CUSTOM_PALETTE_ID;
+  // The swatch shows the stops if there are any, or what selecting Custom would
+  // start from if there are not.
+  const customPreview = stopsAreUsable(options.customStops)
+    ? paletteFromStops(options.customStops)
+    : paletteFromStops(stopsFromPalette(paletteFor(options)));
 
   return (
     <div className={styles.panel}>
@@ -49,7 +64,45 @@ export function RenderControls({ options, availablePaletteIds, onChange }: Props
               </button>
             );
           })}
+
+          {/*
+            Custom sits with the named ramps because it is the same kind of
+            choice. Selecting a named one is also how a custom one is undone —
+            which is why the stops are kept rather than discarded, so coming
+            back finds the work still there.
+          */}
+          <button
+            type="button"
+            role="radio"
+            aria-checked={custom}
+            className={styles.palette}
+            data-selected={custom ? 'true' : undefined}
+            onClick={() =>
+              onChange({
+                paletteId: CUSTOM_PALETTE_ID,
+                // Seeded from whatever is on screen, so the editor opens on the
+                // artwork as it looks rather than on an arbitrary ramp.
+                ...(stopsAreUsable(options.customStops)
+                  ? {}
+                  : { customStops: stopsFromPalette(paletteFor(options)) }),
+              })
+            }
+          >
+            <span className={styles.swatch} aria-hidden="true">
+              {customPreview.colours.map((colour, index) => (
+                <span key={index} style={{ backgroundColor: colour }} />
+              ))}
+            </span>
+            <span className={styles.paletteName}>Custom</span>
+          </button>
         </div>
+
+        {custom && (
+          <PaletteEditor
+            stops={options.customStops ?? []}
+            onChange={(customStops) => onChange({ customStops })}
+          />
+        )}
       </fieldset>
 
       <fieldset className={styles.group}>

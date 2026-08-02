@@ -11,6 +11,15 @@ export interface Palette {
   readonly id: string;
   readonly name: string;
   readonly colours: readonly string[];
+  /**
+   * Where each colour sits along the ramp, from 0 to 1, ascending.
+   *
+   * Absent on every palette that ships, which means evenly spaced — the
+   * behaviour these ramps were designed around, and unchanged by this existing.
+   * A custom palette sets it, because moving a stop is most of the point of
+   * making one.
+   */
+  readonly positions?: readonly number[];
   /** Shown behind the artwork where cells are transparent or the canvas is letterboxed. */
   readonly background?: string;
 }

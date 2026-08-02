@@ -6,6 +6,7 @@
  * work, or crashing the gallery on load, is worse.
  */
 
+import { CUSTOM_PALETTE_ID, parseStops } from '@/renderer/customPalette';
 import { DEFAULT_PALETTE_ID, canonicalPaletteId, paletteExists } from '@/renderer/palettes';
 import { defaultRenderOptions, isRotation, type RenderOptions } from '@/renderer/renderOptions';
 import { PROJECT_SCHEMA_VERSION, type Project, type StoredMatrix } from './ProjectRepository';
@@ -42,10 +43,17 @@ export function migrateProject(raw: unknown): MigrationOutcome {
     return { ok: false, reason: 'missing an id, preset or code' };
   }
 
-  // A project saved before a palette was renamed keeps working: the id is
-  // redirected rather than discarded.
+  /*
+   * A project saved before a palette was renamed keeps working: the id is
+   * redirected rather than discarded.
+   *
+   * `custom` is accepted although it names no shipped ramp — it means the stops
+   * stored alongside. Without this it would fail the existence check and be
+   * quietly replaced by the default, throwing away colours somebody chose.
+   */
   const paletteId =
-    typeof record.paletteId === 'string' && paletteExists(record.paletteId)
+    typeof record.paletteId === 'string' &&
+    (record.paletteId === CUSTOM_PALETTE_ID || paletteExists(record.paletteId))
       ? canonicalPaletteId(record.paletteId)
       : DEFAULT_PALETTE_ID;
 
@@ -79,6 +87,16 @@ function normaliseRenderOptions(value: unknown, paletteId: string): RenderOption
   if (typeof value !== 'object' || value === null) return fallback;
 
   const record = value as Record<string, unknown>;
+
+  /*
+   * Absent in everything saved before custom palettes existed, which is the
+   * common case and needs no special handling: no stops means the named ramp,
+   * exactly as before. Unreadable stops are dropped rather than repaired, and
+   * `paletteFor` then falls back to the named ramp — a project should still
+   * open when its colours cannot be understood.
+   */
+  const customStops = parseStops(record.customStops);
+
   return {
     paletteId,
     invert: record.invert === true,
@@ -86,6 +104,7 @@ function normaliseRenderOptions(value: unknown, paletteId: string): RenderOption
     mirrorHorizontally: record.mirrorHorizontally === true,
     mirrorVertically: record.mirrorVertically === true,
     smoothScaling: record.smoothScaling === true,
+    ...(customStops === null ? {} : { customStops }),
   };
 }
 

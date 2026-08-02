@@ -13,8 +13,7 @@ import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
 import { drawArtwork, drawCellMarker } from './CanvasRenderer';
 import { type SourceCell, type SourceRect } from './displayMapping';
-import { getPalette } from './palettes';
-import { transformMatrix, type RenderOptions } from './renderOptions';
+import { paletteFor, transformMatrix, type RenderOptions } from './renderOptions';
 import { useArtworkPointer } from './useArtworkPointer';
 import styles from './ArtworkCanvas.module.css';
 
@@ -95,7 +94,7 @@ export function ArtworkCanvas({
     return () => observer.disconnect();
   }, [matrix, stats, mode, options, canvas, marked]);
 
-  const palette = getPalette(options.paletteId);
+  const palette = paletteFor(options);
 
   // Described, and hit-tested, at the size the viewer sees — which rotation and
   // mirroring can change.

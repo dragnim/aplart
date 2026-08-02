@@ -16,6 +16,14 @@ export interface SharedArtworkState {
   readonly code: string;
   readonly params: Readonly<Record<string, unknown>>;
   readonly palette: string;
+  /**
+   * Custom colour stops, compactly: `0-160f0a.50-ff6a13.100-fff1e4`.
+   *
+   * A string rather than an array of objects because a link's length is
+   * something people see. Absent unless the palette is custom, so no existing
+   * link changes shape.
+   */
+  readonly stops?: string;
   readonly render: SharedRenderOptions;
   readonly seed?: number;
   readonly title?: string;

@@ -13,6 +13,7 @@ import { useCallback, useState } from 'react';
 import { captionLinesFor } from '@/presets/codeMetrics';
 import { type ArtworkPreset } from '@/presets/schema';
 import { downloadBlob, exportArtworkPng, exportFilename, type ExportSize } from '@/renderer/exportPng';
+import { encodeStops, stopsAreUsable } from '@/renderer/customPalette';
 import { fromRenderOptions } from '@/sharing/decodeShareState';
 import { buildShareUrl, encodeShareState } from '@/sharing/encodeShareState';
 import { SHARE_SCHEMA_VERSION, SHARE_URL_WARNING_LENGTH } from '@/sharing/shareState';
@@ -55,6 +56,11 @@ export function useArtworkActions(options: {
       code: state.code,
       params: {},
       palette: state.renderOptions.paletteId,
+      // Only when there are colours to send. A link using a named ramp keeps
+      // exactly the shape it had before custom palettes existed.
+      ...(stopsAreUsable(state.renderOptions.customStops)
+        ? { stops: encodeStops(state.renderOptions.customStops) }
+        : {}),
       render: fromRenderOptions(state.renderOptions),
       title: preset.title,
       ...(seed === undefined ? {} : { seed }),

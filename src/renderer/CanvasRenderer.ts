@@ -13,8 +13,7 @@ import { type RenderMode } from '@/presets/schema';
 import { cellBounds, displayedShape, type SourceCell } from './displayMapping';
 import { fitArtwork } from './fitArtwork';
 import { renderArtwork } from './renderArtwork';
-import { getPalette } from './palettes';
-import { transformMatrix, type RenderOptions } from './renderOptions';
+import { paletteFor, transformMatrix, type RenderOptions } from './renderOptions';
 
 export interface DrawRequest {
   readonly matrix: NumericMatrix;
@@ -31,7 +30,7 @@ export interface DrawRequest {
  */
 export function buildArtworkImage(request: DrawRequest) {
   const transformed = transformMatrix(request.matrix, request.options);
-  const palette = getPalette(request.options.paletteId);
+  const palette = paletteFor(request.options);
 
   return {
     image: renderArtwork(transformed, request.stats, {

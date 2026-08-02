@@ -9,6 +9,7 @@
 import { inflateSync } from 'fflate';
 import { config } from '@/app/config';
 import { isRotation, type RenderOptions } from '@/renderer/renderOptions';
+import { CUSTOM_PALETTE_ID, decodeStops } from '@/renderer/customPalette';
 import { DEFAULT_PALETTE_ID, canonicalPaletteId, paletteExists } from '@/renderer/palettes';
 import { fromBase64Url } from './encodeShareState';
 import { migrateShareState } from './migrations';
@@ -87,7 +88,8 @@ export function validateShareState(parsed: unknown): DecodeResult {
   // renamed still names the old id and must resolve to the new one rather than
   // silently falling back to the default.
   const palette =
-    typeof source.palette === 'string' && paletteExists(source.palette)
+    typeof source.palette === 'string' &&
+    (source.palette === CUSTOM_PALETTE_ID || paletteExists(source.palette))
       ? canonicalPaletteId(source.palette)
       : DEFAULT_PALETTE_ID;
 
@@ -109,6 +111,7 @@ export function validateShareState(parsed: unknown): DecodeResult {
       code,
       params,
       palette,
+      ...(decodeStops(source.stops) === null ? {} : { stops: source.stops as string }),
       render: normaliseRender(source.render),
       ...(typeof source.seed === 'number' && Number.isFinite(source.seed) ? { seed: source.seed } : {}),
       ...(title === undefined || title === '' ? {} : { title }),
@@ -130,8 +133,17 @@ function normaliseRender(value: unknown) {
 
 /** Turns a validated shared state into the renderer's options. */
 export function toRenderOptions(state: SharedArtworkState): RenderOptions {
+  /*
+   * Absent from every link written before custom palettes, and from every link
+   * that uses a named ramp. Unreadable stops become no stops, and `paletteFor`
+   * then draws the named ramp — a link should open even when part of it cannot
+   * be understood.
+   */
+  const stops = decodeStops(state.stops);
+
   return {
     paletteId: state.palette,
+    ...(stops === null ? {} : { customStops: stops }),
     invert: state.render.invert,
     rotation: state.render.rotation,
     mirrorHorizontally: state.render.mirrorH,

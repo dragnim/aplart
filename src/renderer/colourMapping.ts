@@ -48,15 +48,47 @@ export function mixRgb(from: Rgb, to: Rgb, amount: number): Rgb {
  *
  * The entries are treated as evenly spaced stops and interpolated between.
  */
-export function sampleGradient(stops: readonly Rgb[], position: number): Rgb {
+export function sampleGradient(
+  stops: readonly Rgb[],
+  position: number,
+  /**
+   * Where each stop sits, from 0 to 1, ascending. Omit for evenly spaced.
+   */
+  positions?: readonly number[],
+): Rgb {
   if (stops.length === 0) return { r: 0, g: 0, b: 0 };
   if (stops.length === 1) return stops[0] as Rgb;
 
-  const scaled = clamp01(position) * (stops.length - 1);
-  const lower = Math.floor(scaled);
-  const upper = Math.min(lower + 1, stops.length - 1);
+  const at = clamp01(position);
 
-  return mixRgb(stops[lower] as Rgb, stops[upper] as Rgb, scaled - lower);
+  if (positions === undefined || positions.length !== stops.length) {
+    const scaled = at * (stops.length - 1);
+    const lower = Math.floor(scaled);
+    const upper = Math.min(lower + 1, stops.length - 1);
+    return mixRgb(stops[lower] as Rgb, stops[upper] as Rgb, scaled - lower);
+  }
+
+  // Before the first stop and after the last, the ramp holds its end colour
+  // rather than fading to nothing.
+  if (at <= (positions[0] as number)) return stops[0] as Rgb;
+  const lastIndex = stops.length - 1;
+  if (at >= (positions[lastIndex] as number)) return stops[lastIndex] as Rgb;
+
+  let upper = 1;
+  while (upper < lastIndex && (positions[upper] as number) < at) upper += 1;
+
+  const lowerPosition = positions[upper - 1] as number;
+  const upperPosition = positions[upper] as number;
+  const span = upperPosition - lowerPosition;
+
+  /*
+   * Two stops in the same place make a hard edge, and dividing by the nothing
+   * between them would give NaN. The later one wins, which is what "the same
+   * place" has to mean if it is to mean anything.
+   */
+  if (span <= 0) return stops[upper] as Rgb;
+
+  return mixRgb(stops[upper - 1] as Rgb, stops[upper] as Rgb, (at - lowerPosition) / span);
 }
 
 /**
@@ -91,6 +123,20 @@ export function createColourMapper(
   const ramp = options.invert === true ? [...stops].reverse() : stops;
   const { min, max, uniform } = stats;
 
+  /*
+   * Inverting reverses the colours, so the positions have to be mirrored to
+   * match: a stop a tenth of the way along becomes a stop a tenth from the end.
+   * Reversing the colours alone would move every stop as well as recolouring
+   * it, which is not what the control says it does.
+   */
+  const declared = options.palette.positions;
+  const positions =
+    declared === undefined
+      ? undefined
+      : options.invert === true
+        ? [...declared].reverse().map((position) => 1 - position)
+        : declared;
+
   switch (options.mode) {
     case 'indexed': {
       // Values index the palette directly, wrapping round. The double modulo
@@ -106,11 +152,11 @@ export function createColourMapper(
       // A uniform matrix has no range to normalise against; dividing by zero
       // would give NaN, so the midpoint of the ramp is used instead.
       if (uniform) {
-        const midpoint = sampleGradient(ramp, 0.5);
+        const midpoint = sampleGradient(ramp, 0.5, positions);
         return () => midpoint;
       }
       const span = max - min;
-      return (value: number) => sampleGradient(ramp, (value - min) / span);
+      return (value: number) => sampleGradient(ramp, (value - min) / span, positions);
     }
 
     case 'binary': {
@@ -134,7 +180,9 @@ export function createColourMapper(
         const position = (value - min) / span;
         // The top value must land in the last band rather than one past it.
         const band = Math.min(bands - 1, Math.floor(position * bands));
-        return sampleGradient(ramp, bands === 1 ? 0.5 : band / (bands - 1));
+        // Positions apply here too: a band takes the colour that sits at its
+        // place along the ramp, wherever the stops put it.
+        return sampleGradient(ramp, bands === 1 ? 0.5 : band / (bands - 1), positions);
       };
     }
   }

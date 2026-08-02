@@ -1,0 +1,114 @@
+.editor {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+/* The ramp itself, at the width of the panel. */
+.preview {
+  height: 2.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.stops {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.swatch {
+  width: var(--tap-target);
+  height: var(--tap-target);
+  padding: 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.hex,
+.position {
+  min-height: var(--tap-target);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.hex {
+  width: 7rem;
+  font-family: var(--font-mono, monospace);
+}
+
+.position {
+  width: 5rem;
+}
+
+/*
+ * The label says which stop it removes, for anyone hearing the list rather than
+ * seeing it. Only the cross is drawn.
+ */
+.remove {
+  flex: none;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+  overflow: hidden;
+  text-indent: -100em;
+  position: relative;
+}
+
+.remove::after {
+  content: '×';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-indent: 0;
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+
+.remove:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.action {
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+
+.action:hover:not(:disabled) {
+  background: var(--surface-sunken);
+}
+
+.action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

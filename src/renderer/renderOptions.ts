@@ -7,11 +7,21 @@
  */
 
 import { type NumericMatrix } from '@/matrix/matrixTypes';
+import { CUSTOM_PALETTE_ID, paletteFromStops, stopsAreUsable, type ColourStop } from './customPalette';
+import { getPalette, type Palette } from './palettes';
 
 export type Rotation = 0 | 90 | 180 | 270;
 
 export interface RenderOptions {
   readonly paletteId: string;
+  /**
+   * Colours somebody chose, used when `paletteId` is `custom`.
+   *
+   * Kept even while a named palette is selected, so switching to Custom and
+   * back does not throw the work away — choosing a named ramp is how you undo a
+   * custom one, and it would be a poor undo if it also deleted it.
+   */
+  readonly customStops?: readonly ColourStop[];
   readonly invert: boolean;
   readonly rotation: Rotation;
   readonly mirrorHorizontally: boolean;
@@ -29,6 +39,24 @@ export function defaultRenderOptions(paletteId: string): RenderOptions {
     mirrorVertically: false,
     smoothScaling: false,
   };
+}
+
+/**
+ * The palette these options describe.
+ *
+ * The one place that decides between a named ramp and a custom one, so nothing
+ * downstream has to know the difference — the renderer, the export and the
+ * thumbnail script all take a `Palette` and are unaware this exists.
+ *
+ * Falls back to the named ramp when the stops are missing or unusable. A link
+ * that says "custom" and carries nothing readable should draw the artwork in
+ * some sensible colours, not fail to draw it.
+ */
+export function paletteFor(options: RenderOptions): Palette {
+  if (options.paletteId === CUSTOM_PALETTE_ID && stopsAreUsable(options.customStops)) {
+    return paletteFromStops(options.customStops);
+  }
+  return getPalette(options.paletteId);
 }
 
 export const ROTATIONS: readonly Rotation[] = [0, 90, 180, 270];
