@@ -15,9 +15,17 @@
   border-radius: 999px;
   background: var(--surface);
   cursor: pointer;
-  transition:
-    background var(--motion-fast) var(--ease),
-    border-color var(--motion-fast) var(--ease);
+  /*
+   * The border eases; the background does not.
+   *
+   * Selecting a filter inverts it — dark ground, light label — and the label's
+   * colour changes at once. Easing the background too meant a moment of light
+   * text on a mid-grey ground, which measures 1.7:1 against a requirement of
+   * 4.5 and is genuinely unreadable while it lasts. Brief is not the same as
+   * acceptable, and an accessibility check caught it intermittently for exactly
+   * that reason.
+   */
+  transition: border-color var(--motion-fast) var(--ease);
 }
 
 .filter:hover {

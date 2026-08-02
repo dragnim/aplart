@@ -696,6 +696,8 @@ describe('the edge check', () => {
     expect(edgeText()).toMatch(/Left and right edges/);
     expect(edgeText()).toMatch(/Top and bottom edges/);
     expect(edgeText()).toContain('not proof of mathematical seamlessness');
+    // Modular Bloom is a cell artwork, so the values were compared.
+    expect(edgeText()).toContain('values along the edges');
     expect(edgeText()).not.toMatch(/seamless pattern|guaranteed|verified/i);
   });
 
@@ -747,6 +749,26 @@ describe('the edge check', () => {
     const turned = edgeText();
     expect(turned).toMatch(/Left and right edges/);
     expect(upright).toMatch(/Left and right edges/);
+  });
+
+  it('is unmoved by a running palette animation', async () => {
+    /*
+     * The reason it compares values rather than colours. A rotating ramp can
+     * hand two different values the same colour at one phase and different
+     * colours at another, so an answer read off the rendering would change while
+     * nothing about the artwork had.
+     */
+    const { user } = await openAndRun();
+    const before = edgeText();
+
+    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+    expect(edgeText()).toBe(before);
+
+    await user.click(screen.getByRole('radio', { name: /Neon/ }));
+    expect(edgeText()).toBe(before);
+
+    await user.click(screen.getByRole('button', { name: 'Pause' }));
+    expect(edgeText()).toBe(before);
   });
 
   it('says nothing before a first run', async () => {

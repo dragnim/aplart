@@ -24,6 +24,8 @@
  */
 
 import { type RgbaImage } from './colourMapping';
+import { type NumericMatrix } from '@/matrix/matrixTypes';
+import { type Palette } from './palettes';
 
 export type EdgeVerdict = 'exact' | 'tolerant' | 'mismatch';
 
@@ -41,6 +43,16 @@ export interface EdgeCheck {
   readonly horizontal: EdgeComparison;
   /** Top edge against bottom edge. */
   readonly vertical: EdgeComparison;
+  /**
+   * What was actually compared.
+   *
+   * `values` is the matrix itself and depends on nothing else — no palette, no
+   * animation phase, no rasterisation. `rendering` is a fixed diagnostic image,
+   * used where colour comes from shape rather than from value and there is no
+   * number to compare; it is equally phase-independent, and the wording says it
+   * is a rendering so nobody reads more into it.
+   */
+  readonly basis: 'values' | 'rendering';
 }
 
 /**
@@ -100,17 +112,89 @@ function compare(
 }
 
 /**
- * Compares the outermost row and column against their opposites.
+ * Compares the matrix's own edge values.
+ *
+ * The answer that depends on nothing else. Two values are equal or they are
+ * not, so there is no tolerance here and none is wanted — and because no
+ * palette is involved, no palette animation can move the answer.
+ *
+ * Comparing colours instead would make the result a property of the palette:
+ * two different values can be given the same colour by one ramp and different
+ * colours by another, or by the same ramp at another animation phase. The
+ * question people are asking is about the artwork.
+ *
+ * The matrix passed in must already be the finished base tile — transformed by
+ * the artwork's own Rotate and Mirror settings, and never composed.
+ */
+export function checkEdgeValues(matrix: NumericMatrix): EdgeCheck | null {
+  const { rows, columns, values } = matrix;
+  if (rows < 2 || columns < 2) return null;
+
+  const count = (total: number, at: (step: number) => number, other: (step: number) => number) => {
+    let differing = 0;
+    let worst = 0;
+    for (let step = 0; step < total; step += 1) {
+      const a = values[at(step)] as number;
+      const b = values[other(step)] as number;
+      if (a === b) continue;
+      differing += 1;
+      worst = Math.max(worst, Math.abs(a - b));
+    }
+    return {
+      verdict: (differing === 0 ? 'exact' : 'mismatch') as EdgeVerdict,
+      differingPixels: differing,
+      comparedPixels: total,
+      maximumDifference: worst,
+      meanDifference: 0,
+    };
+  };
+
+  return {
+    basis: 'values',
+    horizontal: count(
+      rows,
+      (row) => row * columns,
+      (row) => row * columns + columns - 1,
+    ),
+    vertical: count(
+      columns,
+      (column) => column,
+      (column) => (rows - 1) * columns + column,
+    ),
+  };
+}
+
+/**
+ * A palette that turns a motif tiling into ink and paper and nothing else.
+ *
+ * Three entries because the motif renderer takes its ground from the second
+ * colour and its line from the last; with two they would be the same colour and
+ * the diagnostic image would come out blank.
+ */
+export const DIAGNOSTIC_PALETTE: Palette = {
+  id: 'edge-check',
+  name: 'Edge check',
+  colours: ['#000000', '#000000', '#ffffff'],
+};
+
+/**
+ * Compares the outermost row and column of a rendering against their opposites.
+ *
+ * For a motif tiling, where the colour of a pixel comes from the shape drawn
+ * over it rather than from a value, there is no number to compare — so a
+ * rendering is compared instead, and it is rendered with a fixed palette so the
+ * answer cannot move with the artwork's own colours or their animation.
  *
  * The whole edge, not a sample of it and certainly not a corner: a tiling can
  * agree at its corners and disagree everywhere between them, and one pixel
  * would report that as a match.
  */
-export function checkEdges(image: RgbaImage): EdgeCheck | null {
+export function checkEdgeRendering(image: RgbaImage): EdgeCheck | null {
   const { width, height, data } = image;
   if (width < 2 || height < 2) return null;
 
   return {
+    basis: 'rendering',
     horizontal: compare(
       data,
       height,
@@ -140,6 +224,16 @@ export function describeEdge(pair: 'horizontal' | 'vertical', comparison: EdgeCo
   }
 }
 
-/** The qualification that goes with every result, without exception. */
-export const EDGE_CHECK_CAVEAT =
-  'This checks the rendered edges. It is not proof of mathematical seamlessness.';
+/**
+ * The qualification that goes with every result, without exception.
+ *
+ * Worded for what was actually compared. Saying "the rendered edges" of a value
+ * comparison would understate it, and saying anything less than "a rendering" of
+ * the motif path would overstate that one — and both would be a step towards
+ * the claim this must never make.
+ */
+export function edgeCheckCaveat(basis: 'values' | 'rendering'): string {
+  return basis === 'values'
+    ? 'This compares the values along the edges of this result. It is not proof of mathematical seamlessness.'
+    : 'This compares a fixed diagnostic rendering of the edges, not the artwork’s colours. It is not proof of mathematical seamlessness.';
+}

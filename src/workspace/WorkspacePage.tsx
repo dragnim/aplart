@@ -28,9 +28,9 @@ import { ArtworkCanvas } from '@/renderer/ArtworkCanvas';
 import { DEFAULT_ANIMATION, type AnimationSettings } from '@/renderer/paletteAnimation';
 import { escapeSettingsFor } from './escapeSettings';
 import { buildArtworkImage } from '@/renderer/CanvasRenderer';
-import { checkEdges } from '@/renderer/edgeCheck';
+import { DIAGNOSTIC_PALETTE, checkEdgeRendering, checkEdgeValues } from '@/renderer/edgeCheck';
 import { DEFAULT_TILING, isRepeating } from '@/renderer/tiling';
-import { defaultRenderOptions } from '@/renderer/renderOptions';
+import { defaultRenderOptions, transformMatrix } from '@/renderer/renderOptions';
 import { decodeShareState, toRenderOptions } from '@/sharing/decodeShareState';
 import { numberAssignedTo } from '@/editor/parameterBinding';
 import { ParameterControls } from './ParameterControls';
@@ -292,35 +292,46 @@ function Workspace({
   const edges = useMemo(() => {
     if (state.result === null) return null;
 
-    const { image } = buildArtworkImage({
-      matrix: state.result.matrix,
-      stats: state.result.stats,
-      mode: preset.renderMode,
-      /*
-       * Rebuilt from the fields that shape one tile rather than passed whole,
-       * so changing the repeat count does not re-render the artwork to answer
-       * a question the repeat cannot affect. Truchet's motif renderer draws a
-       * quarter of a million pixels; a radio button should not cost that.
-       */
-      options: {
-        paletteId,
-        ...(customStops === undefined ? {} : { customStops }),
-        ...(colouring === undefined ? {} : { colouring }),
-        invert,
-        rotation,
-        mirrorHorizontally,
-        mirrorVertically,
-        smoothScaling,
-        tiling: DEFAULT_TILING,
-      },
-      ...(escape === undefined ? {} : { escape }),
-    });
+    const options = {
+      paletteId,
+      ...(customStops === undefined ? {} : { customStops }),
+      ...(colouring === undefined ? {} : { colouring }),
+      invert,
+      rotation,
+      mirrorHorizontally,
+      mirrorVertically,
+      smoothScaling,
+      tiling: DEFAULT_TILING,
+    };
 
-    return checkEdges(image);
+    /*
+     * A tiling's colour comes from the shape drawn over a cell, not from the
+     * cell's value, so comparing values would compare nothing — two different
+     * classes can draw motifs that meet identically at an edge. It gets a
+     * rendering instead, with a fixed palette so no palette or animation phase
+     * can move the answer.
+     */
+    if (preset.renderMode === 'tiles') {
+      const { image } = buildArtworkImage({
+        matrix: state.result.matrix,
+        stats: state.result.stats,
+        mode: preset.renderMode,
+        options,
+        palette: DIAGNOSTIC_PALETTE,
+      });
+      return checkEdgeRendering(image);
+    }
+
+    /*
+     * Everything else has a number per cell, and comparing those depends on
+     * nothing at all — not the palette, not its animation, not the viewport.
+     * The transform is applied first so the edges compared are the finished
+     * tile's, exactly as they would be repeated.
+     */
+    return checkEdgeValues(transformMatrix(state.result.matrix, options));
   }, [
     state.result,
     preset.renderMode,
-    escape,
     paletteId,
     customStops,
     colouring,

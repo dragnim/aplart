@@ -9,7 +9,7 @@
  */
 
 import { TILE_COUNTS, TILE_SCALES, type TilingMode, type TilingView } from '@/renderer/tiling';
-import { EDGE_CHECK_CAVEAT, describeEdge, type EdgeCheck } from '@/renderer/edgeCheck';
+import { describeEdge, edgeCheckCaveat, type EdgeCheck } from '@/renderer/edgeCheck';
 import styles from './TilingControls.module.css';
 
 interface Props {
@@ -160,7 +160,7 @@ export function TilingControls({ tiling, edges, onChange }: Props) {
           <p className={styles.reading} data-verdict={edges.vertical.verdict}>
             {describeEdge('vertical', edges.vertical)}
           </p>
-          <p className={styles.note}>{EDGE_CHECK_CAVEAT}</p>
+          <p className={styles.note}>{edgeCheckCaveat(edges.basis)}</p>
         </div>
       )}
     </fieldset>

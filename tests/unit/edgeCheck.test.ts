@@ -9,9 +9,10 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  EDGE_CHECK_CAVEAT,
+  edgeCheckCaveat,
   EDGE_TOLERANCE,
-  checkEdges,
+  checkEdgeRendering,
+  checkEdgeValues,
   describeEdge,
   type EdgeVerdict,
 } from '@/renderer/edgeCheck';
@@ -44,7 +45,7 @@ describe('edges that match', () => {
     // Columns vary down the image so the comparison is not trivially uniform,
     // and the first and last are made the same.
     const tile = image(8, 8, (x, y) => opaque(x === 0 || x === 7 ? 10 + y * 5 : 200));
-    const result = checkEdges(tile);
+    const result = checkEdgeRendering(tile);
 
     expect(result?.horizontal.verdict).toBe('exact');
     expect(result?.horizontal.differingPixels).toBe(0);
@@ -53,7 +54,7 @@ describe('edges that match', () => {
 
   it('reports an exact match when the top and bottom rows are identical', () => {
     const tile = image(8, 8, (x, y) => opaque(y === 0 || y === 7 ? 10 + x * 5 : 200));
-    const result = checkEdges(tile);
+    const result = checkEdgeRendering(tile);
 
     expect(result?.vertical.verdict).toBe('exact');
     expect(result?.horizontal.verdict).toBe('mismatch');
@@ -63,7 +64,7 @@ describe('edges that match', () => {
     // Matching top and bottom says nothing about left and right, and a check
     // that reported one number would hide exactly the useful half.
     const tile = image(8, 8, (x, y) => opaque(y === 0 || y === 7 ? 60 : 20 + x * 20));
-    const result = checkEdges(tile);
+    const result = checkEdgeRendering(tile);
 
     expect(result?.vertical.verdict).toBe('exact');
     expect(result?.horizontal.verdict).toBe('mismatch');
@@ -78,7 +79,7 @@ describe('edges that nearly match', () => {
      * eye and to any honest reading of the picture.
      */
     const tile = image(8, 8, (x, y) => opaque(x === 7 ? 100 + (y % 2 === 0 ? EDGE_TOLERANCE : 0) : 100));
-    const result = checkEdges(tile);
+    const result = checkEdgeRendering(tile);
 
     expect(result?.horizontal.verdict).toBe('tolerant');
     expect(result?.horizontal.maximumDifference).toBe(EDGE_TOLERANCE);
@@ -86,7 +87,7 @@ describe('edges that nearly match', () => {
 
   it('refuses a difference past the tolerance', () => {
     const tile = image(8, 8, (x, y) => opaque(x === 7 && y === 0 ? 100 + EDGE_TOLERANCE + 1 : 100));
-    const result = checkEdges(tile);
+    const result = checkEdgeRendering(tile);
 
     expect(result?.horizontal.verdict).toBe('mismatch');
     expect(result?.horizontal.maximumDifference).toBe(EDGE_TOLERANCE + 1);
@@ -101,7 +102,7 @@ describe('edges that nearly match', () => {
      * to know how widespread the difference is.
      */
     const tile = image(8, 8, (x) => opaque(x === 7 ? 104 : 100));
-    const result = checkEdges(tile);
+    const result = checkEdgeRendering(tile);
 
     expect(result?.horizontal.verdict).toBe('tolerant');
     expect(result?.horizontal.differingPixels).toBe(8);
@@ -120,19 +121,19 @@ describe('what it compares', () => {
       return opaque(120);
     });
 
-    expect(checkEdges(tile)?.horizontal.verdict).toBe('mismatch');
+    expect(checkEdgeRendering(tile)?.horizontal.verdict).toBe('mismatch');
   });
 
   it('notices a difference in transparency alone', () => {
     // A cell that has not arrived is transparent. Against an opaque one that is
     // a difference the eye sees even where the colours agree.
     const tile = image(8, 8, (x) => [100, 100, 100, x === 7 ? 0 : 255] as const);
-    expect(checkEdges(tile)?.horizontal.verdict).toBe('mismatch');
+    expect(checkEdgeRendering(tile)?.horizontal.verdict).toBe('mismatch');
   });
 
   it('declines to answer about an image too small to have opposite edges', () => {
-    expect(checkEdges(image(1, 8, () => opaque(0)))).toBeNull();
-    expect(checkEdges(image(8, 1, () => opaque(0)))).toBeNull();
+    expect(checkEdgeRendering(image(1, 8, () => opaque(0)))).toBeNull();
+    expect(checkEdgeRendering(image(8, 1, () => opaque(0)))).toBeNull();
   });
 });
 
@@ -167,8 +168,78 @@ describe('how it is worded', () => {
     expect(said).toContain('Left and right edges do not match.');
   });
 
-  it('carries a caveat that says what the check is not', () => {
-    expect(EDGE_CHECK_CAVEAT).toContain('not proof');
-    expect(EDGE_CHECK_CAVEAT).toContain('rendered edges');
+  it('carries a caveat that says what the check is not, and what it looked at', () => {
+    expect(edgeCheckCaveat('values')).toContain('not proof of mathematical seamlessness');
+    expect(edgeCheckCaveat('values')).toContain('values along the edges');
+
+    // The rendering path must not be read as covering the artwork's colours,
+    // because it deliberately does not use them.
+    expect(edgeCheckCaveat('rendering')).toContain('not proof of mathematical seamlessness');
+    expect(edgeCheckCaveat('rendering')).toContain('fixed diagnostic rendering');
+  });
+});
+
+describe('comparing values instead of colours', () => {
+  const matrix = (rows: number, columns: number, at: (x: number, y: number) => number) => ({
+    rows,
+    columns,
+    values: Float64Array.from(
+      Array.from({ length: rows * columns }, (_unused, index) =>
+        at(index % columns, Math.floor(index / columns)),
+      ),
+    ),
+  });
+
+  it('reports an exact match when the edge values agree', () => {
+    const tile = matrix(6, 6, (x, y) => (x === 0 || x === 5 ? y : 99));
+    const result = checkEdgeValues(tile);
+
+    expect(result?.basis).toBe('values');
+    expect(result?.horizontal.verdict).toBe('exact');
+    expect(result?.horizontal.comparedPixels).toBe(6);
+  });
+
+  it('reports a mismatch when they do not, and by how much', () => {
+    const tile = matrix(6, 6, (x, y) => (x === 5 ? y + 10 : y));
+    const result = checkEdgeValues(tile);
+
+    expect(result?.horizontal.verdict).toBe('mismatch');
+    expect(result?.horizontal.differingPixels).toBe(6);
+    expect(result?.horizontal.maximumDifference).toBe(10);
+  });
+
+  it('has no tolerance, because two numbers are equal or they are not', () => {
+    // A hair's difference in a value is a different value. Tolerance belongs to
+    // rasterisation, and nothing here is rasterised.
+    const tile = matrix(4, 4, (x) => (x === 3 ? 1.000001 : 1));
+    expect(checkEdgeValues(tile)?.horizontal.verdict).toBe('mismatch');
+  });
+
+  it('gives the same answer whatever the palette is doing', () => {
+    /*
+     * The point of comparing values. Two different values can be handed the
+     * same colour by one ramp and different colours by another, or by the same
+     * ramp at another animation phase — so a colour comparison answers a
+     * question about the palette. This one cannot move.
+     */
+    const tile = matrix(5, 5, (x, y) => (x === 0 ? 3 : x === 4 ? 7 : y));
+    const first = checkEdgeValues(tile);
+    const again = checkEdgeValues(tile);
+
+    expect(first).toEqual(again);
+    expect(first?.horizontal.verdict).toBe('mismatch');
+  });
+
+  it('keeps the two axes independent', () => {
+    const tile = matrix(6, 6, (x, y) => (y === 0 || y === 5 ? x : x * 3));
+    const result = checkEdgeValues(tile);
+
+    expect(result?.vertical.verdict).toBe('exact');
+    expect(result?.horizontal.verdict).toBe('mismatch');
+  });
+
+  it('declines to answer about a matrix with no opposite edges', () => {
+    expect(checkEdgeValues(matrix(1, 6, () => 0))).toBeNull();
+    expect(checkEdgeValues(matrix(6, 1, () => 0))).toBeNull();
   });
 });
