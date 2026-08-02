@@ -175,6 +175,20 @@ describe('the controls still find their assignments', () => {
   });
 });
 
+/**
+ * A deliberately narrow canonicalisation contract.
+ *
+ * `artworkSource` sits between a text file and the program a person reads,
+ * edits and sends to an interpreter, which makes it the one place where a
+ * well-meant tidy-up would be invisible and permanent. Whitespace in APL is not
+ * decoration: a stray space changes the character count the gallery advertises,
+ * and any change at all reclassifies somebody's saved project as an edit.
+ *
+ * So the contract is exhaustive rather than illustrative. It does exactly four
+ * things — remove carriage returns, remove at most one terminal newline, keep
+ * an intentional blank final line, and nothing else — and each clause has a
+ * test, including the ones asserting that something does *not* happen.
+ */
 describe('artworkSource', () => {
   it('removes the file convention and nothing else', () => {
     expect(artworkSource('a←1\nb←2\n')).toBe('a←1\nb←2');
@@ -190,11 +204,91 @@ describe('artworkSource', () => {
     expect(artworkSource('a←1\n\n')).toBe('a←1\n');
   });
 
+  it('removes one terminal newline and no more, however many there are', () => {
+    expect(artworkSource('a←1\n\n\n')).toBe('a←1\n\n');
+    expect(artworkSource('a←1\n\n\n\n')).toBe('a←1\n\n\n');
+  });
+
   it('leaves leading blank lines alone', () => {
     expect(artworkSource('\na←1\n')).toBe('\na←1');
+    expect(artworkSource('\n\n\na←1\n')).toBe('\n\n\na←1');
   });
 
   it('survives a checkout that ignored .gitattributes', () => {
     expect(artworkSource('a←1\r\nb←2\r\n')).toBe('a←1\nb←2');
+  });
+
+  it('removes a lone carriage return as well as a paired one', () => {
+    /*
+     * An old-Mac line ending, or one line of a file mangled halfway through.
+     * It becomes a newline rather than disappearing: deleting it would satisfy
+     * "remove carriage returns" by silently joining two lines of APL, which is
+     * a worse outcome than the problem being fixed.
+     */
+    expect(artworkSource('a←1\rb←2\n')).toBe('a←1\nb←2');
+  });
+
+  it('preserves indentation at the start of a line', () => {
+    // A dfn body or a continued expression can be indented deliberately, and
+    // dedenting it would silently rewrite what the person wrote.
+    expect(artworkSource('  a←1\n    b←2\n')).toBe('  a←1\n    b←2');
+  });
+
+  it('preserves runs of spaces inside a line', () => {
+    expect(artworkSource('a ←  1   ⋄   b←2\n')).toBe('a ←  1   ⋄   b←2');
+  });
+
+  it('preserves trailing spaces on a line', () => {
+    // Invisible and usually accidental, and still not this function's to
+    // remove: it would change the character count and the saved-project
+    // comparison for a file nobody had edited.
+    expect(artworkSource('a←1   \nb←2  \n')).toBe('a←1   \nb←2  ');
+  });
+
+  it('preserves trailing spaces on the last line', () => {
+    // The one place a trim would be most tempting and most damaging, because
+    // the terminal newline is being removed right beside it.
+    expect(artworkSource('a←1\nb←2  \n')).toBe('a←1\nb←2  ');
+  });
+
+  it('preserves tabs rather than expanding them', () => {
+    expect(artworkSource('\ta←1\n')).toBe('\ta←1');
+  });
+
+  it('preserves blank lines in the middle of a program', () => {
+    expect(artworkSource('a←1\n\n\nb←2\n')).toBe('a←1\n\n\nb←2');
+  });
+
+  it('trims nothing at either end', () => {
+    /*
+     * Stated once, plainly: the only characters that may disappear are `\r`
+     * and one final `\n`. Everything a `trim` would take is still here.
+     */
+    const program = '  \n\ta←1  \n\nb←2\t\n';
+    expect(artworkSource(program)).toBe('  \n\ta←1  \n\nb←2\t');
+  });
+
+  it('changes nothing at all in a program that needs no canonicalising', () => {
+    const program = '⍝ Controls\nsize←64\n\nmodulus|∘.×⍨⍳size';
+    expect(artworkSource(program)).toBe(program);
+  });
+
+  it('is deliberately not idempotent, and is applied exactly once', () => {
+    /*
+     * Applying it twice removes a second newline, and that is correct rather
+     * than a defect: "remove at most one terminal newline" and "preserve an
+     * intentional blank final line" are the same clause seen from two sides,
+     * and a function that could be applied repeatedly would have to break one
+     * of them. What protects the programs is that it is applied once, to the
+     * text of a file — enforced by the import test above, which requires every
+     * preset to read `artworkSource(source)` and nothing else.
+     */
+    expect(artworkSource('a←1\n\n')).toBe('a←1\n');
+    expect(artworkSource(artworkSource('a←1\n\n'))).toBe('a←1');
+
+    // A program with no terminal newline left to take is already settled.
+    for (const program of ['a←1\nb←2', '\ta←1  ', '\na←1']) {
+      expect(artworkSource(program)).toBe(program);
+    }
   });
 });
