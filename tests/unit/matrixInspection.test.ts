@@ -92,3 +92,62 @@ describe('isUniform', () => {
     expect(isUniform(STATS)).toBe(false);
   });
 });
+
+describe('a partly delivered buffer', () => {
+  /*
+   * The rule is that absence never reaches the parts of the application that
+   * describe an artwork: statistics and matching counts are taken over what has
+   * arrived, and the inspector reads only a completed result. These pin the
+   * arithmetic that rule depends on, because both would give confidently wrong
+   * answers if a not-a-number ever got through.
+   */
+  const arrived = Float64Array.from([4, 9, 4, 9, 4]);
+
+  it('describes only the cells that have arrived', () => {
+    const whole = Float64Array.from([...arrived, Number.NaN, Number.NaN]);
+    const filled = arrived.length;
+
+    // Taken over the prefix, exactly as the workspace does while a run delivers.
+    const stats = matrixStats({ rows: 1, columns: filled, values: whole.subarray(0, filled) });
+
+    expect(stats.min).toBe(4);
+    expect(stats.max).toBe(9);
+    expect(Number.isNaN(stats.min)).toBe(false);
+    expect(Number.isNaN(stats.max)).toBe(false);
+  });
+
+  it('ignores absence in the range, but would count it as a distinct value', () => {
+    /*
+     * Stated as it is rather than as one might hope. Every comparison against
+     * not-a-number is false, so it can never become the smallest or largest
+     * value and the colour range is safe either way. The distinct count is not:
+     * a set holds it like anything else, and a half-delivered artwork would
+     * describe itself as having one more distinct value than it does.
+     *
+     * Which is why the workspace takes statistics over the cells that have
+     * arrived rather than over the whole buffer. If that ever changes, this
+     * says what will go wrong.
+     */
+    const polluted = matrixStats({
+      rows: 1,
+      columns: 3,
+      values: Float64Array.from([4, Number.NaN, 9]),
+    });
+
+    expect(polluted.min).toBe(4);
+    expect(polluted.max).toBe(9);
+    expect(polluted.distinct).toBe(3);
+  });
+
+  it('counts matching cells only among real values', () => {
+    // `readCell` is only ever given a completed result, so its count is over
+    // real values by construction. Stated as a test so a future caller that
+    // hands it a delivery has something to fail against.
+    const matrix = { rows: 1, columns: arrived.length, values: arrived };
+    const reading = readCell(matrix, matrixStats(matrix), 1, 1);
+
+    expect(reading?.value).toBe(4);
+    expect(reading?.matching).toBe(3);
+    expect(reading?.total).toBe(5);
+  });
+});

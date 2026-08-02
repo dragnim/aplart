@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { fromNested, toNested } from '@/matrix/matrixTypes';
-import { defaultRenderOptions, transformMatrix, type RenderOptions } from '@/renderer/renderOptions';
+import { fromNested, toNested, type NumericMatrix } from '@/matrix/matrixTypes';
+import {
+  ROTATIONS,
+  defaultRenderOptions,
+  transformMatrix,
+  type RenderOptions,
+} from '@/renderer/renderOptions';
 import { exportDimensions, exportFilename } from '@/renderer/exportPng';
 
 /**
@@ -145,5 +150,62 @@ describe('exportDimensions', () => {
       width: 2,
       height: 3,
     });
+  });
+});
+
+describe('cells that have not arrived, under every orientation', () => {
+  /*
+   * A banded run marks unfetched cells not-a-number, and the orientation
+   * transforms run before the renderer sees them. Permuting must move absence
+   * around; it must never create a value where there was none, and never lose
+   * one that was there. This is the property that made not-a-number the right
+   * marker instead of a count of filled cells — a count describes positions,
+   * and positions are exactly what these transforms change.
+   */
+  const ROWS = 3;
+  const COLUMNS = 4;
+
+  /** The first `filled` cells hold their index; the rest hold nothing. */
+  function partlyArrived(filled: number): NumericMatrix {
+    const values = new Float64Array(ROWS * COLUMNS);
+    for (let index = 0; index < values.length; index += 1) {
+      values[index] = index < filled ? index + 1 : Number.NaN;
+    }
+    return { rows: ROWS, columns: COLUMNS, values };
+  }
+
+  const orientations = ROTATIONS.flatMap((rotation) =>
+    [false, true].flatMap((mirrorHorizontally) =>
+      [false, true].map((mirrorVertically) => ({ rotation, mirrorHorizontally, mirrorVertically })),
+    ),
+  );
+
+  it('keeps absence absent and values whole, in all sixteen combinations', () => {
+    for (const filled of [0, 1, 7, ROWS * COLUMNS]) {
+      const matrix = partlyArrived(filled);
+
+      for (const orientation of orientations) {
+        const options = { ...defaultRenderOptions('heat'), ...orientation };
+        const moved = transformMatrix(matrix, options);
+        const where = `${filled} filled, ${JSON.stringify(orientation)}`;
+
+        const present = [...moved.values].filter((value) => Number.isFinite(value));
+        const absent = [...moved.values].filter((value) => Number.isNaN(value));
+
+        // Exactly as many of each as went in: nothing invented, nothing lost.
+        expect(present.length, where).toBe(filled);
+        expect(absent.length, where).toBe(ROWS * COLUMNS - filled);
+
+        // And the values themselves are the same set, merely somewhere else.
+        expect(
+          [...present].sort((a, b) => a - b),
+          where,
+        ).toEqual(Array.from({ length: filled }, (_unused, index) => index + 1));
+
+        // Never a zero, which is what an absent cell would decay into if a
+        // transform copied out of an uninitialised buffer.
+        expect(moved.values.includes(0), where).toBe(false);
+      }
+    }
   });
 });
