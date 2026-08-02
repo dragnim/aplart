@@ -104,14 +104,16 @@ export function useArtworkActions(options: {
       /*
        * The frame on screen, not the palette as saved. Exporting a moving
        * artwork and getting the unanimated one back would be a small betrayal
-       * of what the button appears to do. At rest this is the saved palette
-       * exactly, because that is what `animatePalette` returns at phase zero.
+       * of what the button appears to do.
+       *
+       * The phase is read whether or not the animation is running, because
+       * *pausing does not rewind*. A paused artwork shows the frame it stopped
+       * on, and an earlier version of this exported the base palette instead —
+       * so the one moment somebody is most likely to press Export, having
+       * paused on a frame they liked, was the one moment it gave them something
+       * else. At rest the phase is zero and this is the saved palette exactly.
        */
-      const palette = animatePalette(
-        paletteFor(state.renderOptions),
-        animation.mode,
-        animation.running ? animationPhase.current : 0,
-      );
+      const palette = animatePalette(paletteFor(state.renderOptions), animation.mode, animationPhase.current);
 
       void exportArtworkPng({
         matrix: state.matrix,
