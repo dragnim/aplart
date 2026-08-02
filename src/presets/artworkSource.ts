@@ -7,25 +7,28 @@
  * holds the metadata — parameters, prose, palettes — and imports the program
  * rather than restating it.
  *
- * All this does is reconcile one difference between a text file and a string. A
- * text file conventionally ends in a newline; the program does not have a blank
- * last line, and the editor would show one. So exactly one trailing newline is
- * removed — which also means the program is identical whether or not an editor
- * or a tool has re-added it, and a genuinely blank final line survives as the
- * second newline.
+ * The contract, exactly:
  *
- * Carriage returns go for the same reason. `.gitattributes` checks every text
- * file out as LF, so this should never fire; if a clone somehow bypasses that,
- * the artwork still runs and its character count is still right, rather than
- * every line quietly gaining a character.
+ *   CRLF and lone CR line endings are normalised to LF; at most one terminal LF
+ *   is removed; all other whitespace is preserved.
  *
- * A lone carriage return is turned into a newline rather than deleted. Deleting
- * it would satisfy the letter of "remove carriage returns" by joining two lines
- * into one — a far worse corruption than the one being fixed.
+ * Each clause earns its place. The terminal newline is the one difference
+ * between a text file and a program: a file conventionally ends in one, and the
+ * editor would show it as a blank last line. Removing exactly one means the
+ * program is the same whether or not an editor re-added it, while a genuinely
+ * blank final line survives as the second newline.
  *
- * Nothing else happens here. No trimming, no dedenting, no collapsing of runs
- * of spaces: whitespace in APL is not decoration, and a program that had been
- * tidied would no longer match the copy in somebody's saved project.
+ * Line endings are normalised because `.gitattributes` checks every text file
+ * out as LF, so this should never fire — and if a clone bypasses it, the
+ * artwork should still run with the character count the gallery advertises,
+ * rather than every line quietly gaining a character. A lone CR becomes a
+ * newline rather than disappearing: deleting it would honour the letter of the
+ * rule by joining two lines of APL into one, which is worse than the corruption
+ * being repaired.
+ *
+ * And nothing else happens. No trimming, no dedenting, no collapsing runs of
+ * spaces. Whitespace in APL is not decoration, and a program quietly tidied
+ * here would no longer match the copy in somebody's saved project.
  */
 export function artworkSource(raw: string): string {
   return raw.replace(/\r\n?/gu, '\n').replace(/\n$/u, '');
