@@ -196,6 +196,23 @@ describe('what that means for a rendered tiling', () => {
     }
   });
 
+  it('matches for a large non-default seed turned and mirrored at once', () => {
+    /*
+     * One combined case kept deliberately. Size, seed and orientation are
+     * tested separately because they exercise independent transforms, and this
+     * guards the assumption that they do not interact — the largest tested
+     * tiling, an unusual seed, rotated and mirrored on both axes together.
+     */
+    const result = edgesOf(classField(33, 101, 2), {
+      rotation: 270,
+      mirrorHorizontally: true,
+      mirrorVertically: true,
+    });
+
+    expect(result?.horizontal.verdict).toBe('exact');
+    expect(result?.vertical.verdict).toBe('exact');
+  });
+
   it('does not match once the diagonals are allowed in', () => {
     // Not a defect to be fixed here — the diagonals are meant to cut across the
     // flow. It is the reason the compatible-by-construction claim is limited to

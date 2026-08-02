@@ -90,3 +90,25 @@
 .restore:hover {
   background: var(--surface-sunken);
 }
+
+/*
+ * Set apart from the control's own description without shouting: it is a
+ * statement about the artwork that ran, not an instruction.
+ */
+.edgeNote {
+  margin-top: calc(-1 * var(--space-1));
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
+.edgeNote[data-compatible='true'] {
+  border-left-color: var(--dyalog-orange);
+}
+
+.edgeTitle {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}

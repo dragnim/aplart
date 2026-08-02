@@ -27,6 +27,7 @@ import { type ArtworkParameter, type ArtworkPreset } from '@/presets/schema';
 import { ArtworkCanvas } from '@/renderer/ArtworkCanvas';
 import { DEFAULT_ANIMATION, type AnimationSettings } from '@/renderer/paletteAnimation';
 import { escapeSettingsFor } from './escapeSettings';
+import { edgeClaimFor } from './edgeClaim';
 import { buildArtworkImage } from '@/renderer/CanvasRenderer';
 import { DIAGNOSTIC_PALETTE, checkEdgeRendering, checkEdgeValues } from '@/renderer/edgeCheck';
 import { DEFAULT_TILING, isRepeating } from '@/renderer/tiling';
@@ -341,6 +342,8 @@ function Workspace({
     mirrorVertically,
     smoothScaling,
   ]);
+
+  const edgeClaim = useMemo(() => edgeClaimFor(preset, state.result?.source ?? null), [preset, state.result]);
 
   const actions = useArtworkActions({ preset, state, seed, animation, animationPhase, escape });
 
@@ -714,6 +717,12 @@ function Workspace({
           code={state.code}
           onChange={handleParameterChange}
           onRestore={handleParameterRestore}
+          /*
+           * From the source that produced the artwork, not the editor. Editing
+           * the class count changes what the next run will be able to say and
+           * nothing about the one on screen.
+           */
+          edges={edgeClaim}
         />
         <div className={styles.parameterActions}>
           <button type="button" className={styles.secondary} onClick={handleRandomise}>

@@ -97,6 +97,29 @@ export const truchetGrid: ArtworkPreset = {
   // a flat colour per cell cannot show that at all.
   renderMode: 'tiles',
 
+  /*
+   * Two shapes are the two arc orientations, and both cross every edge at the
+   * midpoint, perpendicular to it — so any tile meets any tile with neither a
+   * gap nor a kink, at any size or seed. Three or four bring in the diagonals,
+   * which arrive at a corner at an angle and cannot continue an arc.
+   *
+   * Conditional on the assignment rather than claimed for the preset, because
+   * the preset can produce either. Proved in tests/unit/motifEdges.test.ts.
+   */
+  edgeCompatibility: {
+    variable: 'classes',
+    compatibleUpTo: 2,
+    compatible: {
+      title: 'Seamless by construction',
+      detail:
+        'With two classes, every available arc motif meets repeated edges at the same position and direction.',
+    },
+    uncertain: {
+      title: 'Edge continuity is not guaranteed',
+      detail: 'Diagonal motifs can meet arc motifs at different positions and angles.',
+    },
+  },
+
   primitives: [
     {
       glyph: '∘.+',

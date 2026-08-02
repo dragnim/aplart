@@ -8,7 +8,9 @@
  */
 
 import { bindingStateFor, type ParameterValue } from '@/editor/parameterBinding';
+import { Fragment } from 'react';
 import { type ArtworkParameter } from '@/presets/schema';
+import { type EdgeClaim } from './edgeClaim';
 import { LOG_SLIDER_POSITIONS, fromSliderPosition, toSliderPosition } from './sliderScale';
 import styles from './ParameterControls.module.css';
 
@@ -17,20 +19,41 @@ interface Props {
   readonly code: string;
   readonly onChange: (parameter: ArtworkParameter, value: ParameterValue) => void;
   readonly onRestore: (parameter: ArtworkParameter) => void;
+  /** Derived from the source that ran, or null before a first run. */
+  readonly edges: EdgeClaim | null;
 }
 
-export function ParameterControls({ parameters, code, onChange, onRestore }: Props) {
+export function ParameterControls({ parameters, code, onChange, onRestore, edges }: Props) {
   return (
     <div className={styles.list}>
       {parameters.map((parameter) => (
-        <ParameterControl
-          key={parameter.id}
-          parameter={parameter}
-          code={code}
-          onChange={onChange}
-          onRestore={onRestore}
-        />
+        <Fragment key={parameter.id}>
+          <ParameterControl parameter={parameter} code={code} onChange={onChange} onRestore={onRestore} />
+          {/*
+            Beside the control that decides it, so the claim and the setting it
+            depends on are read together.
+          */}
+          {edges !== null && edges.variable === parameter.variable && <EdgeNote note={edges} />}
+        </Fragment>
       ))}
+    </div>
+  );
+}
+
+/**
+ * What the artwork that ran can say about its repeated edges.
+ *
+ * Two things it must not do. It must not describe the preset — only this result,
+ * because the same preset produces compatible and incompatible tilings depending
+ * on one assignment. And it must not follow the editor: the claim is about the
+ * artwork on screen, so it moves when a run replaces that artwork and not when
+ * somebody types.
+ */
+function EdgeNote({ note }: { readonly note: EdgeClaim }) {
+  return (
+    <div className={styles.edgeNote} data-compatible={note.compatible ? 'true' : 'false'}>
+      <p className={styles.edgeTitle}>{note.title}</p>
+      <p className={styles.description}>{note.detail}</p>
     </div>
   );
 }

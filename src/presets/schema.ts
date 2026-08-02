@@ -138,6 +138,29 @@ export interface DeclaredValueRange {
   readonly maxVariable: string;
 }
 
+/**
+ * What a preset can say about whether its tiles meet.
+ *
+ * Declared, and conditional on a setting the visible APL already contains — so
+ * the claim is derived from the code that ran rather than asserted about the
+ * preset as a whole. A preset that can produce both compatible and incompatible
+ * results must not be labelled either way.
+ *
+ * The threshold is a property somebody proved, not a preference: Truchet's arc
+ * motifs cross every edge at the same midpoint and perpendicular to it, so any
+ * two arcs join without a gap or a kink, while its diagonals arrive at a corner
+ * at an angle and cannot continue them. `tests/unit/motifEdges.test.ts` is that
+ * proof, and it is what this declaration rests on.
+ */
+export interface EdgeCompatibility {
+  /** The assignment that decides it, read from the source that ran. */
+  readonly variable: string;
+  /** The largest value for which every available shape is compatible. */
+  readonly compatibleUpTo: number;
+  readonly compatible: { readonly title: string; readonly detail: string };
+  readonly uncertain: { readonly title: string; readonly detail: string };
+}
+
 export interface ArtworkPreset {
   readonly id: string;
   readonly title: string;
@@ -156,6 +179,8 @@ export interface ArtworkPreset {
   readonly valueNotes?: ValueNotes;
   /** Set by presets whose values come from a known range rather than an open one. */
   readonly valueRange?: DeclaredValueRange;
+  /** Set by presets that can say something proven about their repeated edges. */
+  readonly edgeCompatibility?: EdgeCompatibility;
   readonly primitives: readonly PrimitiveReference[];
   readonly thumbnailPath: string;
   readonly fixturePath: string;
