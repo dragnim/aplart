@@ -1,0 +1,62 @@
+.controls {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+/* The extent, so the range is known before a value is rejected. */
+.of {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.number {
+  width: 7rem;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.action {
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+
+.action:hover:not(:disabled) {
+  background: var(--surface-sunken);
+}
+
+.action:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

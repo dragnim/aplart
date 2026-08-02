@@ -19,6 +19,20 @@
   backdrop-filter: blur(8px);
 }
 
+/*
+ * The announced form. Not shown, because the visible layout above says the same
+ * thing better to anyone who can see it — and read out as it falls it would be a
+ * heading, a button and three paragraphs rather than a sentence.
+ */
+.spoken {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
 .header {
   display: flex;
   align-items: baseline;

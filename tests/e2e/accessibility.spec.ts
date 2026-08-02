@@ -138,6 +138,26 @@ test.describe('accessibility of the workspace', () => {
     await audit(page);
   });
 
+  test('has no violations with a cell being inspected', async ({ page }) => {
+    await stubTryApl(page);
+    await page.goto('./#/art/modular-bloom');
+    await page.waitForSelector('.cm-content');
+
+    await page.getByRole('button', { name: /^Run/ }).click();
+    await expect(page.locator('[role="status"][data-status]')).toHaveText(/Finished in/, {
+      timeout: 20_000,
+    });
+
+    // Through the controls rather than the canvas, since that is the route this
+    // audit can reach — and the one that has to work without a pointer.
+    await page.getByRole('button', { name: 'Inspect' }).click();
+    await expect(page.getByText(/^Row 1, column 1$/u)).toBeVisible();
+
+    // The readout sits over the artwork rather than on a surface, so its
+    // contrast is worth checking against something other than a plain panel.
+    await audit(page);
+  });
+
   test('has no violations with a primitive explanation expanded', async ({ page }) => {
     await stubTryApl(page);
     await page.goto('./#/art/modular-bloom');

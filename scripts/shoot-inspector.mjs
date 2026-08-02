@@ -89,7 +89,8 @@ try {
   console.log('interior cell:', await reading(page));
 
   // --- A view entirely inside the set: one flat colour, and the notice ---
-  await page.getByRole('button', { name: 'Clear' }).click();
+  // `exact`, because the inspector controls also offer "Clear selection".
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
   await page
     .locator('.cm-content')
     .fill(
@@ -123,6 +124,25 @@ try {
   await pressAt(page, 0.5, 0.4);
   await page.screenshot({ path: `${OUT}/i4-focus-reading.png` });
   console.log('in focus:', await reading(page));
+
+  // --- The route that needs no pointer ---
+  const keyboard = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  keyboard.on('console', (m) => {
+    if (m.type() === 'error') errors.push(`[keyboard] ${m.text()}`);
+  });
+  await keyboard.goto(`${BASE}#/art/mandelbrot-field`, { waitUntil: 'networkidle' });
+  await keyboard.waitForSelector('.cm-content');
+  await keyboard.getByRole('button', { name: /^Run/ }).click();
+  await waitForRun(keyboard);
+
+  await keyboard.getByLabel(/^Row/).fill('40');
+  await keyboard.getByLabel(/^Column/).fill('52');
+  await keyboard.getByRole('button', { name: 'Inspect' }).click();
+  await keyboard.getByRole('button', { name: 'Next cell' }).click();
+  await keyboard.getByRole('button', { name: 'Next cell' }).click();
+  await keyboard.getByLabel(/^Row/).scrollIntoViewIfNeeded();
+  await keyboard.screenshot({ path: `${OUT}/i6-without-a-pointer.png` });
+  console.log('by keyboard:', await reading(keyboard));
 
   // --- A tiling, where a cell is a tile rather than a pixel ---
   const tiles = await browser.newPage({ viewport: { width: 1440, height: 950 } });

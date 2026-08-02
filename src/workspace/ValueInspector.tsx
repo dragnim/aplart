@@ -5,9 +5,12 @@
  * question asked by pressing the artwork — and because that is the only place it
  * can be in Focus mode without opening the drawer to read it.
  *
- * One live region, not two. The whole-view note and the cell reading are never
- * shown together: pressing a cell replaces the note with something more
- * specific, which is also why the note is not announced again on every press.
+ * One live region, announcing one purpose-written sentence. The visible layout
+ * is hidden from assistive technology instead of being read out as it falls: a
+ * heading, a button label and three separate paragraphs are a poor way to hear
+ * "row four, column seven, value seventeen". The whole-view note and the cell
+ * reading share that region rather than having one each, because they answer the
+ * same question at different precisions and only one is ever shown.
  */
 
 import { type CellReading } from '@/matrix/matrixInspection';
@@ -48,38 +51,73 @@ function describeShare(reading: CellReading): string {
   return `${reading.matching.toLocaleString()} cells share it — ${share} of the artwork.`;
 }
 
+function ceilingNote(
+  reading: CellReading,
+  notes: ValueNotes | undefined,
+  ceiling: number | null,
+): string | null {
+  if (!reading.isMaximum || notes === undefined || ceiling === null) return null;
+  return notes.cellAtCeiling.replace('{ceiling}', String(ceiling));
+}
+
+function extentNote(
+  reading: CellReading,
+  notes: ValueNotes | undefined,
+  categorical: boolean,
+): string | null {
+  if (categorical || notes !== undefined) return null;
+  if (reading.isMaximum) return 'The largest value in this artwork.';
+  if (reading.isMinimum) return 'The smallest value in this artwork.';
+  return null;
+}
+
 export function ValueInspector({ reading, viewNote, notes, ceiling, categorical, onDismiss }: Props) {
   if (reading === null && viewNote === null) return null;
 
+  const extra =
+    reading === null
+      ? null
+      : (ceilingNote(reading, notes, ceiling) ?? extentNote(reading, notes, categorical));
+
+  const spoken =
+    reading === null
+      ? (viewNote ?? '')
+      : [
+          `Row ${reading.row}, column ${reading.column}.`,
+          `Value ${formatValue(reading.value)}.`,
+          describeShare(reading),
+          extra,
+        ]
+          .filter((part) => part !== null)
+          .join(' ');
+
   return (
-    <div className={styles.panel} role="status">
+    <div className={styles.panel}>
+      <p className={styles.spoken} role="status">
+        {spoken}
+      </p>
+
       {reading === null ? (
-        <p className={styles.note}>{viewNote}</p>
+        <p className={styles.note} aria-hidden="true">
+          {viewNote}
+        </p>
       ) : (
         <>
           <div className={styles.header}>
-            <p className={styles.position}>
+            <p className={styles.position} aria-hidden="true">
               Row {reading.row}, column {reading.column}
             </p>
+            {/* Outside the hidden layout: a control has to stay reachable. */}
             <button type="button" className={styles.dismiss} onClick={onDismiss}>
-              {/* Named for what it does, not marked with a glyph the label has to explain. */}
               Clear
             </button>
           </div>
 
-          <p className={styles.value}>{formatValue(reading.value)}</p>
-          <p className={styles.detail}>{describeShare(reading)}</p>
-
-          {reading.isMaximum && notes !== undefined && ceiling !== null && (
-            <p className={styles.detail}>{notes.cellAtCeiling.replace('{ceiling}', String(ceiling))}</p>
-          )}
-
-          {!categorical && reading.isMaximum && notes === undefined && (
-            <p className={styles.detail}>The largest value in this artwork.</p>
-          )}
-          {!categorical && reading.isMinimum && !reading.isMaximum && (
-            <p className={styles.detail}>The smallest value in this artwork.</p>
-          )}
+          <div aria-hidden="true">
+            <p className={styles.value}>{formatValue(reading.value)}</p>
+            <p className={styles.detail}>{describeShare(reading)}</p>
+            {extra !== null && <p className={styles.detail}>{extra}</p>}
+          </div>
         </>
       )}
     </div>

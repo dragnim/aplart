@@ -14,6 +14,7 @@ import { runArtwork } from '@/execution/runArtwork';
 import { type AplExecutionService } from '@/execution/AplExecutionService';
 import { TryAplExecutionService } from '@/execution/TryAplExecutionService';
 import { type ArtworkPreset } from '@/presets/schema';
+import { type SourceCell } from '@/renderer/displayMapping';
 import { type RenderOptions } from '@/renderer/renderOptions';
 import {
   initialWorkspaceState,
@@ -43,6 +44,7 @@ export interface Workspace {
    * instead of relying on that ordering.
    */
   readonly runCode: (source: string) => void;
+  readonly inspectCell: (cell: SourceCell | null) => void;
   readonly stop: () => void;
   readonly restore: (state: WorkspaceState) => void;
 }
@@ -161,6 +163,10 @@ export function useWorkspace({ preset, service, initialState }: UseWorkspaceOpti
     dispatch({ type: 'codeChanged', code });
   }, []);
 
+  const inspectCell = useCallback((cell: SourceCell | null) => {
+    dispatch({ type: 'cellInspected', cell });
+  }, []);
+
   const setRenderOptions = useCallback((options: Partial<RenderOptions>) => {
     dispatch({ type: 'renderOptionsChanged', options });
   }, []);
@@ -169,5 +175,5 @@ export function useWorkspace({ preset, service, initialState }: UseWorkspaceOpti
     dispatch({ type: 'restored', state: restored });
   }, []);
 
-  return { state, setCode, setRenderOptions, run, runCode, stop, restore };
+  return { state, setCode, setRenderOptions, run, runCode, stop, restore, inspectCell };
 }

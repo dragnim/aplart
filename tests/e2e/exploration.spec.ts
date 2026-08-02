@@ -243,7 +243,8 @@ test.describe('reading a value off the artwork', () => {
     // The middle of a 128-wide view, so around the middle of the matrix.
     await expect(page.getByText(/^Row 6[0-9], column 6[0-9]$/u)).toBeVisible();
 
-    await page.getByRole('button', { name: 'Clear' }).click();
+    // `exact`, because the inspector controls also offer "Clear selection".
+    await page.getByRole('button', { name: 'Clear', exact: true }).click();
     await expect(page.getByText(/^Row \d+, column \d+$/u)).toHaveCount(0);
   });
 
@@ -296,7 +297,9 @@ test.describe('reading a value off the artwork', () => {
     // Each tile is many pixels; the answer has to be the logical cell.
     await pressAt(page, 0.5, 0.5);
     await expect(page.getByText(/^Row \d+, column \d+$/u)).toBeVisible();
-    await expect(page.getByText(/cells share it/)).toBeVisible();
+    // The panel says everything twice — once to be seen, once to be heard — so
+    // this asks the announced sentence rather than matching both.
+    await expect(page.locator('[role="status"]').filter({ hasText: /cells share it/u })).toHaveCount(1);
   });
 });
 

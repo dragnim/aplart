@@ -83,6 +83,20 @@ function drag(from: readonly [number, number], to: readonly [number, number]) {
   fireEvent.pointerUp(canvas, { button: 0, pointerId: 1, clientX: to[0], clientY: to[1] });
 }
 
+/**
+ * The sentence the live region announces.
+ *
+ * The panel says everything twice: once as a visible layout and once as a
+ * sentence written to be heard. Regex queries match both, so anything asking
+ * about wording asks this.
+ */
+function announced(): string {
+  const spoken = screen
+    .getAllByRole('status')
+    .find((element) => /Row \d+, column \d+|Every point in this view/u.test(element.textContent ?? ''));
+  return spoken?.textContent ?? '';
+}
+
 describe('inspecting a cell', () => {
   it('names the cell pressed and reports its value', async () => {
     await openAndRun(modularBloom.id);
@@ -119,8 +133,9 @@ describe('inspecting a cell', () => {
     // artwork runs from y=100 to y=300. (50, 150) is row 1, column 1.
     press(50, 150);
 
-    expect(await screen.findByText(/6 cells share it/)).toBeInTheDocument();
-    expect(screen.getByText(/75% of the artwork/)).toBeInTheDocument();
+    await screen.findByText('Row 1, column 1');
+    expect(announced()).toContain('6 cells share it');
+    expect(announced()).toContain('75% of the artwork');
   });
 
   it('says when a value is unique', async () => {
@@ -181,9 +196,9 @@ describe('inspecting a cell', () => {
      * "The largest value in this artwork" is true of it and says nothing, so
      * magnitude goes unmentioned — while how common the shape is still matters.
      */
-    expect(screen.queryByText(/largest value/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/smallest value/)).not.toBeInTheDocument();
-    expect(screen.getByText(/3 cells share it/)).toBeInTheDocument();
+    expect(announced()).not.toContain('largest value');
+    expect(announced()).not.toContain('smallest value');
+    expect(announced()).toContain('3 cells share it');
   });
 });
 
@@ -279,6 +294,227 @@ describe('putting the reading away', () => {
     // And nothing is reported in its place, rather than a cell nobody chose.
     expect(screen.queryByText(/^Row /)).not.toBeInTheDocument();
   });
+
+  it('forgets it rather than hiding it, so it cannot come back', async () => {
+    /*
+     * The selection is dropped at the moment the matrix is replaced, not merely
+     * left unrendered. Keeping it out of sight would have been enough to pass
+     * the test above and still wrong: the next result large enough to contain it
+     * would have brought it back, pointing at a cell nobody had chosen, in an
+     * artwork they had not been looking at when they chose it.
+     */
+    const { user, service } = await openAndRun(modularBloom.id, labelled(8, 8));
+    press(375, 375);
+    await screen.findByText('Row 8, column 8');
+
+    service.register('default', labelled(3, 3));
+    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await waitFor(() => expect(screen.queryByText(/^Row /)).not.toBeInTheDocument());
+
+    // Big enough to hold row 8 again.
+    service.register('default', labelled(8, 8));
+    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await waitFor(() => expect(screen.getByRole('img')).toHaveAccessibleName(/8 by 8 grid/));
+
+    expect(screen.queryByText('Row 8, column 8')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Row /)).not.toBeInTheDocument();
+  });
+
+  it('keeps the selection across a run of the same shape', async () => {
+    // Only an incompatible shape drops it. A re-run at the same size leaves the
+    // cell meaningful, so it stays chosen.
+    const { user, service } = await openAndRun(modularBloom.id, labelled(8, 8));
+    press(125, 75);
+    await screen.findByText('Row 2, column 3');
+
+    service.register('default', labelled(8, 8));
+    await user.click(screen.getByRole('button', { name: /^Run/ }));
+
+    await waitFor(() => expect(screen.getByText('Row 2, column 3')).toBeInTheDocument());
+  });
+});
+
+describe('choosing a cell without a pointer', () => {
+  it('inspects the coordinates that were typed', async () => {
+    const { user } = await openAndRun(modularBloom.id);
+
+    await user.clear(screen.getByLabelText(/^Row/));
+    await user.type(screen.getByLabelText(/^Row/), '4');
+    await user.clear(screen.getByLabelText(/^Column/));
+    await user.type(screen.getByLabelText(/^Column/), '7');
+    await user.click(screen.getByRole('button', { name: 'Inspect' }));
+
+    expect(await screen.findByText('Row 4, column 7')).toBeInTheDocument();
+    expect(screen.getByText('407')).toBeInTheDocument();
+  });
+
+  it('waits for the deliberate action rather than reading each keystroke', async () => {
+    const { user } = await openAndRun(modularBloom.id);
+
+    await user.clear(screen.getByLabelText(/^Row/));
+    await user.type(screen.getByLabelText(/^Row/), '12');
+
+    // "1" on the way to "12" must not choose a cell — and must not count every
+    // matching cell in the matrix while doing it.
+    expect(screen.queryByText(/^Row /)).not.toBeInTheDocument();
+  });
+
+  it('names the extent of each axis', async () => {
+    await openAndRun(modularBloom.id, labelled(5, 9));
+    // The range has to be knowable before a value is rejected.
+    expect(screen.getByLabelText('Row of 5')).toBeInTheDocument();
+    expect(screen.getByLabelText('Column of 9')).toBeInTheDocument();
+  });
+
+  it('refuses a coordinate the matrix does not have', async () => {
+    const { user } = await openAndRun(modularBloom.id, labelled(4, 4));
+    await user.click(screen.getByRole('button', { name: 'Inspect' }));
+    await screen.findByText('Row 1, column 1');
+
+    fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: '99' } });
+    await user.click(screen.getByRole('button', { name: 'Inspect' }));
+
+    /*
+     * The field declares its extent, so the browser refuses the submission and
+     * says why. Better than accepting it and quietly reading a different cell —
+     * which is what an application-side clamp alone would do, and is how this
+     * was first written.
+     */
+    expect(screen.getByLabelText(/^Row/)).toBeInvalid();
+    expect(screen.getByText('Row 1, column 1')).toBeInTheDocument();
+  });
+
+  it('treats an empty field as the first row or column', async () => {
+    // An empty number input is perfectly valid, so this one does reach the
+    // application and has to mean something sensible.
+    const { user } = await openAndRun(modularBloom.id, labelled(4, 4));
+
+    fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText(/^Column/), { target: { value: '3' } });
+    await user.click(screen.getByRole('button', { name: 'Inspect' }));
+
+    expect(await screen.findByText('Row 1, column 3')).toBeInTheDocument();
+  });
+
+  it('steps through the cells in reading order', async () => {
+    const { user } = await openAndRun(modularBloom.id, labelled(4, 4));
+
+    await user.click(screen.getByRole('button', { name: 'Inspect' }));
+    await screen.findByText('Row 1, column 1');
+
+    await user.click(screen.getByRole('button', { name: 'Next cell' }));
+    expect(await screen.findByText('Row 1, column 2')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Previous cell' }));
+    expect(await screen.findByText('Row 1, column 1')).toBeInTheDocument();
+  });
+
+  it('carries on to the next row at the end of one', async () => {
+    const { user } = await openAndRun(modularBloom.id, labelled(4, 4));
+
+    await user.clear(screen.getByLabelText(/^Column/));
+    await user.type(screen.getByLabelText(/^Column/), '4');
+    await user.click(screen.getByRole('button', { name: 'Inspect' }));
+    await screen.findByText('Row 1, column 4');
+
+    await user.click(screen.getByRole('button', { name: 'Next cell' }));
+    expect(await screen.findByText('Row 2, column 1')).toBeInTheDocument();
+  });
+
+  it('follows a cell chosen by pressing the artwork', async () => {
+    const { user } = await openAndRun(modularBloom.id);
+    press(125, 75);
+    await screen.findByText('Row 2, column 3');
+
+    // The fields show where the press landed, so stepping goes on from there
+    // rather than from wherever they were left.
+    expect(screen.getByLabelText(/^Row/)).toHaveValue(2);
+    expect(screen.getByLabelText(/^Column/)).toHaveValue(3);
+
+    await user.click(screen.getByRole('button', { name: 'Next cell' }));
+    expect(await screen.findByText('Row 2, column 4')).toBeInTheDocument();
+  });
+
+  it('reaches the same reading as a press does', async () => {
+    const { user } = await openAndRun(modularBloom.id);
+
+    press(125, 75);
+    await screen.findByText('Row 2, column 3');
+    const pressed = announced();
+
+    await user.click(screen.getByRole('button', { name: 'Clear selection' }));
+    await user.clear(screen.getByLabelText(/^Row/));
+    await user.type(screen.getByLabelText(/^Row/), '2');
+    await user.clear(screen.getByLabelText(/^Column/));
+    await user.type(screen.getByLabelText(/^Column/), '3');
+    await user.click(screen.getByRole('button', { name: 'Inspect' }));
+
+    await screen.findByText('Row 2, column 3');
+    // Two routes, one result model.
+    expect(announced()).toBe(pressed);
+  });
+
+  it('clears the selection', async () => {
+    const { user } = await openAndRun(modularBloom.id);
+    press(125, 75);
+    await screen.findByText('Row 2, column 3');
+
+    await user.click(screen.getByRole('button', { name: 'Clear selection' }));
+    expect(screen.queryByText('Row 2, column 3')).not.toBeInTheDocument();
+  });
+
+  it('costs no execution', async () => {
+    const { user, service } = await openAndRun(modularBloom.id);
+    const before = service.executionCount;
+
+    await user.click(screen.getByRole('button', { name: 'Inspect' }));
+    await screen.findByText('Row 1, column 1');
+    await user.click(screen.getByRole('button', { name: 'Next cell' }));
+    await screen.findByText('Row 1, column 2');
+
+    expect(service.executionCount).toBe(before);
+  });
+});
+
+describe('what is announced', () => {
+  it('reads as a sentence rather than as a layout', async () => {
+    await openAndRun(modularBloom.id);
+    press(125, 75);
+
+    await screen.findByText('Row 2, column 3');
+    // Not "Row 2, column 3 Clear 203 The only cell…", which is what reading the
+    // panel as it falls would give.
+    expect(announced()).toBe('Row 2, column 3. Value 203. The only cell with this value.');
+  });
+
+  it('lets the preset’s note follow the value', async () => {
+    await openAndRun(
+      mandelbrotField.id,
+      fromNested([
+        [1, 2],
+        [3, 28],
+      ]),
+    );
+    press(300, 300);
+
+    await screen.findByText('Row 2, column 2');
+    expect(announced()).toMatch(
+      /Row 2, column 2\. Value 28\..*This point reached the maximum of 28 iterations\./u,
+    );
+  });
+
+  it('announces from one place, not two', async () => {
+    await openAndRun(modularBloom.id);
+    press(125, 75);
+    await screen.findByText('Row 2, column 3');
+
+    // The visible layout is hidden from assistive technology so that it is not
+    // announced alongside the sentence written for the purpose.
+    const speaking = screen
+      .getAllByRole('status')
+      .filter((element) => /Value 203/u.test(element.textContent ?? ''));
+    expect(speaking).toHaveLength(1);
+  });
 });
 
 describe('a drag is not a press', () => {
@@ -311,7 +547,7 @@ describe('a drag is not a press', () => {
     // still work, because any matrix has cells worth asking about.
     await openAndRun(modularBloom.id);
     drag([100, 100], [300, 300]);
-    expect(await screen.findByText(/^Row /)).toBeInTheDocument();
+    await waitFor(() => expect(announced()).toMatch(/^Row \d+, column \d+\./u));
   });
 });
 
@@ -355,9 +591,9 @@ describe('what a preset can add', () => {
     );
 
     // Mathematically correct, and indistinguishable from a fault unless said.
-    expect(
-      await screen.findByText(/Every point in this view reached the current iteration limit/),
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(announced()).toMatch(/Every point in this view reached the current iteration limit/u),
+    );
   });
 
   it('says it once, not again for every press', async () => {
@@ -368,14 +604,14 @@ describe('what a preset can add', () => {
         [28, 28],
       ]),
     );
-    await screen.findByText(/Every point in this view/);
+    await waitFor(() => expect(announced()).toMatch(/Every point in this view/u));
 
     press(100, 100);
 
     // Pressing answers the same question more precisely; repeating the general
     // note over it would be noise in a live region.
-    await waitFor(() => expect(screen.queryByText(/Every point in this view/)).not.toBeInTheDocument());
-    expect(screen.getByText('This point reached the maximum of 28 iterations.')).toBeInTheDocument();
+    await waitFor(() => expect(announced()).not.toMatch(/Every point in this view/u));
+    expect(announced()).toContain('This point reached the maximum of 28 iterations.');
   });
 
   it('says nothing of the sort for an artwork with no ceiling to speak of', async () => {

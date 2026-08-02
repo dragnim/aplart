@@ -28,13 +28,14 @@ import { defaultRenderOptions } from '@/renderer/renderOptions';
 import { decodeShareState, toRenderOptions } from '@/sharing/decodeShareState';
 import { numberAssignedTo } from '@/editor/parameterBinding';
 import { ParameterControls } from './ParameterControls';
+import { InspectorControls } from './InspectorControls';
 import { ValueInspector } from './ValueInspector';
 import { PrimitivePanel } from './PrimitivePanel';
 import { TryChangingThis } from './TryChangingThis';
 import { randomiseParameters } from './randomise';
 import { readSavedProjectImmediate, useLocalProject } from './useLocalProject';
 import { FocusToolbar } from './FocusToolbar';
-import { type SourceCell, type SourceRect } from '@/renderer/displayMapping';
+import { type SourceRect } from '@/renderer/displayMapping';
 import {
   readViewport,
   panViewport,
@@ -141,7 +142,7 @@ function Workspace({
     ...(service === undefined ? {} : { service }),
     ...(initialState === undefined ? {} : { initialState }),
   });
-  const { state, setCode, setRenderOptions, run, runCode, stop } = workspace;
+  const { state, setCode, setRenderOptions, run, runCode, stop, inspectCell } = workspace;
 
   const editorHandle = useRef<AplEditorHandle>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -388,8 +389,9 @@ function Workspace({
    * The reading counts every cell sharing the value, so it is computed only when
    * the cell or the matrix changes. Never while the pointer is moving.
    */
-  const [inspected, setInspected] = useState<SourceCell | null>(null);
-  const clearInspection = useCallback(() => setInspected(null), []);
+  const inspected = state.inspected;
+  const setInspected = inspectCell;
+  const clearInspection = useCallback(() => inspectCell(null), [inspectCell]);
 
   /*
    * Escape puts the reading away before it means anything else.
@@ -404,11 +406,11 @@ function Workspace({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.stopPropagation();
-      setInspected(null);
+      inspectCell(null);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [inspected]);
+  }, [inspected, inspectCell]);
 
   const reading = useMemo(() => {
     if (inspected === null || state.matrix === null || state.stats === null) return null;
@@ -572,6 +574,28 @@ function Workspace({
           onChange={setRenderOptions}
         />
       </section>
+
+      {/*
+        The other way to choose a cell. Pressing the artwork is quicker and needs
+        a pointer; this needs neither, and it is in the controls panel so that
+        Focus mode gets it too — the drawer holds the same panel.
+      */}
+      {state.matrix !== null && (
+        <section aria-labelledby="inspect-heading">
+          <h2 className={styles.sectionHeading} id="inspect-heading">
+            Read a value
+          </h2>
+          <p className={styles.sectionNote}>
+            Press the artwork, or name a cell here. Neither changes the APL.
+          </p>
+          <InspectorControls
+            rows={state.matrix.rows}
+            columns={state.matrix.columns}
+            selected={inspected}
+            onInspect={setInspected}
+          />
+        </section>
+      )}
 
       <TryChangingThis
         prompts={preset.tryChangingThis ?? []}
