@@ -93,8 +93,16 @@ export function drawArtwork(
    * when nothing is being repeated.
    */
   const { columns, rows } = tileCounts(request.options.tiling);
-  const grid = tileGrid(image.width, image.height, columns, rows, pixelWidth, pixelHeight);
-  const box = grid.box;
+  const grid = tileGrid(
+    image.width,
+    image.height,
+    columns,
+    rows,
+    pixelWidth,
+    pixelHeight,
+    request.options.tiling?.scale ?? 1,
+  );
+  const box = grid.region;
 
   context.imageSmoothingEnabled = request.options.smoothScaling;
   if (request.options.smoothScaling) context.imageSmoothingQuality = 'high';
@@ -125,6 +133,17 @@ export function drawArtwork(
    * image is built once and the statistics are computed once however many
    * copies are on screen — a repeat is a drawing operation, not a re-render.
    */
+  context.save();
+  /*
+   * Clipped to the artwork region. A scale above 100% makes the outermost
+   * copies overhang, and without this they would spill across the letterboxed
+   * mat and out to the edge of the canvas — the artwork would stop having a
+   * shape.
+   */
+  context.beginPath();
+  context.rect(box.left, box.top, box.width, box.height);
+  context.clip();
+
   for (let row = 0; row < grid.rows; row += 1) {
     for (let column = 0; column < grid.columns; column += 1) {
       const cell = tileRect(grid, column, row);
@@ -132,6 +151,7 @@ export function drawArtwork(
       context.drawImage(source, cell.left, cell.top, cell.width, cell.height);
     }
   }
+  context.restore();
 }
 
 /** The stripe tile, built once and reused for every frame. */
@@ -199,8 +219,9 @@ export function drawCellMarker(
     rows,
     Math.round(cssWidth * devicePixelRatio),
     Math.round(cssHeight * devicePixelRatio),
+    options.tiling?.scale ?? 1,
   );
-  if (grid.box.width === 0 || grid.box.height === 0) return;
+  if (grid.region.width === 0 || grid.region.height === 0) return;
 
   const bounds = cellBounds(cell, matrix.rows, matrix.columns, options);
 
@@ -212,13 +233,43 @@ export function drawCellMarker(
    * of its way to say they are not. Which copy the press landed on is not
    * remembered anywhere, and deliberately: it is not part of the artwork.
    */
+  // Clipped like the artwork, so a marker on a copy the scale pushed past the
+  // edge is cut off with it rather than floating on the mat.
+  context.save();
+  context.beginPath();
+  context.rect(grid.region.left, grid.region.top, grid.region.width, grid.region.height);
+  context.clip();
+
+  /*
+   * Quieter the more copies there are, and equally quiet on all of them.
+   *
+   * One marker on one artwork should be easy to find. A hundred of them, each
+   * inflated to a ten-pixel minimum over a four-pixel cell, stop being a
+   * selection and become a regular grid of squares that reads as part of the
+   * pattern — which at 5 × 5 and half scale is exactly what happened.
+   *
+   * Emphasis drops for every copy together rather than picking one to be the
+   * real one: they all show the same cell, and suggesting otherwise would be a
+   * claim about the artwork that is not true.
+   */
+  const copies = grid.columns * grid.rows;
+  /*
+   * A gentle taper on top of that. Dropping the inflation does most of the
+   * work — a marker that matches its cell can never be louder than one cell of
+   * the artwork — so this only takes the edge off the lattice a hundred
+   * identically placed outlines would otherwise make. Taken too far it stops
+   * being findable, which is the opposite failure and just as useless.
+   */
+  const emphasis = copies === 1 ? 1 : Math.max(0.7, 1 - (copies - 1) * 0.02);
+
   for (let row = 0; row < grid.rows; row += 1) {
     for (let column = 0; column < grid.columns; column += 1) {
       const box = tileRect(grid, column, row);
       if (box.width <= 0 || box.height <= 0) continue;
-      markCell(context, box, bounds, devicePixelRatio);
+      markCell(context, box, bounds, devicePixelRatio, copies === 1, emphasis);
     }
   }
+  context.restore();
 }
 
 function markCell(
@@ -226,6 +277,8 @@ function markCell(
   box: { left: number; top: number; width: number; height: number },
   bounds: { left: number; top: number; width: number; height: number },
   devicePixelRatio: number,
+  growToMinimum: boolean,
+  emphasis: number,
 ): void {
   const left = box.left + bounds.left * box.width;
   const top = box.top + bounds.top * box.height;
@@ -238,9 +291,12 @@ function markCell(
    * be told from a stray mark; the marker grows around the cell's centre instead.
    */
   const minimum = 10 * devicePixelRatio;
-  const grow = Math.max(0, (minimum - Math.min(width, height)) / 2);
+  // Only worth inflating when there is one of them. Across many copies the
+  // inflation is what turns markers into a pattern.
+  const grow = growToMinimum ? Math.max(0, (minimum - Math.min(width, height)) / 2) : 0;
 
   context.save();
+  context.globalAlpha = emphasis;
   context.lineWidth = Math.max(1, devicePixelRatio);
   context.strokeStyle = 'rgb(0 0 0 / 70%)';
   context.strokeRect(

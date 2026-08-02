@@ -246,9 +246,22 @@ function Workspace({
     };
   }, [state.progress, preset, state.renderOptions]);
 
-  /** What the canvas shows: the delivery if one is running, else the artwork. */
-  const shown = partial ?? state.result;
-  const shownEscape = partial === null ? escape : partial.escape;
+  /**
+   * What the canvas shows: the delivery if one is running, else the artwork.
+   *
+   * With one exception. A repeat is a preview of a finished pattern, and
+   * repeating a half-delivered tile previews nothing — twenty-five copies of an
+   * artwork that is mostly hatching, with the hatch itself reading as part of
+   * the design. While copies are on screen the last complete result stays, and
+   * the new one appears when it is whole.
+   *
+   * A first run has no complete result to keep, so the delivery is shown as it
+   * arrives, singly. Better to watch one artwork build than to watch nothing.
+   */
+  const repeating = isRepeating(state.renderOptions.tiling);
+  const keepComplete = repeating && partial !== null && state.result !== null;
+  const shown = keepComplete ? state.result : (partial ?? state.result);
+  const shownEscape = shown === state.result ? escape : partial?.escape;
 
   const actions = useArtworkActions({ preset, state, seed, animation, animationPhase, escape });
 
@@ -759,6 +772,11 @@ function Workspace({
         // mounting another, so there is one loop however the artwork is shown.
         animation={{ settings: animation, phase: animationPhase }}
         escape={shownEscape}
+        /*
+         * A delivery with nothing behind it is drawn once, never repeated: the
+         * copies would be of an artwork that does not exist yet.
+         */
+        singleCopy={partial !== null && state.result === null}
       />
 
       <ValueInspector

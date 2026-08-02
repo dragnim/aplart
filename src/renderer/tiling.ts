@@ -33,10 +33,16 @@ export interface TilingView {
   readonly mode: TilingMode;
   readonly columns: number;
   readonly rows: number;
-  /** How large each copy is drawn. Reserved; no control offers it yet. */
+  /**
+   * How large each copy is drawn, relative to the grid count.
+   *
+   * The count says how many copies span the artwork at 100%; the scale then
+   * multiplies each copy's size. Halving it therefore shows twice as many
+   * copies, and doubling it shows half as many, larger — with whatever falls
+   * outside the artwork region clipped at its edges. Both controls change how
+   * many copies you see, which is why the interface says so in words.
+   */
   readonly scale: number;
-  /** Thin lines on the tile boundaries. Reserved; no control offers it yet. */
-  readonly showSeamGuides: boolean;
 }
 
 export const DEFAULT_TILING: TilingView = {
@@ -44,7 +50,6 @@ export const DEFAULT_TILING: TilingView = {
   columns: 3,
   rows: 3,
   scale: 1,
-  showSeamGuides: false,
 };
 
 export const MIN_TILES = 1;
@@ -54,6 +59,18 @@ export const MAX_TILE_SCALE = 4;
 
 /** The counts the interface offers, as square grids. */
 export const TILE_COUNTS: readonly number[] = [2, 3, 5];
+
+/**
+ * The sizes the interface offers.
+ *
+ * Discrete rather than a slider, because a handful of round numbers is easier
+ * to reason about than a continuum and every value here is one somebody might
+ * actually name. Several of them divide the default count of three into whole
+ * copies — 50, 75, 100 and 150 per cent all land flush — so the common cases
+ * show no clipped edge; the rest overhang, which is expected and is why the
+ * grid is centred and clipped rather than nudged to fit.
+ */
+export const TILE_SCALES: readonly number[] = [0.5, 0.75, 1, 1.5, 2];
 
 function whole(value: unknown, fallback: number, low: number, high: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
@@ -84,7 +101,6 @@ export function normaliseTiling(value: unknown): TilingView {
     columns: whole(record.columns, DEFAULT_TILING.columns, MIN_TILES, MAX_TILES),
     rows: whole(record.rows, DEFAULT_TILING.rows, MIN_TILES, MAX_TILES),
     scale: within(record.scale, DEFAULT_TILING.scale, MIN_TILE_SCALE, MAX_TILE_SCALE),
-    showSeamGuides: record.showSeamGuides === true,
   };
 }
 
@@ -107,7 +123,15 @@ export interface TileRect {
 }
 
 export interface TileGrid {
-  /** The whole composition, letterboxed into the box it was given. */
+  /**
+   * The artwork region: where copies may be drawn, and nothing outside it.
+   *
+   * Fixed by the grid count alone, so changing the scale changes how densely
+   * the region is filled without moving or resizing the region itself. Anything
+   * a scale pushes past its edges is clipped rather than allowed onto the mat.
+   */
+  readonly region: FittedBox;
+  /** Kept for callers that letterboxed a single copy before any of this. */
   readonly box: FittedBox;
   readonly columns: number;
   readonly rows: number;
@@ -117,18 +141,34 @@ export interface TileGrid {
 }
 
 /**
+ * How many whole or partial copies of `size` are needed to cover `extent`.
+ *
+ * The tolerance matters: at a scale that divides the count exactly — every one
+ * the interface offers does — floating point can leave the quotient a hair above
+ * a whole number and ask for one more copy than is needed, which would clip an
+ * edge that ought to land flush.
+ */
+function copiesToCover(extent: number, size: number): number {
+  if (!(size > 0)) return 1;
+  return Math.max(1, Math.ceil(extent / size - 1e-9));
+}
+
+/**
  * Where every copy goes.
  *
- * The composition as a whole is letterboxed exactly as a single artwork is, so
- * a 3 × 3 repeat of a square tile occupies the same space one copy would and
- * every copy keeps the artwork's aspect ratio.
+ * The region is letterboxed exactly as a single artwork is, so a 3 × 3 repeat of
+ * a square tile occupies the space one copy would and every copy keeps the
+ * artwork's aspect ratio. The scale then multiplies each copy's size within that
+ * region: smaller copies mean more of them, larger copies mean fewer and the
+ * outermost are clipped. The grid is centred, so clipping is symmetrical rather
+ * than all falling on one edge.
  *
- * Boundaries are rounded, not widths. Rounding each width independently leaves
- * a tile ending at 100.4 next to one starting at 100.6, and the half-pixel
- * between them is a seam — a thin line of background running down the artwork,
- * which on a repeating pattern is exactly the artefact somebody is looking for
- * and exactly what they must not be shown by accident. Sharing the rounded
- * boundary makes the gap impossible rather than unlikely.
+ * Boundaries are rounded, not widths. Rounding each width independently leaves a
+ * tile ending at 100.4 next to one starting at 100.6, and the half-pixel between
+ * them is a seam — a thin line of background running down the artwork, which on
+ * a repeating pattern is exactly the artefact somebody is looking for and
+ * exactly what they must not be shown by accident. Sharing the rounded boundary
+ * makes the gap impossible rather than unlikely.
  */
 export function tileGrid(
   tileWidth: number,
@@ -137,22 +177,30 @@ export function tileGrid(
   rows: number,
   boxWidth: number,
   boxHeight: number,
+  scale = 1,
 ): TileGrid {
   const across = Math.max(1, Math.round(columns));
   const down = Math.max(1, Math.round(rows));
-  const box = fitArtwork(tileWidth * across, tileHeight * down, boxWidth, boxHeight);
+  const region = fitArtwork(tileWidth * across, tileHeight * down, boxWidth, boxHeight);
+
+  const size = Math.min(MAX_TILE_SCALE, Math.max(MIN_TILE_SCALE, scale));
+  const drawnWidth = (region.width / across) * size;
+  const drawnHeight = (region.height / down) * size;
+
+  const wide = copiesToCover(region.width, drawnWidth);
+  const tall = copiesToCover(region.height, drawnHeight);
+
+  // Centred, so a scale that does not divide evenly clips both edges equally.
+  const originX = region.left + (region.width - wide * drawnWidth) / 2;
+  const originY = region.top + (region.height - tall * drawnHeight) / 2;
 
   const xs: number[] = [];
-  for (let index = 0; index <= across; index += 1) {
-    xs.push(Math.round(box.left + (box.width * index) / across));
-  }
+  for (let index = 0; index <= wide; index += 1) xs.push(Math.round(originX + drawnWidth * index));
 
   const ys: number[] = [];
-  for (let index = 0; index <= down; index += 1) {
-    ys.push(Math.round(box.top + (box.height * index) / down));
-  }
+  for (let index = 0; index <= tall; index += 1) ys.push(Math.round(originY + drawnHeight * index));
 
-  return { box, columns: across, rows: down, xs, ys };
+  return { region, box: region, columns: wide, rows: tall, xs, ys };
 }
 
 /** The rectangle for one copy, in the same units the grid was built in. */
@@ -176,26 +224,30 @@ export interface TileHit {
 /**
  * Which copy a point landed on, and where within it.
  *
- * Deliberately unclamped in the sense that matters: a point outside the
- * composition returns null rather than the nearest copy, so a press on the mat
- * beside the artwork misses instead of being rounded onto an edge cell. Inside
- * a copy, the fraction is clamped, because a boundary pixel belongs to one of
- * the two copies that share it and either answer names the same source cell.
+ * A point outside the artwork region returns null rather than the nearest copy,
+ * so a press on the mat beside the artwork misses instead of being rounded onto
+ * an edge cell.
+ *
+ * On an internal boundary the higher copy wins, because that is what is drawn
+ * there: a copy is painted from its left edge for its own width, so the shared
+ * pixel belongs to the one on the right. The two conventions have to agree — at
+ * u = 1 the artwork's last column is named and at u = 0 its first, so a
+ * disagreement here puts the reading at the opposite edge of the artwork from
+ * the pixel under the pointer. The final boundary is the exception and belongs
+ * to the last copy, there being nothing beyond it.
  */
 export function tileAt(grid: TileGrid, x: number, y: number): TileHit | null {
-  const first = grid.xs[0] ?? 0;
-  const last = grid.xs[grid.columns] ?? first;
-  const top = grid.ys[0] ?? 0;
-  const bottom = grid.ys[grid.rows] ?? top;
-
-  if (x < first || x > last || y < top || y > bottom) return null;
-  if (last === first || bottom === top) return null;
+  const { region } = grid;
+  if (region.width <= 0 || region.height <= 0) return null;
+  if (x < region.left || x > region.left + region.width) return null;
+  if (y < region.top || y > region.top + region.height) return null;
 
   const find = (value: number, edges: readonly number[], count: number) => {
     for (let index = 0; index < count; index += 1) {
       const start = edges[index] ?? 0;
       const end = edges[index + 1] ?? start;
-      if (value <= end) return { index, start, end };
+      // Strictly less, so the shared pixel goes to the next copy along, as drawn.
+      if (value < end) return { index, start, end };
     }
     const start = edges[count - 1] ?? 0;
     return { index: count - 1, start, end: edges[count] ?? start };
@@ -216,5 +268,9 @@ export function tileAt(grid: TileGrid, x: number, y: number): TileHit | null {
 /** How the repeat is described where a sentence is better than a picture. */
 export function describeTiling(tiling: TilingView): string {
   if (!isRepeating(tiling)) return 'Single copy.';
-  return `Repeat preview, ${String(tiling.columns)} columns by ${String(tiling.rows)} rows.`;
+
+  const grid = `Repeat preview, ${String(tiling.columns)} columns by ${String(tiling.rows)} rows`;
+  return tiling.scale === 1
+    ? `${grid}.`
+    : `${grid}, each copy at ${String(Math.round(tiling.scale * 100))} per cent.`;
 }

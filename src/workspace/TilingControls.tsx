@@ -8,7 +8,7 @@
  * is the whole point of keeping this separate from anything computational.
  */
 
-import { TILE_COUNTS, type TilingMode, type TilingView } from '@/renderer/tiling';
+import { TILE_COUNTS, TILE_SCALES, type TilingMode, type TilingView } from '@/renderer/tiling';
 import styles from './TilingControls.module.css';
 
 interface Props {
@@ -81,9 +81,47 @@ export function TilingControls({ tiling, onChange }: Props) {
       )}
 
       {repeating && (
+        <div className={styles.field}>
+          <span className={styles.label} id="tiling-scale-label">
+            Tile scale
+          </span>
+          <div className={styles.modes} role="radiogroup" aria-labelledby="tiling-scale-label">
+            {TILE_SCALES.map((scale) => {
+              const percent = Math.round(scale * 100);
+              return (
+                <button
+                  key={scale}
+                  type="button"
+                  role="radio"
+                  aria-checked={tiling.scale === scale}
+                  className={styles.mode}
+                  data-selected={tiling.scale === scale ? 'true' : undefined}
+                  onClick={() => onChange({ ...tiling, scale })}
+                >
+                  {percent}%
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {repeating && (
         <p className={styles.note}>
           A preview of how the artwork repeats. It draws the same result again and does not change the
           calculation, so the edges join only where the artwork already makes them join.
+        </p>
+      )}
+
+      {/*
+        Both controls change how many copies are on screen, which is confusing
+        unless it is said plainly: the count sets how many span the artwork at
+        full size, and the scale resizes them within that same area.
+      */}
+      {repeating && (
+        <p className={styles.note}>
+          The preview count sets how many copies span the artwork at 100%. A smaller tile scale fits more
+          copies into the same area and a larger one fits fewer, trimming whatever runs past the edge.
         </p>
       )}
     </fieldset>

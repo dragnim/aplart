@@ -51,15 +51,20 @@ describe('reading a tiling setting from outside', () => {
     });
   });
 
-  it('clamps the scale and repairs the rest', () => {
-    const repaired = normaliseTiling({ mode: 'repeat', scale: 99, showSeamGuides: 'yes' });
-    expect(repaired.scale).toBe(MAX_TILE_SCALE);
-    expect(repaired.showSeamGuides).toBe(false);
+  it('clamps the scale', () => {
+    expect(normaliseTiling({ mode: 'repeat', scale: 99 }).scale).toBe(MAX_TILE_SCALE);
     expect(normaliseTiling({ mode: 'repeat', scale: 0 }).scale).toBe(MIN_TILE_SCALE);
+    expect(normaliseTiling({ mode: 'repeat', scale: 'big' }).scale).toBe(1);
+  });
+
+  it('ignores a field no interface can honour', () => {
+    // Seam guides belong to a later stage. Reading the key now would commit the
+    // shared format to a setting nothing can act on.
+    expect(normaliseTiling({ mode: 'repeat', showSeamGuides: true })).not.toHaveProperty('showSeamGuides');
   });
 
   it('keeps a usable setting untouched', () => {
-    const settings = { mode: 'repeat' as const, columns: 5, rows: 2, scale: 1, showSeamGuides: false };
+    const settings = { mode: 'repeat' as const, columns: 5, rows: 2, scale: 1 };
     expect(normaliseTiling(settings)).toEqual(settings);
   });
 
@@ -202,5 +207,139 @@ describe('finding which copy was pressed', () => {
         expect(hit.row).toBeLessThan(3);
       }
     }
+  });
+});
+
+describe('tile scale', () => {
+  it('changes nothing at 100%', () => {
+    const plain = tileGrid(64, 64, 3, 3, 400, 400);
+    const scaled = tileGrid(64, 64, 3, 3, 400, 400, 1);
+    expect(scaled).toEqual(plain);
+  });
+
+  it('fits more copies when the tiles are smaller', () => {
+    const grid = tileGrid(64, 64, 3, 3, 300, 300, 0.5);
+    // Half the size, so twice as many span the same region.
+    expect(grid.columns).toBe(6);
+    expect(grid.rows).toBe(6);
+    expect(tileRect(grid, 0, 0).width).toBe(50);
+  });
+
+  it('fits fewer, larger copies when the tiles are bigger', () => {
+    const grid = tileGrid(64, 64, 4, 4, 400, 400, 2);
+    expect(grid.columns).toBe(2);
+    expect(tileRect(grid, 0, 0).width).toBe(200);
+  });
+
+  it('keeps the artwork region exactly where it was, whatever the scale', () => {
+    /*
+     * The region is the artwork's place on the canvas. Scaling changes how
+     * densely it is filled; it must not move or resize the artwork itself, or
+     * the letterbox would breathe every time somebody changed the density.
+     */
+    const reference = tileGrid(64, 64, 3, 3, 500, 380).region;
+    for (const scale of [0.5, 0.75, 1, 1.5, 2]) {
+      expect(tileGrid(64, 64, 3, 3, 500, 380, scale).region, String(scale)).toEqual(reference);
+    }
+  });
+
+  it('lands flush where the scale divides the count, and overhangs evenly where it does not', () => {
+    /*
+     * Not every offered scale divides every count: three copies at 75% is four
+     * exactly, but two copies at 75% is two and two thirds. Both are fine — the
+     * first shows no clipped edge, the second clips equally at both — and the
+     * point is that neither is lopsided.
+     */
+    for (const count of [2, 3, 5]) {
+      for (const scale of [0.5, 0.75, 1, 1.5, 2]) {
+        const grid = tileGrid(64, 64, count, count, 480, 480, scale);
+        const first = tileRect(grid, 0, 0);
+        const last = tileRect(grid, grid.columns - 1, 0);
+        const where = `${String(count)} at ${String(scale)}`;
+
+        const before = Math.round(grid.region.left) - first.left;
+        const after = last.left + last.width - Math.round(grid.region.left + grid.region.width);
+
+        expect(before, where).toBeGreaterThanOrEqual(0);
+        expect(after, where).toBeGreaterThanOrEqual(0);
+        expect(Math.abs(before - after), where).toBeLessThanOrEqual(1);
+
+        // Whole copies where the arithmetic allows it.
+        const divides = Math.abs(count / scale - Math.round(count / scale)) < 1e-9;
+        if (divides) expect(before, `${where} should be flush`).toBe(0);
+      }
+    }
+  });
+
+  it('overhangs symmetrically at a scale that does not divide evenly', () => {
+    const grid = tileGrid(64, 64, 3, 3, 300, 300, 1.7);
+    const first = tileRect(grid, 0, 0);
+    const last = tileRect(grid, grid.columns - 1, 0);
+
+    const before = grid.region.left - first.left;
+    const after = last.left + last.width - (grid.region.left + grid.region.width);
+    expect(before).toBeGreaterThan(0);
+    expect(Math.abs(before - after)).toBeLessThanOrEqual(1);
+  });
+
+  it('leaves no gap between neighbours at any scale', () => {
+    for (const scale of [0.5, 0.75, 1.5, 2, 1.3]) {
+      for (const boxWidth of [401, 499, 1001]) {
+        const grid = tileGrid(64, 64, 3, 3, boxWidth, boxWidth, scale);
+        for (let column = 0; column + 1 < grid.columns; column += 1) {
+          const left = tileRect(grid, column, 0);
+          const right = tileRect(grid, column + 1, 0);
+          expect(left.left + left.width, `${String(scale)} at ${String(boxWidth)}px`).toBe(right.left);
+        }
+      }
+    }
+  });
+
+  it('never lets a press land outside the artwork region', () => {
+    // At 200% the copies overhang, and the overhang is clipped when drawn. A
+    // press on the mat beside the artwork must still miss.
+    const grid = tileGrid(64, 64, 3, 3, 300, 500, 2);
+    expect(tileAt(grid, 150, 5)).toBeNull();
+    expect(tileAt(grid, 150, 495)).toBeNull();
+    expect(tileAt(grid, 150, 250)).not.toBeNull();
+  });
+});
+
+describe('a press exactly on a boundary', () => {
+  /*
+   * It does not matter which side wins, but drawing and inspection have to
+   * agree. A copy is painted from its left edge for its own width, so the
+   * shared pixel belongs to the copy on the right — and the reading must say
+   * the same, or a press on the line names the artwork's last column while the
+   * pixel under it came from the first.
+   */
+  const grid = tileGrid(64, 64, 3, 3, 300, 300);
+
+  it('resolves to the copy on the right, as drawn', () => {
+    const boundary = tileRect(grid, 0, 0).left + tileRect(grid, 0, 0).width;
+    const hit = tileAt(grid, boundary, 150);
+
+    expect(hit?.column).toBe(1);
+    expect(hit?.u).toBe(0);
+  });
+
+  it('resolves to the copy below, as drawn', () => {
+    const boundary = tileRect(grid, 0, 0).top + tileRect(grid, 0, 0).height;
+    expect(tileAt(grid, 150, boundary)?.row).toBe(1);
+    expect(tileAt(grid, 150, boundary)?.v).toBe(0);
+  });
+
+  it('keeps the final edge with the last copy, there being nothing beyond it', () => {
+    const last = tileRect(grid, 2, 2);
+    const hit = tileAt(grid, last.left + last.width, last.top + last.height);
+
+    expect(hit).toMatchObject({ column: 2, row: 2 });
+    expect(hit?.u).toBe(1);
+  });
+
+  it('is deterministic: the same point always gives the same answer', () => {
+    const boundary = tileRect(grid, 1, 0).left;
+    const answers = new Set(Array.from({ length: 20 }, () => JSON.stringify(tileAt(grid, boundary, 150))));
+    expect(answers.size).toBe(1);
   });
 });

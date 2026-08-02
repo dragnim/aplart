@@ -55,6 +55,7 @@ interface Painted {
   readonly matrix: { readonly rows: number; readonly columns: number; readonly values: Float64Array };
   readonly escape?: { readonly range: { readonly min: number; readonly max: number } };
   readonly palette?: { readonly colours: readonly string[] };
+  readonly options?: { readonly tiling?: { readonly mode: string } };
 }
 
 const { drawCalls } = vi.hoisted(() => ({ drawCalls: [] as Painted[] }));
@@ -474,5 +475,52 @@ describe('what a delivery is kept out of', () => {
     const project = readSavedProjectImmediate(mandelbrotField.id);
     expect(project?.lastSuccessfulMatrix?.values.every((value) => Number.isFinite(value))).toBe(true);
     expect(project?.lastSuccessfulMatrix?.values.some((value) => value === 0)).toBe(false);
+  });
+});
+
+describe('a delivery while the artwork is repeated', () => {
+  it('keeps showing the last complete result rather than repeating half of one', async () => {
+    const { service, user } = await start();
+    await finish(service);
+
+    await user.click(screen.getByRole('radio', { name: 'Repeat' }));
+    const complete = paintedCells();
+    expect(complete).toBe(SIZE * SIZE);
+
+    // A second run, left part-way.
+    fireEvent.click(screen.getByRole('button', { name: /^Run/ }));
+    await releaseBands(service, 3);
+
+    /*
+     * Twenty-five copies of a mostly-hatched tile previews nothing, and the
+     * hatch itself would read as part of the pattern. The finished artwork
+     * stays on screen until the new one is whole.
+     */
+    expect(paintedCells()).toBe(complete);
+    expect(lastPaint()?.options?.tiling?.mode).toBe('repeat');
+
+    await finish(service);
+    expect(paintedCells()).toBe(complete);
+  });
+
+  it('shows a first delivery as one copy, never repeated', async () => {
+    const user = userEvent.setup();
+    const service = new HeldService(counts(28));
+    render(<WorkspacePage presetId={mandelbrotField.id} sharedState={null} service={service} />);
+
+    // Repeat chosen before anything has been drawn at all.
+    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await waitFor(() => expect(service.pending).toBeGreaterThan(0));
+    await service.release();
+    await paintedSince(0);
+    await releaseBands(service, 2);
+
+    /*
+     * Nothing complete to keep, so the delivery is worth watching — but singly.
+     * Copies of an artwork that does not exist yet would be copies of nothing.
+     */
+    expect(paintedCells()).toBeGreaterThan(0);
+    expect(paintedCells()).toBeLessThan(SIZE * SIZE);
+    expect(lastPaint()?.options?.tiling?.mode ?? 'single').toBe('single');
   });
 });

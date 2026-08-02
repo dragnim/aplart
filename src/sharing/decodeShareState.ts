@@ -137,7 +137,6 @@ export function validateShareState(parsed: unknown): DecodeResult {
                 columns: tiling.columns,
                 rows: tiling.rows,
                 scale: tiling.scale,
-                showSeamGuides: tiling.showSeamGuides,
               },
             };
       })(),
@@ -206,6 +205,5 @@ export function fromTilingOptions(options: RenderOptions): SharedTilingState | u
     columns: tiling.columns,
     rows: tiling.rows,
     scale: tiling.scale,
-    showSeamGuides: tiling.showSeamGuides,
   };
 }

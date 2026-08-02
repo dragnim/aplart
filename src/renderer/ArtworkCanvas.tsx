@@ -12,7 +12,7 @@ import { describeMatrix, type MatrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
 import { drawArtwork, drawCellMarker, type DrawRequest } from './CanvasRenderer';
-import { describeTiling, isRepeating, type TilingView } from './tiling';
+import { DEFAULT_TILING, describeTiling, isRepeating, type TilingView } from './tiling';
 import { type SourceCell, type SourceRect } from './displayMapping';
 import { animatePalette, phaseFor, type AnimationSettings } from './paletteAnimation';
 import { paletteFor, transformMatrix, type RenderOptions } from './renderOptions';
@@ -54,6 +54,8 @@ interface Props {
   readonly inspection?: CanvasInspection | undefined;
   readonly animation?: CanvasAnimation | undefined;
   readonly escape?: DrawRequest['escape'];
+  /** Draws one copy whatever the tiling says, for a partly delivered artwork. */
+  readonly singleCopy?: boolean;
 }
 
 /**
@@ -80,6 +82,7 @@ export function ArtworkCanvas({
   inspection,
   animation,
   escape,
+  singleCopy = false,
 }: Props) {
   const internalRef = useRef<HTMLCanvasElement>(null);
   const canvas = canvasRef ?? internalRef;
@@ -115,10 +118,19 @@ export function ArtworkCanvas({
           ? base
           : animatePalette(base, animation.settings.mode, animation.phase.current);
 
-      drawArtwork(element, { matrix, stats, mode, options, palette: painted, escape }, width, height, ratio);
+      // The tiling is dropped rather than overridden, so the drawing and the
+      // hit-testing below read the same options object and cannot disagree.
+      const drawn = singleCopy ? { ...options, tiling: DEFAULT_TILING } : options;
+      drawArtwork(
+        element,
+        { matrix, stats, mode, options: drawn, palette: painted, escape },
+        width,
+        height,
+        ratio,
+      );
       // After the artwork, so the outline is not painted over. Repainted with it
       // on every resize, which is why it is inside `paint` rather than beside it.
-      if (marked !== null) drawCellMarker(element, marked, matrix, options, width, height, ratio);
+      if (marked !== null) drawCellMarker(element, marked, matrix, drawn, width, height, ratio);
     };
 
     paintRef.current = paint;
@@ -129,7 +141,7 @@ export function ArtworkCanvas({
     const observer = new ResizeObserver(paint);
     observer.observe(box);
     return () => observer.disconnect();
-  }, [matrix, stats, mode, options, canvas, marked, animation, escape]);
+  }, [matrix, stats, mode, options, canvas, marked, animation, escape, singleCopy]);
 
   /*
    * The animation loop.

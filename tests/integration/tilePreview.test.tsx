@@ -21,7 +21,9 @@ type CanvasRendererModule = typeof CanvasRenderer;
 const CANVAS = { left: 0, top: 0, width: 400, height: 400 };
 
 interface Painted {
-  readonly options: { readonly tiling?: { mode: string; columns: number; rows: number } };
+  readonly options: {
+    readonly tiling?: { mode: string; columns: number; rows: number; scale: number };
+  };
   readonly matrix: { readonly rows: number; readonly columns: number };
   readonly palette?: { readonly colours: readonly string[] };
 }
@@ -321,5 +323,112 @@ describe('keeping the setting', () => {
     await screen.findByText(/shared with you/);
 
     expect(lastTiling()).toMatchObject({ mode: 'repeat', columns: 8, rows: 1 });
+  });
+});
+
+describe('tile scale', () => {
+  it('is offered only while repeating, and starts at 100%', async () => {
+    const { user } = await openAndRun();
+    expect(screen.queryByRole('radio', { name: '100%' })).not.toBeInTheDocument();
+
+    await user.click(repeatButton());
+    expect(screen.getByRole('radio', { name: '100%' })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('changes the copies without touching the artwork', async () => {
+    const { user, service } = await openAndRun();
+    await user.click(repeatButton());
+    const before = service.executionCount;
+    const matrix = drawCalls.at(-1)?.matrix;
+
+    await user.click(screen.getByRole('radio', { name: '50%' }));
+
+    expect(lastTiling()?.scale).toBe(0.5);
+    expect(service.executionCount).toBe(before);
+    expect(drawCalls.at(-1)?.matrix).toEqual(matrix);
+  });
+
+  it('keeps the cell somebody was reading', async () => {
+    const { user } = await openAndRun();
+    await user.click(repeatButton());
+    fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: '4' } });
+    fireEvent.change(screen.getByLabelText(/^Column/), { target: { value: '7' } });
+    await user.click(screen.getByRole('button', { name: /^Inspect$/ }));
+
+    await user.click(screen.getByRole('radio', { name: '200%' }));
+
+    // The scale is how large a copy is drawn, not which cell was chosen.
+    expect(announced()).toContain('Row 4, column 7');
+  });
+
+  it('saves and shares', async () => {
+    const { user } = await openAndRun();
+    await user.click(repeatButton());
+    await user.click(screen.getByRole('radio', { name: '150%' }));
+
+    const { readSavedProjectImmediate } = await import('@/workspace/useLocalProject');
+    await waitFor(
+      () => {
+        expect(readSavedProjectImmediate(modularBloom.id)?.renderOptions.tiling?.scale).toBe(1.5);
+      },
+      { timeout: 4000 },
+    );
+  });
+
+  it('defaults safely when a link carries no scale', async () => {
+    const { encodeShareState } = await import('@/sharing/encodeShareState');
+    const encoded = encodeShareState({
+      v: 1,
+      preset: modularBloom.id,
+      code: modularBloom.code,
+      params: {},
+      palette: 'ember',
+      tiling: { mode: 'repeat', columns: 3, rows: 3 },
+      render: { invert: false, rotation: 0, mirrorH: false, mirrorV: false, smooth: false },
+    });
+
+    await openAndRun(encoded);
+    await screen.findByText(/shared with you/);
+
+    expect(lastTiling()?.scale).toBe(1);
+    expect(screen.getByRole('radio', { name: '100%' })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('clamps an absurd scale from a link', async () => {
+    const { encodeShareState } = await import('@/sharing/encodeShareState');
+    const encoded = encodeShareState({
+      v: 1,
+      preset: modularBloom.id,
+      code: modularBloom.code,
+      params: {},
+      palette: 'ember',
+      tiling: { mode: 'repeat', columns: 3, rows: 3, scale: 500 },
+      render: { invert: false, rotation: 0, mirrorH: false, mirrorV: false, smooth: false },
+    });
+
+    await openAndRun(encoded);
+    await screen.findByText(/shared with you/);
+
+    expect(lastTiling()?.scale).toBe(4);
+  });
+});
+
+describe('palette animation across the copies', () => {
+  it('paints every copy from one palette, in one loop', async () => {
+    const { user } = await openAndRun();
+    await user.click(repeatButton());
+    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+
+    /*
+     * There is nothing to synchronise, and that is the point: the copies are
+     * drawn inside a single paint from a single effective palette, so they
+     * cannot drift apart. One draw call carries one palette and all nine copies
+     * come out of it.
+     */
+    const painted = drawCalls.at(-1);
+    expect(painted?.palette?.colours).toBeDefined();
+    expect(painted?.options.tiling).toMatchObject({ mode: 'repeat', columns: 3, rows: 3 });
+
+    await user.click(screen.getByRole('button', { name: 'Pause' }));
   });
 });

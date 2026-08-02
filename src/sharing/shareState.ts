@@ -41,7 +41,6 @@ export interface SharedTilingState {
   readonly columns: number;
   readonly rows: number;
   readonly scale?: number;
-  readonly showSeamGuides?: boolean;
 }
 
 export interface SharedRenderOptions {

@@ -138,8 +138,9 @@ export function useArtworkPointer(options: {
         down,
         finished.bounds.width,
         finished.bounds.height,
+        render.tiling?.scale ?? 1,
       );
-      const box = grid.box;
+      const box = grid.region;
       if (box.width === 0 || box.height === 0) return;
 
       const moved = Math.max(Math.abs(x1 - finished.x0), Math.abs(y1 - finished.y0));
