@@ -67,7 +67,7 @@ export function useArtworkPointer(options: {
   readonly renderOptions: RenderOptions;
   readonly onSelect: (rect: SourceRect) => void;
   /** A press on a cell, or null for a press that missed the artwork. */
-  readonly onInspect: (cell: SourceCell | null) => void;
+  readonly onInspect: (cell: SourceCell | null, at?: { u: number; v: number }) => void;
 }): {
   readonly overlay: OverlayRect | null;
   readonly onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
@@ -175,7 +175,14 @@ export function useArtworkPointer(options: {
          */
         const within = unreflect(hit, tileParity(grid, hit.column, hit.row));
         const source = displayToSource(within, render);
-        inspect(sourceCellAt(source, sourceRows, sourceColumns));
+
+        // Where the press landed across the whole artwork region, not within
+        // its copy: the panel is placed against the region, not against a tile.
+        const across = {
+          u: (x1 - box.left) / box.width,
+          v: (y1 - box.top) / box.height,
+        };
+        inspect(sourceCellAt(source, sourceRows, sourceColumns), across);
         return;
       }
 

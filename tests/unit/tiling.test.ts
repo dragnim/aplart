@@ -25,6 +25,7 @@ import {
   unreflect,
   type TilingView,
 } from '@/renderer/tiling';
+import { furthestCorner } from '@/workspace/readingPlacement';
 
 function view(overrides: Partial<TilingView> = {}): TilingView {
   return { ...DEFAULT_TILING, ...overrides };
@@ -473,5 +474,20 @@ describe('undoing a copy’s reflection', () => {
     }
 
     expect(readings).toEqual(new Set(['0.3,0.8']));
+  });
+});
+
+describe('where the reading sits', () => {
+  it('goes to the corner furthest from the selection', () => {
+    expect(furthestCorner({ u: 0.1, v: 0.1 })).toBe('bottom-right');
+    expect(furthestCorner({ u: 0.9, v: 0.1 })).toBe('bottom-left');
+    expect(furthestCorner({ u: 0.1, v: 0.9 })).toBe('top-right');
+    expect(furthestCorner({ u: 0.9, v: 0.9 })).toBe('top-left');
+  });
+
+  it('keeps its usual place when no press was involved', () => {
+    // A cell named through the keyboard has no position on screen to move away
+    // from, and moving on every arrow press would be worse than staying put.
+    expect(furthestCorner(null)).toBe('bottom-left');
   });
 });

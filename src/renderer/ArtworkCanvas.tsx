@@ -39,7 +39,13 @@ export interface CanvasExploration {
  */
 export interface CanvasInspection {
   readonly marked: SourceCell | null;
-  readonly onInspect: (cell: SourceCell | null) => void;
+  /**
+   * `at` is where in the artwork region the press landed, as fractions.
+   *
+   * Presentation only — it decides where the reading panel sits, and is absent
+   * when a cell is named through the keyboard rather than pressed.
+   */
+  readonly onInspect: (cell: SourceCell | null, at?: { u: number; v: number }) => void;
 }
 
 interface Props {

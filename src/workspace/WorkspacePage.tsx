@@ -34,12 +34,13 @@ import { numberAssignedTo } from '@/editor/parameterBinding';
 import { ParameterControls } from './ParameterControls';
 import { InspectorControls } from './InspectorControls';
 import { ValueInspector } from './ValueInspector';
+import { furthestCorner } from './readingPlacement';
 import { PrimitivePanel } from './PrimitivePanel';
 import { TryChangingThis } from './TryChangingThis';
 import { randomiseParameters } from './randomise';
 import { readSavedProjectImmediate, useLocalProject } from './useLocalProject';
 import { FocusToolbar } from './FocusToolbar';
-import { type SourceRect } from '@/renderer/displayMapping';
+import { type SourceCell, type SourceRect } from '@/renderer/displayMapping';
 import {
   readViewport,
   panViewport,
@@ -492,8 +493,40 @@ function Workspace({
    * the cell or the matrix changes. Never while the pointer is moving.
    */
   const inspected = state.inspected;
-  const setInspected = inspectCell;
-  const clearInspection = useCallback(() => inspectCell(null), [inspectCell]);
+
+  /*
+   * Where the reading sits, and whether it is showing.
+   *
+   * Both are presentation, both session-only. The anchor is where the press
+   * landed, so the panel can move to the corner furthest from it; a cell named
+   * through the keyboard has no press, and the panel keeps its usual place.
+   */
+  const [anchor, setAnchor] = useState<{ u: number; v: number } | null>(null);
+  const [readingHidden, setReadingHidden] = useState(false);
+
+  const setInspected = useCallback(
+    (cell: SourceCell | null, at?: { u: number; v: number }) => {
+      inspectCell(cell);
+      setAnchor(at ?? null);
+      // Choosing a cell is asking about it, so the reading comes back.
+      setReadingHidden(false);
+    },
+    [inspectCell],
+  );
+
+  const clearInspection = useCallback(() => {
+    inspectCell(null);
+    setAnchor(null);
+    setReadingHidden(false);
+  }, [inspectCell]);
+
+  /*
+   * In Focus mode the drawer covers the left of the artwork, so the reading is
+   * kept to the right of it whatever the press said. Everywhere else it is the
+   * corner furthest from the selection.
+   */
+  const readingCorner =
+    focus && drawerOpen ? ((anchor?.v ?? 1) < 0.5 ? 'bottom-right' : 'top-right') : furthestCorner(anchor);
 
   /*
    * Escape puts the reading away before it means anything else.
@@ -780,8 +813,8 @@ function Workspace({
       />
 
       <ValueInspector
-        reading={reading}
-        viewNote={viewNote}
+        reading={readingHidden ? null : reading}
+        viewNote={readingHidden ? null : viewNote}
         notes={preset.valueNotes}
         ceiling={ceiling}
         /*
@@ -793,6 +826,8 @@ function Workspace({
         escape={escape}
         // A tiling's values choose a shape rather than measure anything.
         categorical={preset.renderMode === 'tiles'}
+        corner={readingCorner}
+        onHide={() => setReadingHidden(true)}
         onDismiss={clearInspection}
       />
     </div>

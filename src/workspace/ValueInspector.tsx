@@ -14,6 +14,7 @@
  */
 
 import { type CellReading } from '@/matrix/matrixInspection';
+import { type PanelCorner } from './readingPlacement';
 import { type ValueNotes } from '@/presets/schema';
 import { bandCountFor, bandNumberFor } from '@/renderer/escapeColouring';
 import { type EscapeSettings } from './escapeSettings';
@@ -37,6 +38,16 @@ interface Props {
    * it still matters — that is how common the shape is.
    */
   readonly categorical: boolean;
+  /**
+   * Which corner to sit in, chosen furthest from what was selected.
+   *
+   * A reading that covers the cell it is describing makes somebody dismiss it
+   * to see the thing they just asked about, which is the whole of the problem.
+   */
+  readonly corner: PanelCorner;
+  /** Hides the reading and keeps the selection and its markers. */
+  readonly onHide: () => void;
+  /** Removes the selection entirely. A different act, so a different control. */
   readonly onDismiss: () => void;
 }
 
@@ -114,7 +125,17 @@ function extentNote(
   return null;
 }
 
-export function ValueInspector({ reading, viewNote, notes, ceiling, escape, categorical, onDismiss }: Props) {
+export function ValueInspector({
+  reading,
+  viewNote,
+  notes,
+  ceiling,
+  escape,
+  categorical,
+  corner,
+  onHide,
+  onDismiss,
+}: Props) {
   if (reading === null && viewNote === null) return null;
 
   /*
@@ -143,7 +164,7 @@ export function ValueInspector({ reading, viewNote, notes, ceiling, escape, cate
         ].join(' ');
 
   return (
-    <div className={styles.panel}>
+    <div className={styles.panel} data-corner={corner}>
       <p className={styles.spoken} role="status">
         {spoken}
       </p>
@@ -158,10 +179,20 @@ export function ValueInspector({ reading, viewNote, notes, ceiling, escape, cate
             <p className={styles.position} aria-hidden="true">
               Row {reading.row}, column {reading.column}
             </p>
-            {/* Outside the hidden layout: a control has to stay reachable. */}
-            <button type="button" className={styles.dismiss} onClick={onDismiss}>
-              Clear
-            </button>
+            {/*
+              Two different acts, so two controls. Hiding puts the reading away
+              and leaves the cell chosen and marked; clearing gives the cell up.
+              One button doing both meant somebody who only wanted to see what
+              was underneath lost their selection for it.
+            */}
+            <div className={styles.actions}>
+              <button type="button" className={styles.dismiss} onClick={onHide}>
+                Hide
+              </button>
+              <button type="button" className={styles.dismiss} onClick={onDismiss}>
+                Clear
+              </button>
+            </div>
           </div>
 
           <div aria-hidden="true">

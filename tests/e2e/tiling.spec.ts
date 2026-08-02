@@ -291,3 +291,76 @@ test.describe('mirroring the repeat', () => {
     expect(await backgroundColumns(page)).toBeLessThanOrEqual(2);
   });
 });
+
+test.describe('the value reading', () => {
+  test.use({ viewport: WIDE });
+
+  test('never covers the cell it is describing', async ({ page }) => {
+    await openAndRun(page);
+
+    const canvas = page.locator('canvas').first();
+    const box = await canvas.boundingBox();
+    if (box === null) throw new Error('the canvas has no size');
+    const size = Math.min(box.width, box.height);
+    const left = box.width / 2 - size / 2;
+    const top = box.height / 2 - size / 2;
+
+    /*
+     * Well into each corner, where the panel used to sit on top of the marker.
+     *
+     * Ordered so the panel is never in the corner about to be pressed: it moves
+     * to the opposite corner from each selection, so going round the four in
+     * this sequence always leaves the next one clear. The panel does still cover
+     * its own corner while it is open — Hide is the way out of that, and the
+     * next test covers it.
+     */
+    const corners = [
+      { name: 'top-left', u: 0.12, v: 0.12 },
+      { name: 'top-right', u: 0.88, v: 0.12 },
+      { name: 'bottom-right', u: 0.88, v: 0.88 },
+      { name: 'bottom-left', u: 0.12, v: 0.88 },
+    ];
+
+    for (const corner of corners) {
+      const x = box.x + left + size * corner.u;
+      const y = box.y + top + size * corner.v;
+      await canvas.click({ position: { x: left + size * corner.u, y: top + size * corner.v } });
+
+      const panel = page.locator('[data-corner]');
+      await expect(panel).toBeVisible();
+      const panelBox = await panel.boundingBox();
+      if (panelBox === null) throw new Error('the reading has no size');
+
+      const covers =
+        x >= panelBox.x &&
+        x <= panelBox.x + panelBox.width &&
+        y >= panelBox.y &&
+        y <= panelBox.y + panelBox.height;
+
+      expect(covers, `${corner.name} selection is under the reading`).toBe(false);
+    }
+  });
+
+  test('hiding the reading keeps the selection; clearing it does not', async ({ page }) => {
+    await openAndRun(page);
+
+    const canvas = page.locator('canvas').first();
+    await canvas.click({ position: { x: 120, y: 120 } });
+    await expect(page.locator('[data-corner]')).toBeVisible();
+
+    /*
+     * Two different acts. Somebody who only wants to see what is underneath
+     * should not lose the cell they chose to get the view.
+     */
+    await page.getByRole('button', { name: 'Hide', exact: true }).click();
+    await expect(page.locator('[data-corner]')).toBeHidden();
+
+    // The cell is still chosen: the keyboard control that gives it up is still
+    // offered, which it is not when nothing is selected.
+    const clear = page.getByRole('button', { name: 'Clear selection' });
+    await expect(clear).toBeEnabled();
+
+    await clear.click();
+    await expect(clear).toBeDisabled();
+  });
+});
