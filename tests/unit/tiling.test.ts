@@ -557,3 +557,37 @@ describe('composing into an export of a given size', () => {
     expect(grid.region.width).toBeLessThan(1920);
   });
 });
+
+describe('parity where the composition is clipped', () => {
+  /*
+   * A tile scale above 100% pushes the outermost copies past the region, so the
+   * first and last are partial. Parity is taken from the grid index, not from
+   * whether a copy is whole, so a clipped copy reflects the same way a whole one
+   * in that position would — the alternation must not restart at the visible
+   * edge or the join at the clip would be wrong.
+   */
+  it('alternates by index, whether or not a copy is whole', () => {
+    const grid = tileGrid(64, 64, 3, 3, 300, 300, 1.7, true);
+
+    const first = tileRect(grid, 0, 0);
+    const last = tileRect(grid, grid.columns - 1, 0);
+    expect(first.left).toBeLessThan(grid.region.left);
+    expect(last.left + last.width).toBeGreaterThan(grid.region.left + grid.region.width);
+
+    for (let column = 0; column < grid.columns; column += 1) {
+      expect(tileParity(grid, column, 0).mirrorX, `column ${String(column)}`).toBe(column % 2 === 1);
+    }
+  });
+
+  it('still meets along every internal join when clipped', () => {
+    // The reflected neighbour of a clipped copy is placed against the same
+    // rounded boundary, so the join is where it would be if nothing were cut.
+    const grid = tileGrid(64, 64, 3, 3, 401, 401, 1.7, true);
+    for (let column = 0; column + 1 < grid.columns; column += 1) {
+      const a = tileRect(grid, column, 0);
+      const b = tileRect(grid, column + 1, 0);
+      expect(a.left + a.width).toBe(b.left);
+      expect(tileParity(grid, column, 0).mirrorX).not.toBe(tileParity(grid, column + 1, 0).mirrorX);
+    }
+  });
+});

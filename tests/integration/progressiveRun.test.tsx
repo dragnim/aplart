@@ -524,3 +524,46 @@ describe('a delivery while the artwork is repeated', () => {
     expect(lastPaint()?.options?.tiling?.mode ?? 'single').toBe('single');
   });
 });
+
+describe('exporting while a run is in flight', () => {
+  it('offers nothing to export before a first result exists', async () => {
+    const user = userEvent.setup();
+    const service = new HeldService(counts(28));
+    render(<WorkspacePage presetId={mandelbrotField.id} sharedState={null} service={service} />);
+
+    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await waitFor(() => expect(service.pending).toBeGreaterThan(0));
+    await service.release();
+    await paintedSince(0);
+    await releaseBands(service, 2);
+
+    // Part of an artwork has arrived and none of it is exportable: there is no
+    // completed result, and a delivery is not one.
+    await user.click(screen.getByRole('button', { name: 'Export' }));
+    await user.click(screen.getByRole('menuitem', { name: /512/ }));
+
+    expect(
+      screen
+        .getAllByRole('status')
+        .some((element) => /Run the artwork before exporting/u.test(element.textContent ?? '')),
+    ).toBe(true);
+  });
+
+  it('keeps the completed result available while the next one is arriving', async () => {
+    const { service, user } = await start();
+    await finish(service);
+
+    // A second run, left part-way. The finished artwork is still what Export
+    // would write — a delivery never becomes the thing that gets saved.
+    fireEvent.click(screen.getByRole('button', { name: /^Run/ }));
+    await releaseBands(service, 2);
+
+    await user.click(screen.getByRole('button', { name: 'Export' }));
+    expect(screen.getByRole('menuitem', { name: /512/ })).toBeEnabled();
+    expect(
+      screen
+        .getAllByRole('status')
+        .some((element) => /Run the artwork before exporting/u.test(element.textContent ?? '')),
+    ).toBe(false);
+  });
+});

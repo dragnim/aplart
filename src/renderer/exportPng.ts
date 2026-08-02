@@ -178,27 +178,39 @@ export async function exportArtworkPng(request: ExportRequest): Promise<Blob> {
    * regardless of the appearance setting. That setting is about how the artwork
    * looks enlarged, which is not the situation here.
    */
-  const reducing = scale < 1;
+  const source = toSourceCanvas(image);
+
+  /*
+   * The same grid arithmetic and the same composition as the screen, applied to
+   * the export's own pixels. Nothing is copied from the visible canvas.
+   */
+  const { columns, rows } = tileCounts(request.options.tiling);
+  const grid = tiled
+    ? tileGrid(
+        image.width,
+        image.height,
+        columns,
+        rows,
+        artworkWidth,
+        artworkHeight,
+        request.options.tiling?.scale ?? 1,
+        request.options.tiling?.mode === 'mirror-repeat',
+      )
+    : null;
+
+  /*
+   * Judged on how large each copy actually ends up, not on how large the whole
+   * image would have been. A tile drawn nine times into a 512-pixel square is
+   * reduced even when one copy of it would have been enlarged, and reducing a
+   * drawn motif without smoothing loses parts of its strokes.
+   */
+  const drawnScale =
+    grid === null ? scale : Math.min(grid.region.width / (grid.columns * image.width), 1) || scale;
+  const reducing = drawnScale < 1;
   context.imageSmoothingEnabled = reducing || request.options.smoothScaling;
   if (context.imageSmoothingEnabled) context.imageSmoothingQuality = 'high';
 
-  const source = toSourceCanvas(image);
-  if (tiled) {
-    /*
-     * The same grid arithmetic and the same composition as the screen, applied
-     * to the export's own pixels. Nothing is copied from the visible canvas.
-     */
-    const { columns, rows } = tileCounts(request.options.tiling);
-    const grid = tileGrid(
-      image.width,
-      image.height,
-      columns,
-      rows,
-      artworkWidth,
-      artworkHeight,
-      request.options.tiling?.scale ?? 1,
-      request.options.tiling?.mode === 'mirror-repeat',
-    );
+  if (grid !== null) {
     composeTiles(context, source, grid);
   } else {
     context.drawImage(source, 0, 0, artworkWidth, artworkHeight);

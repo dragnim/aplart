@@ -72,7 +72,13 @@ export function ExportMenu({ actions, triggerClassName, label = 'Export' }: Prop
                   {actions.exportTiling ? '✓' : ''}
                 </span>
                 <span>
-                  Export the repeat
+                  {/*
+                    Neutral on purpose. "Export the repeat" reads as the Repeat
+                    mode, and this control is equally about Mirror repeat — two
+                    things the interface goes to some trouble to keep distinct.
+                    The filename still names the exact mode.
+                  */}
+                  Export current tiling
                   <span className={styles.preview}>
                     Off writes one tile, as before. On writes the composition on screen.
                   </span>

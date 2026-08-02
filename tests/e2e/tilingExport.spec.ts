@@ -50,7 +50,7 @@ async function chooseRepeat(page: Page, mode: string, count: string, scale = '10
 
 async function turnOnRepeatExport(page: Page) {
   await page.getByRole('button', { name: 'Export' }).click();
-  await page.getByRole('menuitemcheckbox', { name: /Export the repeat/ }).click();
+  await page.getByRole('menuitemcheckbox', { name: /Export current tiling/ }).click();
   // The menu stays open on a toggle; close it so the next open is clean.
   await page.keyboard.press('Escape');
 }
@@ -233,6 +233,6 @@ test.describe('exporting a repeat', () => {
 
     // One copy and a composition are the same picture; two controls for it
     // would read as a fault rather than a choice.
-    await expect(page.getByRole('menuitemcheckbox', { name: /Export the repeat/ })).toBeHidden();
+    await expect(page.getByRole('menuitemcheckbox', { name: /Export current tiling/ })).toBeHidden();
   });
 });
