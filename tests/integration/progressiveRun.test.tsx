@@ -31,6 +31,16 @@ type CanvasRendererModule = typeof CanvasRenderer;
 
 const CANVAS = { left: 0, top: 0, width: 400, height: 400 };
 
+/*
+ * Longer than the default five seconds, and honestly so.
+ *
+ * Each of these drives a dozen sequential requests through React, one at a
+ * time, waiting for a render between each. That is genuinely slow rather than
+ * accidentally slow, and the default was close enough to trip on a loaded CI
+ * worker while passing on a developer's machine.
+ */
+vi.setConfig({ testTimeout: 20_000 });
+
 /** Narrow enough that a modest artwork genuinely needs several bands. */
 const CAPABILITIES: ExecutionCapabilities = {
   maxOutputLines: 12,
@@ -171,6 +181,15 @@ beforeEach(() => {
     const classes = typeof this.className === 'string' ? this.className : '';
     return this instanceof HTMLCanvasElement || classes.includes('frame') ? measured : nothing;
   });
+
+  /*
+   * jsdom's Range measures nothing, and CodeMirror's cursor layer asks it to.
+   * Left alone it throws from inside a measure callback, which surfaces as a
+   * failure in whichever assertion happened to be waiting at the time.
+   */
+  Range.prototype.getClientRects = () => Object.assign([], { item: () => null }) as unknown as DOMRectList;
+  Range.prototype.getBoundingClientRect = () => nothing;
+
   Element.prototype.setPointerCapture = () => undefined;
   Element.prototype.releasePointerCapture = () => undefined;
 });
@@ -215,14 +234,29 @@ async function releaseBands(service: HeldService, count: number) {
   }
 }
 
+const SETTLED = /Finished|went wrong|unavailable|Stopped/u;
+
+/**
+ * Releases bands until the run reports an outcome.
+ *
+ * Waits for one of two things each time round: another request queued, or the
+ * run visibly settled. Neither alone is enough — between two bands the queue is
+ * briefly empty while the runner reads a reply, and after the last band the
+ * status is briefly stale while React catches up. Testing either on its own
+ * abandons the run part-way and leaves every later assertion describing a
+ * half-delivered artwork.
+ */
 async function finish(service: HeldService) {
   for (let guard = 0; guard < 80; guard += 1) {
-    if (service.pending === 0) break;
+    let more = false;
+    await waitFor(() => {
+      more = service.pending > 0;
+      expect(more || SETTLED.test(runStatus())).toBe(true);
+    });
+    if (!more) break;
     await service.release();
-    // Long enough for the runner to issue the next request, if there is one.
-    await waitFor(() => expect(true).toBe(true));
   }
-  await waitFor(() => expect(runStatus()).toMatch(/Finished|went wrong|unavailable/u));
+  await waitFor(() => expect(runStatus()).toMatch(SETTLED));
 }
 
 describe('while the bands are arriving', () => {

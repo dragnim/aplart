@@ -389,12 +389,19 @@ describe('runArtwork, reporting progress', () => {
       expect(report.filled).toBeGreaterThan(previous);
       previous = report.filled;
 
-      // Every cell claimed as filled matches the final artwork. A report that
-      // over-claimed would have the renderer paint uninitialised zeroes as
-      // though the calculation had returned them.
-      for (let index = 0; index < report.filled; index += 1) {
-        expect(report.values[index]).toBe(expected.values[index]);
-      }
+      /*
+       * Every cell claimed as filled matches the final artwork. A report that
+       * over-claimed would have the renderer paint uninitialised zeroes as
+       * though the calculation had returned them.
+       *
+       * Compared as whole slices rather than cell by cell: an assertion per
+       * cell is 650,000 of them across the run, which is quick enough on a
+       * developer's machine and over the timeout on a busy CI worker.
+       */
+      const claimed = report.values.subarray(0, report.filled);
+      const truth = expected.values.subarray(0, report.filled);
+      const firstDifference = claimed.findIndex((value, index) => value !== truth[index]);
+      expect(firstDifference, `report of ${report.filled} cells`).toBe(-1);
     }
   });
 

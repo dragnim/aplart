@@ -76,6 +76,15 @@ beforeEach(() => {
     const classes = typeof this.className === 'string' ? this.className : '';
     return this instanceof HTMLCanvasElement || classes.includes('frame') ? measured : nothing;
   });
+
+  /*
+   * jsdom's Range measures nothing, and CodeMirror's cursor layer asks it to.
+   * Left alone it throws from inside a measure callback, which surfaces as a
+   * failure in whichever assertion happened to be waiting at the time.
+   */
+  Range.prototype.getClientRects = () => Object.assign([], { item: () => null }) as unknown as DOMRectList;
+  Range.prototype.getBoundingClientRect = () => nothing;
+
   Element.prototype.setPointerCapture = () => undefined;
   Element.prototype.releasePointerCapture = () => undefined;
 
