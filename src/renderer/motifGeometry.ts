@@ -95,3 +95,80 @@ export function joinsCleanly(
     return Math.abs(span.start - other.start) <= tolerance && Math.abs(span.end - other.end) <= tolerance;
   });
 }
+
+/**
+ * The direction the drawn line travels where it crosses an edge.
+ *
+ * Occupancy proves there is no gap; direction is what makes the join
+ * *continuous* rather than a corner. Two arcs can arrive at the same point from
+ * different angles and leave a visible kink, and a claim of continuity should
+ * rest on more than the ink lining up.
+ *
+ * Measured by sampling the curve either side of the crossing rather than
+ * differentiating it, so the answer describes the shape the renderer draws.
+ * Returned as an unsigned direction: a curve has no preferred way round, and a
+ * tangent and its opposite are the same line.
+ */
+export function edgeTangent(
+  motif: Motif,
+  edge: TileEdge,
+  stroke = 0.13,
+): { readonly alongEdge: number; readonly acrossEdge: number } | null {
+  const spans = edgeSignature(motif, edge, stroke);
+  const span = spans[0];
+  if (span === undefined) return null;
+
+  const vertical = edge === 'left' || edge === 'right';
+  const inward = edge === 'left' || edge === 'top' ? 1 : -1;
+  const base = edge === 'left' || edge === 'top' ? 0 : 1;
+
+  /*
+   * Where the line sits a given depth inside the tile.
+   *
+   * Followed inward rather than sampled along the edge: a line crossing square
+   * on has left the edge entirely a hair to either side, so looking along it
+   * finds nothing at all. Tracking the branch nearest the previous position
+   * keeps to one line where a tile draws two.
+   */
+  const alongAt = (depth: number, near: number): number | null => {
+    const across = base + depth * inward;
+
+    // The middle of a run of ink, not the first sample of it: the stroke has
+    // width, and its near edge drifts differently from its centre.
+    const runs: EdgeSpan[] = [];
+    let start: number | null = null;
+    for (let index = 0; index <= SAMPLES; index += 1) {
+      const along = index / SAMPLES;
+      const u = vertical ? across : along;
+      const v = vertical ? along : across;
+      const inked = onStroke(motif, u, v, stroke);
+      if (inked && start === null) start = along;
+      if (!inked && start !== null) {
+        runs.push({ start, end: (index - 1) / SAMPLES });
+        start = null;
+      }
+    }
+    if (start !== null) runs.push({ start, end: 1 });
+    if (runs.length === 0) return null;
+
+    const centres = runs.map((run) => (run.start + run.end) / 2);
+    return centres.reduce((best, centre) =>
+      Math.abs(centre - near) < Math.abs(best - near) ? centre : best,
+    );
+  };
+
+  /*
+   * Two depths, both clear of the stroke's own thickness. The direction between
+   * them is the direction the line is travelling as it reaches the edge.
+   */
+  const shallow = alongAt(0.01, (span.start + span.end) / 2);
+  if (shallow === null) return null;
+  const deep = alongAt(0.05, shallow);
+  if (deep === null) return null;
+
+  const along = Math.abs(deep - shallow);
+  const across = 0.04;
+  const length = Math.hypot(along, across) || 1;
+
+  return { alongEdge: along / length, acrossEdge: across / length };
+}

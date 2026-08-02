@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { MOTIFS, edgeSignature, joinsCleanly, type Motif } from '@/renderer/motifGeometry';
+import { MOTIFS, edgeSignature, edgeTangent, joinsCleanly, type Motif } from '@/renderer/motifGeometry';
 import { matrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { renderMotifsToRgba } from '@/renderer/renderMotifs';
@@ -163,19 +163,34 @@ describe('what that means for a rendered tiling', () => {
     return checkEdgeRendering(image);
   };
 
-  it('matches on every edge at two shapes, for any size, seed or orientation', () => {
+  /*
+   * Split rather than crossed. The first version ran every size against every
+   * seed against all sixteen orientations — 256 renders of up to a megapixel
+   * each, comfortable here and well past the limit on a CI worker. The
+   * orientations permute the matrix and the sizes change how much of it there
+   * is; neither interacts with the other, so testing them separately covers the
+   * same ground for an eighth of the work.
+   */
+  it('matches on every edge at two shapes, whatever the size or seed', () => {
     for (const size of [8, 12, 20, 33]) {
       for (const seed of [1, 7, 23, 101]) {
-        const matrix = classField(size, seed, 2);
-        for (const rotation of [0, 90, 180, 270] as const) {
-          for (const mirrorHorizontally of [false, true]) {
-            for (const mirrorVertically of [false, true]) {
-              const result = edgesOf(matrix, { rotation, mirrorHorizontally, mirrorVertically });
-              const where = `${String(size)}/${String(seed)}/${String(rotation)}`;
-              expect(result?.horizontal.verdict, where).toBe('exact');
-              expect(result?.vertical.verdict, where).toBe('exact');
-            }
-          }
+        const result = edgesOf(classField(size, seed, 2));
+        const where = `${String(size)} cells, seed ${String(seed)}`;
+        expect(result?.horizontal.verdict, where).toBe('exact');
+        expect(result?.vertical.verdict, where).toBe('exact');
+      }
+    }
+  });
+
+  it('matches under every rotation and mirror the controls offer', () => {
+    const matrix = classField(12, 7, 2);
+    for (const rotation of [0, 90, 180, 270] as const) {
+      for (const mirrorHorizontally of [false, true]) {
+        for (const mirrorVertically of [false, true]) {
+          const result = edgesOf(matrix, { rotation, mirrorHorizontally, mirrorVertically });
+          const where = `${String(rotation)}° h:${String(mirrorHorizontally)} v:${String(mirrorVertically)}`;
+          expect(result?.horizontal.verdict, where).toBe('exact');
+          expect(result?.vertical.verdict, where).toBe('exact');
         }
       }
     }
@@ -215,5 +230,59 @@ describe('what that means for a rendered tiling', () => {
     const result = edgesOf({ rows: size, columns: size, values });
     expect(result?.horizontal.verdict).toBe('exact');
     expect(result?.vertical.verdict).toBe('exact');
+  });
+});
+
+describe('the direction the line takes at an edge', () => {
+  /*
+   * The stronger half of the claim. Occupancy says two tiles have ink in the
+   * same place; direction says the line goes the same way through it, so the
+   * join is a continuation rather than a corner. Without this, "compatible"
+   * would only mean "no gap".
+   */
+  it('brings every arc across its edge square on', () => {
+    for (const motif of ARCS) {
+      for (const edge of ['left', 'right', 'top', 'bottom'] as const) {
+        const tangent = edgeTangent(motif, edge, STROKE);
+        const where = `${motif} ${edge}`;
+
+        expect(tangent, where).not.toBeNull();
+        // Perpendicular: nothing along the edge, everything across it.
+        expect(tangent?.alongEdge ?? 1, where).toBeLessThan(0.1);
+        expect(tangent?.acrossEdge ?? 0, where).toBeGreaterThan(0.9);
+      }
+    }
+  });
+
+  it('gives every arc-to-arc pairing the same direction on both sides', () => {
+    /*
+     * The pairing, not just the individual motifs. Both sides of a shared edge
+     * cross it square on, so the curve continues without a kink — in both
+     * directions and for all four orderings.
+     */
+    for (const first of ARCS) {
+      for (const second of ARCS) {
+        for (const [leaving, arriving] of [
+          ['right', 'left'],
+          ['bottom', 'top'],
+        ] as const) {
+          const out = edgeTangent(first, leaving, STROKE);
+          const into = edgeTangent(second, arriving, STROKE);
+          const where = `${first}|${second} ${leaving}`;
+
+          expect(out?.alongEdge, where).toBeCloseTo(into?.alongEdge ?? -1, 1);
+          expect(out?.acrossEdge, where).toBeCloseTo(into?.acrossEdge ?? -1, 1);
+        }
+      }
+    }
+  });
+
+  it('does not bring the diagonals across square on', () => {
+    // A diagonal meets the edge at forty-five degrees, which is the other half
+    // of why it cannot continue an arc.
+    for (const motif of DIAGONALS) {
+      const tangent = edgeTangent(motif, 'right', STROKE);
+      expect(tangent?.alongEdge ?? 0, motif).toBeGreaterThan(0.3);
+    }
   });
 });
