@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MockAplExecutionService } from '@/execution/MockAplExecutionService';
 import { TRYAPL_CAPABILITIES } from '@/execution/TryAplExecutionService';
 import { AplExecutionError } from '@/execution/errors';
-import { runArtwork } from '@/execution/runArtwork';
+import { runArtwork, type RunProgress } from '@/execution/runArtwork';
 import { fromNested, toNested, type NumericMatrix } from '@/matrix/matrixTypes';
 import { type MatrixLimits } from '@/matrix/validateMatrix';
 
@@ -340,5 +340,110 @@ describe('runArtwork, banded transport', () => {
     });
 
     expect(Array.from(run.matrix.values)).toEqual(Array.from(expected.values));
+  });
+});
+
+describe('runArtwork, reporting progress', () => {
+  it('reports the shape before any data, then after every band', async () => {
+    const service = constrainedService();
+    const expected = gradient(256, 256);
+    service.register('default', expected);
+
+    const reports: RunProgress[] = [];
+    const run = await runArtwork({
+      service,
+      source: ['size←256', 'size size⍴⍳65536'].join('\n'),
+      highResolution: true,
+      limits: LIMITS,
+      timeoutMs: 5000,
+      onProgress: (progress) => reports.push(progress),
+    });
+
+    // The first report carries the shape and nothing else, which is what lets
+    // the artwork reserve its space instead of jumping when a band lands.
+    expect(reports[0]).toMatchObject({ rows: 256, columns: 256, filled: 0, total: 65_536 });
+
+    // One per band afterwards, and the last one is the whole thing.
+    expect(reports.length).toBe(run.requestCount);
+    expect(reports.at(-1)?.filled).toBe(65_536);
+    expect(reports.at(-1)?.bandsDone).toBe(run.requestCount - 1);
+  });
+
+  it('never goes backwards, and only ever describes cells it has', async () => {
+    const service = constrainedService();
+    const expected = gradient(256, 256);
+    service.register('default', expected);
+
+    const reports: RunProgress[] = [];
+    await runArtwork({
+      service,
+      source: ['size←256', 'size size⍴⍳65536'].join('\n'),
+      highResolution: true,
+      limits: LIMITS,
+      timeoutMs: 5000,
+      onProgress: (progress) => reports.push(progress),
+    });
+
+    let previous = -1;
+    for (const report of reports) {
+      expect(report.filled).toBeGreaterThan(previous);
+      previous = report.filled;
+
+      // Every cell claimed as filled matches the final artwork. A report that
+      // over-claimed would have the renderer paint uninitialised zeroes as
+      // though the calculation had returned them.
+      for (let index = 0; index < report.filled; index += 1) {
+        expect(report.values[index]).toBe(expected.values[index]);
+      }
+    }
+  });
+
+  it('hands out a snapshot, not the buffer it is still filling', async () => {
+    const service = constrainedService();
+    service.register('default', gradient(256, 256));
+
+    const reports: RunProgress[] = [];
+    await runArtwork({
+      service,
+      source: ['size←256', 'size size⍴⍳65536'].join('\n'),
+      highResolution: true,
+      limits: LIMITS,
+      timeoutMs: 5000,
+      onProgress: (progress) => reports.push(progress),
+    });
+
+    /*
+     * The consumer holds these across renders. Handing out the live buffer
+     * would let a later band change a snapshot already drawn, so an artwork
+     * would gain rows nobody had told React about.
+     */
+    const first = reports[0] as RunProgress;
+    const last = reports.at(-1) as RunProgress;
+    expect(first.values).not.toBe(last.values);
+    expect(first.values.every((value) => value === 0)).toBe(true);
+  });
+
+  it('says nothing at all for a direct run', async () => {
+    const service = constrainedService();
+    service.register(
+      'default',
+      fromNested([
+        [1, 2],
+        [3, 4],
+      ]),
+    );
+
+    const reports: RunProgress[] = [];
+    await runArtwork({
+      service,
+      source: '2 2⍴1 2 3 4',
+      highResolution: false,
+      limits: LIMITS,
+      timeoutMs: 5000,
+      onProgress: (progress) => reports.push(progress),
+    });
+
+    // One request, nothing to report between sending it and having everything.
+    expect(reports).toEqual([]);
   });
 });

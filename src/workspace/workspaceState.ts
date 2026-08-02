@@ -29,6 +29,15 @@ export interface WorkspaceError {
   readonly kind: ExecutionErrorKind;
   readonly message: string;
   readonly detail: string | undefined;
+  /**
+   * The source that failed, so it can be tried again as it was.
+   *
+   * A banded run can fail on its eighth request, several seconds after it was
+   * submitted, by which time the editor may hold something else. Retrying is
+   * retrying *that* run — pressing Run would submit whatever is in the editor,
+   * which is a different question.
+   */
+  readonly source: string;
 }
 
 /**
@@ -49,6 +58,30 @@ export interface ArtworkResult {
   readonly stats: MatrixStats;
   /** The APL that produced it, exactly as submitted. */
   readonly source: string;
+}
+
+/**
+ * A banded run in flight, and how much of it has arrived.
+ *
+ * Deliberately not an `ArtworkResult` and deliberately not convertible into
+ * one. A partial matrix is a picture being delivered, not an artwork: it is
+ * never inspected, never saved, never shared and never exported, and the only
+ * way it can become the result is for the run to finish and dispatch one.
+ *
+ * It carries its own `source` for the same reason the result does, and more
+ * urgently — a banded run takes seconds, which is long enough to edit the code
+ * while it is happening. Every band belongs to the source that was submitted,
+ * so bands already on screen keep meaning what they meant.
+ */
+export interface RunInFlight {
+  readonly source: string;
+  readonly rows: number;
+  readonly columns: number;
+  /** Full length; only the first `filled` entries have been fetched. */
+  readonly values: Float64Array;
+  readonly filled: number;
+  readonly total: number;
+  readonly bandsDone: number;
 }
 
 export interface WorkspaceState {
@@ -72,6 +105,8 @@ export interface WorkspaceState {
    * only way to hold a joint invariant is to change both in one transition.
    */
   readonly inspected: SourceCell | null;
+  /** Set only while a banded run is delivering. Never becomes the result. */
+  readonly progress: RunInFlight | null;
 }
 
 export type WorkspaceAction =
@@ -79,6 +114,7 @@ export type WorkspaceAction =
   | { readonly type: 'cellInspected'; readonly cell: SourceCell | null }
   | { readonly type: 'renderOptionsChanged'; readonly options: Partial<RenderOptions> }
   | { readonly type: 'runStarted' }
+  | { readonly type: 'runProgressed'; readonly progress: RunInFlight }
   | {
       readonly type: 'runSucceeded';
       readonly matrix: NumericMatrix;
@@ -106,6 +142,7 @@ export function initialWorkspaceState(preset: ArtworkPreset): WorkspaceState {
     lastRequestCount: null,
     modified: false,
     inspected: null,
+    progress: null,
   };
 }
 
@@ -148,7 +185,14 @@ export function workspaceReducer(
     }
 
     case 'runStarted':
-      return { ...state, status: 'running', error: null };
+      // The previous artwork stays until something replaces it, so pressing Run
+      // does not blank the screen for the length of a request.
+      return { ...state, status: 'running', error: null, progress: null };
+
+    case 'runProgressed':
+      // Ignored unless a run is actually in flight, so a band arriving after a
+      // cancellation cannot put a partial picture back on screen.
+      return state.status === 'running' ? { ...state, progress: action.progress } : state;
 
     case 'runSucceeded':
       return {
@@ -161,6 +205,10 @@ export function workspaceReducer(
          * nothing about the result already on screen.
          */
         result: { matrix: action.matrix, stats: action.stats, source: action.source },
+        // The delivery is over, so the buffer goes with it. The complete result
+        // above is the only thing left, which is what makes a partial matrix
+        // unable to outlive its run.
+        progress: null,
         /*
          * Dropped outright when the new result has no such cell, rather than
          * merely going unrendered. A selection kept out of sight would come back
@@ -183,16 +231,45 @@ export function workspaceReducer(
         ...state,
         status: 'error',
         error: action.error,
+        // Half an artwork is not an artwork. What is left on screen is the last
+        // complete one, behind the error.
+        progress: null,
         // `result` is deliberately untouched: the last good artwork stays on
         // screen behind the error, still meaning what it meant, because the
         // source that produced it is part of it.
       };
 
     case 'runCancelled':
-      return { ...state, status: 'cancelled' };
+      // Cancelling restores the last complete result by discarding the partial,
+      // which is the whole of the work: the result was never touched.
+      return { ...state, status: 'cancelled', progress: null };
 
     case 'restored':
       return action.state;
+  }
+}
+
+/**
+ * How far along a banded run is, in quarters.
+ *
+ * Deliberately coarse. This sentence goes to a live region, and a tall artwork
+ * arrives in a dozen bands — announcing each one would talk over everything
+ * else on the page for the length of the run to convey nothing anybody needed.
+ * Crossing a quarter is worth saying; band seven of twelve is not.
+ */
+function describeProgress(progress: RunInFlight | null): string {
+  if (progress === null || progress.total === 0) return 'Running…';
+
+  const quarters = Math.floor((4 * progress.filled) / progress.total);
+  switch (quarters) {
+    case 0:
+      return 'Running…';
+    case 1:
+      return 'Running… about a quarter of the artwork has arrived.';
+    case 2:
+      return 'Running… about half of the artwork has arrived.';
+    default:
+      return 'Running… nearly there.';
   }
 }
 
@@ -204,7 +281,7 @@ export function describeStatus(state: WorkspaceState): string {
     case 'edited':
       return state.result === null ? 'Ready to run.' : 'Edited. Run to update the artwork.';
     case 'running':
-      return 'Running…';
+      return describeProgress(state.progress);
     case 'success': {
       const requests = state.lastRequestCount ?? 1;
       const detail = requests > 1 ? ` in ${requests} requests` : '';

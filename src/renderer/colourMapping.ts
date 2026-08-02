@@ -215,7 +215,24 @@ export function renderWithMapper(matrix: NumericMatrix, mapper: (value: number) 
   const data = new Uint8ClampedArray(rows * columns * 4);
 
   for (let index = 0; index < values.length; index += 1) {
-    const { r, g, b } = mapper(values[index] as number);
+    const value = values[index] as number;
+    /*
+     * A cell that holds nothing is left transparent, so the canvas background
+     * shows through and the area reads as "not here yet" rather than as data.
+     *
+     * This is how a banded artwork's unfetched region is marked. Not-a-number
+     * rather than a count of filled cells, because rotation and mirroring
+     * permute the matrix before it reaches here — a count would describe
+     * positions that had moved, while an absent value stays absent wherever it
+     * lands. And unlike a placeholder number it cannot be mistaken for a
+     * measurement: there is no reading it as zero.
+     */
+    if (!Number.isFinite(value)) {
+      // Left at zero, which for the alpha byte is fully transparent.
+      continue;
+    }
+
+    const { r, g, b } = mapper(value);
     const offset = index * 4;
     data[offset] = r;
     data[offset + 1] = g;

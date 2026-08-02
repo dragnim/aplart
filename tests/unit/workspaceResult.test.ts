@@ -93,7 +93,10 @@ describe('a run that does not produce a result', () => {
       before,
       { type: 'codeChanged', code: SOURCE_60 },
       { type: 'runStarted' },
-      { type: 'runFailed', error: { kind: 'tooLarge', message: 'Too large.', detail: undefined } },
+      {
+        type: 'runFailed',
+        error: { kind: 'tooLarge', message: 'Too large.', detail: undefined, source: SOURCE_60 },
+      },
     );
 
     /*
@@ -141,5 +144,100 @@ describe('appearance changes', () => {
     // Presentation, so the matrix and what it means are both untouched. This is
     // the difference the whole application is built around.
     expect(after.result).toBe(before.result);
+  });
+});
+
+describe('a banded run in flight', () => {
+  const delivering = {
+    source: SOURCE_60,
+    rows: 2,
+    columns: 2,
+    values: Float64Array.from([1, 2, 0, 0]),
+    filled: 2,
+    total: 4,
+    bandsDone: 1,
+  };
+
+  it('is held apart from the result and never becomes one', () => {
+    const state = reduce(
+      START,
+      succeeded(AT_28, SOURCE_28),
+      { type: 'codeChanged', code: SOURCE_60 },
+      { type: 'runStarted' },
+      { type: 'runProgressed', progress: delivering },
+    );
+
+    // Two separate things at once: the artwork that exists, and the delivery of
+    // the one that might. Nothing can promote the second into the first except
+    // a run finishing.
+    expect(state.result?.matrix).toBe(AT_28);
+    expect(state.result?.source).toBe(SOURCE_28);
+    expect(state.progress?.filled).toBe(2);
+  });
+
+  it('is discarded when the run finishes, leaving only the result', () => {
+    const state = reduce(
+      START,
+      { type: 'runStarted' },
+      { type: 'runProgressed', progress: delivering },
+      succeeded(AT_60, SOURCE_60),
+    );
+
+    expect(state.progress).toBeNull();
+    expect(state.result?.matrix).toBe(AT_60);
+  });
+
+  it('is discarded on failure, putting the previous artwork back whole', () => {
+    const before = reduce(START, succeeded(AT_28, SOURCE_28));
+    const after = reduce(
+      before,
+      { type: 'runStarted' },
+      { type: 'runProgressed', progress: delivering },
+      {
+        type: 'runFailed',
+        error: { kind: 'serverUnavailable', message: 'Unavailable.', detail: undefined, source: SOURCE_60 },
+      },
+    );
+
+    // Half an artwork is not an artwork; what is left is the last complete one.
+    expect(after.progress).toBeNull();
+    expect(after.result).toBe(before.result);
+  });
+
+  it('is discarded on cancellation, which is the whole of restoring the artwork', () => {
+    const before = reduce(START, succeeded(AT_28, SOURCE_28));
+    const after = reduce(
+      before,
+      { type: 'runStarted' },
+      { type: 'runProgressed', progress: delivering },
+      { type: 'runCancelled' },
+    );
+
+    expect(after.progress).toBeNull();
+    expect(after.result).toBe(before.result);
+  });
+
+  it('ignores a band that arrives after the run has stopped', () => {
+    const stopped = reduce(START, { type: 'runStarted' }, { type: 'runCancelled' });
+    const after = reduce(stopped, { type: 'runProgressed', progress: delivering });
+
+    /*
+     * A cancelled run keeps making requests until its abort lands. A band from
+     * one would otherwise put a partial picture back on screen after the person
+     * had already stopped it.
+     */
+    expect(after.progress).toBeNull();
+    expect(after).toBe(stopped);
+  });
+
+  it('starts a new run with nothing delivered, not with the last one’s bands', () => {
+    const state = reduce(
+      START,
+      { type: 'runStarted' },
+      { type: 'runProgressed', progress: delivering },
+      { type: 'runStarted' },
+    );
+
+    expect(state.progress).toBeNull();
   });
 });

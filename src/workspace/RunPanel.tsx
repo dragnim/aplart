@@ -16,11 +16,24 @@ interface Props {
   readonly onRun: () => void;
   readonly onStop: () => void;
   readonly onResetCode: () => void;
+  /** Runs a particular source, for retrying the attempt that failed. */
+  readonly onRetry: (source: string) => void;
 }
 
-export function RunPanel({ state, onRun, onStop, onResetCode }: Props) {
+export function RunPanel({ state, onRun, onStop, onResetCode, onRetry }: Props) {
   const [detailOpen, setDetailOpen] = useState(false);
   const running = state.status === 'running';
+
+  /*
+   * Offered only when it would do something Run would not.
+   *
+   * A banded run can fail seconds after it was submitted, and the editor may
+   * have moved on since. Retrying means retrying what failed; Run means running
+   * what is written now. When those are the same string there is one action, so
+   * showing two controls for it would invent a distinction that is not there.
+   */
+  const failedSource = state.error?.source;
+  const retryable = failedSource !== undefined && failedSource !== state.code;
 
   return (
     <div className={styles.panel}>
@@ -52,6 +65,17 @@ export function RunPanel({ state, onRun, onStop, onResetCode }: Props) {
           <p className={styles.errorMessage}>{state.error.message}</p>
 
           <div className={styles.errorActions}>
+            {retryable && (
+              <button
+                type="button"
+                className={styles.link}
+                onClick={() => {
+                  onRetry(failedSource);
+                }}
+              >
+                Try that run again
+              </button>
+            )}
             <button type="button" className={styles.link} onClick={onResetCode}>
               Reset code
             </button>

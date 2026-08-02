@@ -30,10 +30,37 @@ import {
  */
 const MAX_BAND_REQUESTS = 32;
 
+/**
+ * How much of a banded artwork has arrived so far.
+ *
+ * `values` is the full-size buffer, so the first `filled` entries are real and
+ * the rest are zeroes that have never been fetched. Callers must not read past
+ * `filled` — a zero there is the absence of a value, not a value of zero, and a
+ * renderer that could not tell the two apart would paint an artwork's unread
+ * half as though the calculation had returned nothing there.
+ */
+export interface RunProgress {
+  readonly rows: number;
+  readonly columns: number;
+  readonly values: Float64Array;
+  /** How many cells, in row-major order, hold data. */
+  readonly filled: number;
+  readonly total: number;
+  /** Bands returned so far, for announcements rather than arithmetic. */
+  readonly bandsDone: number;
+}
+
 export interface RunArtworkOptions {
   readonly service: AplExecutionService;
   /** The preset source as shown in the editor, comments and all. */
   readonly source: string;
+  /**
+   * Called as bands arrive, so a tall artwork can be shown building up.
+   *
+   * Only banded runs report anything; a direct read has nothing to report
+   * between sending one request and having the whole matrix.
+   */
+  readonly onProgress?: ((progress: RunProgress) => void) | undefined;
   /** Use banded transport to exceed the single-request row limit. */
   readonly highResolution: boolean;
   readonly limits: MatrixLimits;
@@ -194,10 +221,34 @@ async function runBanded(
 
   const totalCells = rows * columns;
   const values = new Float64Array(totalCells);
+  // Declared above `report`, which closes over both: a `let` read before its
+  // declaration throws, and the first call is the empty one below.
+  let filled = 0;
+  let bandsDone = 0;
+
+  /*
+   * A copy per band rather than the live buffer.
+   *
+   * The consumer holds this across renders, and handing out the array being
+   * written into would let a later band change a snapshot that had already been
+   * drawn — the artwork would appear to gain rows nobody had told React about,
+   * and in a paused or slow render the two would disagree.
+   */
+  const report = () => {
+    options.onProgress?.({
+      rows,
+      columns,
+      values: values.slice(),
+      filled,
+      total: totalCells,
+      bandsDone,
+    });
+  };
+
+  report();
 
   let width = estimateValueWidth(elementType);
   let plans = planBands(totalCells, width, options.service.capabilities);
-  let filled = 0;
 
   while (filled < totalCells) {
     const plan = plans.find((candidate) => candidate.offset === filled);
@@ -254,7 +305,9 @@ async function runBanded(
       values[filled + index] = received[index] as number;
     }
     filled += plan.count;
+    bandsDone += 1;
     warnings.push(...band.warnings);
+    report();
   }
 
   return { matrix: { rows, columns, values }, requestCount, warnings: dedupe(warnings) };

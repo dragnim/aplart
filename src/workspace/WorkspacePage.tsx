@@ -20,6 +20,7 @@ import { WIDE_LAYOUT_QUERY, useMediaQuery } from '@/app/useMediaQuery';
 import { type AplExecutionService } from '@/execution/AplExecutionService';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { isUniform, readCell } from '@/matrix/matrixInspection';
+import { matrixStats } from '@/matrix/matrixStats';
 import { migratePresetCode } from '@/presets/codeMigrations';
 import { getPreset } from '@/presets/presets';
 import { type ArtworkParameter, type ArtworkPreset } from '@/presets/schema';
@@ -210,6 +211,43 @@ function Workspace({
       state.result === null ? undefined : escapeSettingsFor(preset, state.result.source, state.renderOptions),
     [preset, state.result, state.renderOptions],
   );
+
+  /*
+   * The picture on screen while a banded run is delivering.
+   *
+   * Cells that have not arrived are marked not-a-number, which the renderer
+   * leaves transparent so the background shows through. A number would have to
+   * be a lie — zero is a value this calculation can nearly produce — and would
+   * be indistinguishable from data both to the eye and to the colour mapping.
+   */
+  const partial = useMemo(() => {
+    const progress = state.progress;
+    if (progress === null) return null;
+
+    const values = Float64Array.from(progress.values);
+    values.fill(Number.NaN, progress.filled);
+
+    return {
+      matrix: { rows: progress.rows, columns: progress.columns, values },
+      // Over what has actually arrived. Statistics taken over the whole buffer
+      // would describe thousands of cells nobody has fetched.
+      stats: matrixStats({
+        rows: 1,
+        columns: progress.filled,
+        values: progress.values.subarray(0, progress.filled),
+      }),
+      /*
+       * From the run's own captured source, not the editor and not the previous
+       * result. Bands already on screen were produced under this source and go
+       * on meaning what it says, however the code is edited while they land.
+       */
+      escape: escapeSettingsFor(preset, progress.source, state.renderOptions),
+    };
+  }, [state.progress, preset, state.renderOptions]);
+
+  /** What the canvas shows: the delivery if one is running, else the artwork. */
+  const shown = partial ?? state.result;
+  const shownEscape = partial === null ? escape : partial.escape;
 
   const actions = useArtworkActions({ preset, state, seed, animation, animationPhase, escape });
 
@@ -515,7 +553,15 @@ function Workspace({
         />
       </div>
       <SymbolToolbar onInsert={(glyph) => editorHandle.current?.insertAtCursor(glyph)} />
-      <RunPanel state={state} onRun={run} onStop={stop} onResetCode={handleResetCode} />
+      <RunPanel
+        state={state}
+        onRun={run}
+        onStop={stop}
+        onResetCode={handleResetCode}
+        // The failed source verbatim, so a retry is the same run and not a new
+        // one built from whatever the editor holds by now.
+        onRetry={runCode}
+      />
     </div>
   );
 
@@ -640,7 +686,7 @@ function Workspace({
           onAnimationChange={setAnimation}
           onAnimationReset={resetAnimation}
           reducedMotion={reducedMotion}
-          escape={escape}
+          escape={shownEscape}
         />
       </section>
 
@@ -678,8 +724,8 @@ function Workspace({
   const artworkPanel = (
     <div className={styles.artworkPanel}>
       <ArtworkCanvas
-        matrix={state.result?.matrix ?? null}
-        stats={state.result?.stats ?? null}
+        matrix={shown?.matrix ?? null}
+        stats={shown?.stats ?? null}
         mode={preset.renderMode}
         options={state.renderOptions}
         busy={state.status === 'running'}
@@ -702,7 +748,7 @@ function Workspace({
         // One instance. Focus mode restyles this same element rather than
         // mounting another, so there is one loop however the artwork is shown.
         animation={{ settings: animation, phase: animationPhase }}
-        escape={escape}
+        escape={shownEscape}
       />
 
       <ValueInspector
@@ -710,6 +756,12 @@ function Workspace({
         viewNote={viewNote}
         notes={preset.valueNotes}
         ceiling={ceiling}
+        /*
+         * The result's, never the delivery's. The inspector reads cells out of
+         * the completed artwork, so it must describe them against the ceiling
+         * that artwork was produced under — a run in flight has not replaced it
+         * yet, and may never.
+         */
         escape={escape}
         // A tiling's values choose a shape rather than measure anything.
         categorical={preset.renderMode === 'tiles'}

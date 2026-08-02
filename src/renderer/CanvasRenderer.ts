@@ -93,7 +93,60 @@ export function drawArtwork(
   context.imageSmoothingEnabled = request.options.smoothScaling;
   if (request.options.smoothScaling) context.imageSmoothingQuality = 'high';
 
+  /*
+   * A "nothing here yet" hatch, laid down before the artwork.
+   *
+   * Cells that have not arrived from a banded run are transparent, and letting
+   * the background show through them is not enough: on the heat palette the
+   * background is black and so is the lowest value, so an undelivered region
+   * looked exactly like a large flat area of real result. Stripes cannot be
+   * mistaken for data, because no palette produces them.
+   *
+   * Painted unconditionally rather than behind a flag. It is only ever visible
+   * where a cell is absent, so a finished artwork covers every pixel of it, and
+   * there is no state to get wrong.
+   */
+  const hatch = pendingPattern(context);
+  if (hatch !== null) {
+    context.save();
+    context.fillStyle = hatch;
+    context.fillRect(box.left, box.top, box.width, box.height);
+    context.restore();
+  }
+
   context.drawImage(source, box.left, box.top, box.width, box.height);
+}
+
+/** The stripe tile, built once and reused for every frame. */
+let pendingTile: HTMLCanvasElement | null = null;
+
+function pendingPattern(context: CanvasRenderingContext2D): CanvasPattern | null {
+  if (pendingTile === null) {
+    if (typeof document === 'undefined') return null;
+    const tile = document.createElement('canvas');
+    tile.width = 12;
+    tile.height = 12;
+    const tileContext = tile.getContext('2d');
+    if (tileContext === null) return null;
+
+    // Grey on grey, so it sits quietly over a dark palette background and a
+    // pale one alike without suggesting a colour of its own.
+    tileContext.fillStyle = 'rgba(128, 128, 128, 0.16)';
+    tileContext.fillRect(0, 0, 12, 12);
+    tileContext.strokeStyle = 'rgba(128, 128, 128, 0.28)';
+    tileContext.lineWidth = 4;
+    tileContext.beginPath();
+    tileContext.moveTo(-6, 6);
+    tileContext.lineTo(6, -6);
+    tileContext.moveTo(0, 12);
+    tileContext.lineTo(12, 0);
+    tileContext.moveTo(6, 18);
+    tileContext.lineTo(18, 6);
+    tileContext.stroke();
+    pendingTile = tile;
+  }
+
+  return context.createPattern(pendingTile, 'repeat');
 }
 
 /**

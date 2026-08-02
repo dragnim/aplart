@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { matrixStats } from '@/matrix/matrixStats';
 import { fromNested } from '@/matrix/matrixTypes';
-import { createColourMapper, parseHexColour, renderToRgba, sampleGradient } from '@/renderer/colourMapping';
+import {
+  createColourMapper,
+  parseHexColour,
+  renderToRgba,
+  renderWithMapper,
+  sampleGradient,
+} from '@/renderer/colourMapping';
+import { type Palette } from '@/renderer/palettes';
 import { getPalette, palettes } from '@/renderer/palettes';
 
 const RAMP = {
@@ -158,5 +165,43 @@ describe('renderToRgba', () => {
     for (let index = 3; index < image.data.length; index += 4) {
       expect(image.data[index]).toBe(255);
     }
+  });
+});
+
+describe('cells that hold nothing', () => {
+  it('are left transparent rather than painted as a value', () => {
+    const palette: Palette = { id: 't', name: 'T', colours: ['#000000', '#ffffff'] };
+    const matrix = {
+      rows: 1,
+      columns: 4,
+      values: Float64Array.from([1, 2, Number.NaN, Number.NaN]),
+    };
+
+    const image = renderWithMapper(matrix, () => ({ r: 200, g: 100, b: 50 }));
+
+    // The first two were painted opaque; the last two were not painted at all,
+    // so the canvas background shows through and the area reads as absent.
+    expect(image.data[3]).toBe(255);
+    expect(image.data[7]).toBe(255);
+    expect(image.data[11]).toBe(0);
+    expect(image.data[15]).toBe(0);
+
+    // And nothing was written into their colour bytes either — a mapper called
+    // on not-a-number would have produced whatever its arithmetic happened to.
+    expect([image.data[8], image.data[9], image.data[10]]).toEqual([0, 0, 0]);
+    expect(palette.colours).toHaveLength(2);
+  });
+
+  it('does not let an absent cell colour its neighbours', () => {
+    const matrix = { rows: 1, columns: 3, values: Float64Array.from([5, Number.NaN, 9]) };
+    const seen: number[] = [];
+
+    renderWithMapper(matrix, (value) => {
+      seen.push(value);
+      return { r: 1, g: 2, b: 3 };
+    });
+
+    // The mapper is never asked about a cell that has not arrived.
+    expect(seen).toEqual([5, 9]);
   });
 });

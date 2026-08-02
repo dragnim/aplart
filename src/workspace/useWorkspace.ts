@@ -96,6 +96,16 @@ export function useWorkspace({ preset, service, initialState }: UseWorkspaceOpti
           const outcome = await runArtwork({
             service: executionService,
             source,
+            /*
+             * Guarded by the same token as the result. A superseded run keeps
+             * making requests until its abort lands, and a band arriving from
+             * it would otherwise paint rows of an artwork nobody asked for over
+             * the one being delivered.
+             */
+            onProgress: (progress) => {
+              if (!mounted.current || token !== runToken.current) return;
+              dispatch({ type: 'runProgressed', progress: { ...progress, source } });
+            },
             highResolution: preset.outputLimits?.highResolution ?? false,
             limits: {
               maxRows: preset.outputLimits?.maxRows ?? config.maxMatrixRows,
@@ -136,7 +146,7 @@ export function useWorkspace({ preset, service, initialState }: UseWorkspaceOpti
             analytics.track({ name: 'execution_failed', presetId: preset.id, kind: error.kind });
             dispatch({
               type: 'runFailed',
-              error: { kind: error.kind, message: error.message, detail: error.detail },
+              error: { kind: error.kind, message: error.message, detail: error.detail, source },
             });
             return;
           }
@@ -150,6 +160,7 @@ export function useWorkspace({ preset, service, initialState }: UseWorkspaceOpti
               kind: 'badResponse',
               message: 'Something went wrong while running your code. Please try again.',
               detail: error instanceof Error ? error.message : String(error),
+              source,
             },
           });
         }
