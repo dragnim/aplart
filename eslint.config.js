@@ -15,10 +15,14 @@ export default tseslint.config(
       ecmaVersion: 2023,
       globals: { ...globals.browser, ...globals.node },
       parserOptions: {
-        // Plain JavaScript files are outside the TypeScript project; the
-        // default project lets them still be linted.
+        /*
+         * Only this file is outside the TypeScript project now. The scripts
+         * used to be here too, and the default project takes at most eight
+         * files before it refuses — which the ninth capture script discovered.
+         * They are in the project proper via `allowJs`.
+         */
         projectService: {
-          allowDefaultProject: ['eslint.config.js', 'scripts/*.mjs'],
+          allowDefaultProject: ['eslint.config.js'],
         },
         tsconfigRootDir: import.meta.dirname,
       },

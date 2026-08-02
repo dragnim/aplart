@@ -27,7 +27,16 @@
 
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+
+    /*
+     * The capture and verification scripts are plain JavaScript modules. Named
+     * here so they belong to this project rather than to the linter's default
+     * one, which allows only a handful of files before it refuses — and which
+     * they had quietly outgrown. Not checked: `checkJs` stays off, so this
+     * gives them types for the linter without turning them into a build.
+     */
+    "allowJs": true
   },
   "include": [
     "src",
