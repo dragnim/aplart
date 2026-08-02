@@ -201,7 +201,16 @@ export function renderToRgba(
   stats: MatrixStats,
   options: ColourMappingOptions,
 ): RgbaImage {
-  const mapper = createColourMapper(stats, options);
+  return renderWithMapper(matrix, createColourMapper(stats, options));
+}
+
+/**
+ * Paints a matrix with a mapper somebody else built.
+ *
+ * Split out so a colouring that does not come from the matrix's own statistics
+ * can reuse the same walk rather than a second copy of it.
+ */
+export function renderWithMapper(matrix: NumericMatrix, mapper: (value: number) => Rgb): RgbaImage {
   const { rows, columns, values } = matrix;
   const data = new Uint8ClampedArray(rows * columns * 4);
 

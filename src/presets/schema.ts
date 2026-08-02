@@ -111,6 +111,33 @@ export interface ValueNotes {
   readonly viewAtCeiling: string;
 }
 
+/**
+ * The range of values the calculation can produce, as opposed to the range this
+ * particular result happens to contain.
+ *
+ * Colouring against the declared range is what keeps a value the same colour
+ * between views. Normalising each crop against its own contents would repaint
+ * the artwork every time somebody moved, and make two views impossible to
+ * compare.
+ *
+ * The maximum is read from an assignment in the visible APL, so changing the
+ * iteration count changes the colouring — which is the honest behaviour, since
+ * it changes what the numbers mean.
+ */
+export interface DeclaredValueRange {
+  /**
+   * The smallest value the calculation can produce.
+   *
+   * Not assumed to be zero. Mandelbrot Field counts an iteration before testing
+   * whether the point has escaped, and the first test is on `z = 0`, so every
+   * cell counts at least once and the smallest possible value is one. The
+   * committed fixture confirms it: 128 by 128, values 1 to 28, no zero.
+   */
+  readonly min: number;
+  /** The assignment that sets the largest value. */
+  readonly maxVariable: string;
+}
+
 export interface ArtworkPreset {
   readonly id: string;
   readonly title: string;
@@ -127,6 +154,8 @@ export interface ArtworkPreset {
   readonly planeExploration?: PlaneExploration;
   /** Set by presets whose largest value means something worth saying. */
   readonly valueNotes?: ValueNotes;
+  /** Set by presets whose values come from a known range rather than an open one. */
+  readonly valueRange?: DeclaredValueRange;
   readonly primitives: readonly PrimitiveReference[];
   readonly thumbnailPath: string;
   readonly fixturePath: string;

@@ -9,7 +9,7 @@
 import { type MatrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
-import { buildArtworkImage, toSourceCanvas } from './CanvasRenderer';
+import { buildArtworkImage, toSourceCanvas, type DrawRequest } from './CanvasRenderer';
 import { type Palette } from './palettes';
 import { cellSizeFor } from './renderMotifs';
 import { type RenderOptions } from './renderOptions';
@@ -29,6 +29,8 @@ export interface ExportRequest {
    * needs no code of its own.
    */
   readonly palette?: Palette;
+  /** As on the canvas, so a saved image is coloured the same way. */
+  readonly escape?: DrawRequest['escape'];
   readonly size: ExportSize;
   /**
    * Lines printed beneath the artwork. Omitted or empty means no caption at

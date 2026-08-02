@@ -17,6 +17,8 @@ import { palettes } from '@/renderer/palettes';
 import { paletteFor } from '@/renderer/renderOptions';
 import { type AnimationSettings } from '@/renderer/paletteAnimation';
 import { AnimationControls } from './AnimationControls';
+import { ColouringControls } from './ColouringControls';
+import { type EscapeSettings } from './escapeSettings';
 import { PaletteEditor } from './PaletteEditor';
 import { ROTATIONS, type RenderOptions } from '@/renderer/renderOptions';
 import styles from './RenderControls.module.css';
@@ -29,6 +31,8 @@ interface Props {
   readonly onAnimationChange: (settings: AnimationSettings) => void;
   readonly onAnimationReset: () => void;
   readonly reducedMotion: boolean;
+  /** Present only for a preset that declares the range its values come from. */
+  readonly escape?: EscapeSettings | undefined;
 }
 
 export function RenderControls({
@@ -39,6 +43,7 @@ export function RenderControls({
   onAnimationChange,
   onAnimationReset,
   reducedMotion,
+  escape,
 }: Props) {
   const available =
     availablePaletteIds === undefined
@@ -130,6 +135,18 @@ export function RenderControls({
           reducedMotion={reducedMotion}
         />
       </fieldset>
+
+      {/*
+        After the palette, because it decides which parts of that palette the
+        values reach — and before orientation, which changes neither.
+      */}
+      {escape !== undefined && (
+        <ColouringControls
+          colouring={escape.colouring}
+          range={escape.range}
+          onChange={(colouring) => onChange({ colouring })}
+        />
+      )}
 
       <fieldset className={styles.group}>
         <legend className={styles.legend}>Orientation</legend>

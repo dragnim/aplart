@@ -19,6 +19,7 @@ import { paletteFor } from '@/renderer/renderOptions';
 import { fromRenderOptions } from '@/sharing/decodeShareState';
 import { buildShareUrl, encodeShareState } from '@/sharing/encodeShareState';
 import { SHARE_SCHEMA_VERSION, SHARE_URL_WARNING_LENGTH } from '@/sharing/shareState';
+import { type EscapeSettings } from './escapeSettings';
 import { type WorkspaceState } from './workspaceState';
 
 export const EXPORT_SIZES: readonly ExportSize[] = [512, 1024, 2048, 'original'];
@@ -42,8 +43,9 @@ export function useArtworkActions(options: {
   readonly animation: AnimationSettings;
   /** Where the animation has got to, read at the moment an export is asked for. */
   readonly animationPhase: MutableRefObject<number>;
+  readonly escape?: EscapeSettings | undefined;
 }): ArtworkActions {
-  const { preset, state, seed, animation, animationPhase } = options;
+  const { preset, state, seed, animation, animationPhase, escape } = options;
 
   const [notice, setNotice] = useState<string | null>(null);
   const [withCaption, setWithCaption] = useState(false);
@@ -66,6 +68,7 @@ export function useArtworkActions(options: {
       ...(stopsAreUsable(state.renderOptions.customStops)
         ? { stops: encodeStops(state.renderOptions.customStops) }
         : {}),
+      ...(state.renderOptions.colouring === undefined ? {} : { colouring: state.renderOptions.colouring }),
       render: fromRenderOptions(state.renderOptions),
       title: preset.title,
       ...(seed === undefined ? {} : { seed }),
@@ -121,6 +124,7 @@ export function useArtworkActions(options: {
         mode: preset.renderMode,
         options: state.renderOptions,
         palette,
+        ...(escape === undefined ? {} : { escape }),
         size,
         title: preset.title,
         // Off unless asked for. The caption counts the expression that ran, so
@@ -145,6 +149,7 @@ export function useArtworkActions(options: {
       announce,
       animation,
       animationPhase,
+      escape,
     ],
   );
 

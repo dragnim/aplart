@@ -7,6 +7,7 @@
  */
 
 import { CUSTOM_PALETTE_ID, parseStops } from '@/renderer/customPalette';
+import { normaliseColouring } from '@/renderer/escapeColouring';
 import { DEFAULT_PALETTE_ID, canonicalPaletteId, paletteExists } from '@/renderer/palettes';
 import { defaultRenderOptions, isRotation, type RenderOptions } from '@/renderer/renderOptions';
 import { PROJECT_SCHEMA_VERSION, type Project, type StoredMatrix } from './ProjectRepository';
@@ -96,6 +97,7 @@ function normaliseRenderOptions(value: unknown, paletteId: string): RenderOption
    * open when its colours cannot be understood.
    */
   const customStops = parseStops(record.customStops);
+  const colouring = normaliseColouring(record.colouring);
 
   return {
     paletteId,
@@ -105,6 +107,7 @@ function normaliseRenderOptions(value: unknown, paletteId: string): RenderOption
     mirrorVertically: record.mirrorVertically === true,
     smoothScaling: record.smoothScaling === true,
     ...(customStops === null ? {} : { customStops }),
+    ...(colouring === null ? {} : { colouring }),
   };
 }
 

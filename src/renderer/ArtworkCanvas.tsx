@@ -11,7 +11,7 @@ import { useEffect, useRef, type MutableRefObject, type RefObject } from 'react'
 import { describeMatrix, type MatrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
-import { drawArtwork, drawCellMarker } from './CanvasRenderer';
+import { drawArtwork, drawCellMarker, type DrawRequest } from './CanvasRenderer';
 import { type SourceCell, type SourceRect } from './displayMapping';
 import { animatePalette, phaseFor, type AnimationSettings } from './paletteAnimation';
 import { paletteFor, transformMatrix, type RenderOptions } from './renderOptions';
@@ -52,6 +52,7 @@ interface Props {
   readonly exploration?: CanvasExploration | undefined;
   readonly inspection?: CanvasInspection | undefined;
   readonly animation?: CanvasAnimation | undefined;
+  readonly escape?: DrawRequest['escape'];
 }
 
 /**
@@ -77,6 +78,7 @@ export function ArtworkCanvas({
   exploration,
   inspection,
   animation,
+  escape,
 }: Props) {
   const internalRef = useRef<HTMLCanvasElement>(null);
   const canvas = canvasRef ?? internalRef;
@@ -112,7 +114,7 @@ export function ArtworkCanvas({
           ? base
           : animatePalette(base, animation.settings.mode, animation.phase.current);
 
-      drawArtwork(element, { matrix, stats, mode, options, palette: painted }, width, height, ratio);
+      drawArtwork(element, { matrix, stats, mode, options, palette: painted, escape }, width, height, ratio);
       // After the artwork, so the outline is not painted over. Repainted with it
       // on every resize, which is why it is inside `paint` rather than beside it.
       if (marked !== null) drawCellMarker(element, marked, matrix, options, width, height, ratio);
@@ -126,7 +128,7 @@ export function ArtworkCanvas({
     const observer = new ResizeObserver(paint);
     observer.observe(box);
     return () => observer.disconnect();
-  }, [matrix, stats, mode, options, canvas, marked, animation]);
+  }, [matrix, stats, mode, options, canvas, marked, animation, escape]);
 
   /*
    * The animation loop.

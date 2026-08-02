@@ -10,6 +10,7 @@ import { inflateSync } from 'fflate';
 import { config } from '@/app/config';
 import { isRotation, type RenderOptions } from '@/renderer/renderOptions';
 import { CUSTOM_PALETTE_ID, decodeStops } from '@/renderer/customPalette';
+import { normaliseColouring } from '@/renderer/escapeColouring';
 import { DEFAULT_PALETTE_ID, canonicalPaletteId, paletteExists } from '@/renderer/palettes';
 import { fromBase64Url } from './encodeShareState';
 import { migrateShareState } from './migrations';
@@ -112,6 +113,7 @@ export function validateShareState(parsed: unknown): DecodeResult {
       params,
       palette,
       ...(decodeStops(source.stops) === null ? {} : { stops: source.stops as string }),
+      ...(normaliseColouring(source.colouring) === null ? {} : { colouring: source.colouring }),
       render: normaliseRender(source.render),
       ...(typeof source.seed === 'number' && Number.isFinite(source.seed) ? { seed: source.seed } : {}),
       ...(title === undefined || title === '' ? {} : { title }),
@@ -140,10 +142,12 @@ export function toRenderOptions(state: SharedArtworkState): RenderOptions {
    * be understood.
    */
   const stops = decodeStops(state.stops);
+  const colouring = normaliseColouring(state.colouring);
 
   return {
     paletteId: state.palette,
     ...(stops === null ? {} : { customStops: stops }),
+    ...(colouring === null ? {} : { colouring }),
     invert: state.render.invert,
     rotation: state.render.rotation,
     mirrorHorizontally: state.render.mirrorH,

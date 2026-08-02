@@ -24,6 +24,8 @@ export interface SharedArtworkState {
    * link changes shape.
    */
   readonly stops?: string;
+  /** How escape counts are coloured. Absent unless it differs from the default. */
+  readonly colouring?: unknown;
   readonly render: SharedRenderOptions;
   readonly seed?: number;
   readonly title?: string;

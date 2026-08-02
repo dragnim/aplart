@@ -137,10 +137,18 @@ export const mandelbrotField: ArtworkPreset = {
   planeExploration: { centreXVariable: 'centreX', centreYVariable: 'centreY', spanVariable: 'zoom' },
 
   /*
+   * One, not zero. The step counts before it tests, and the first test is on
+   * z = 0, so no cell can come back with less than one — checked against the
+   * committed fixture, which runs 1 to 28 with no zero in it.
+   */
+  valueRange: { min: 1, maxVariable: 'iterations' },
+
+  /*
    * A cell holding the iteration count never escaped, so far as the count could
-   * tell — the point is inside the set, or close enough to it. The interior is a
-   * single value by definition, so a view entirely inside it is one flat colour:
-   * correct, and indistinguishable from a fault unless something says so.
+   * tell. The interior is a single value by definition, so a view entirely
+   * inside it is one flat colour: correct, and indistinguishable from a fault
+   * unless something says so. No colouring mode can change that — there is no
+   * variation in the numbers for one to expose.
    */
   valueNotes: {
     ceilingVariable: 'iterations',

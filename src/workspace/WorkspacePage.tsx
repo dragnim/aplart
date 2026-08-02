@@ -25,6 +25,7 @@ import { getPreset } from '@/presets/presets';
 import { type ArtworkParameter, type ArtworkPreset } from '@/presets/schema';
 import { ArtworkCanvas } from '@/renderer/ArtworkCanvas';
 import { DEFAULT_ANIMATION, type AnimationSettings } from '@/renderer/paletteAnimation';
+import { escapeSettingsFor } from './escapeSettings';
 import { defaultRenderOptions } from '@/renderer/renderOptions';
 import { decodeShareState, toRenderOptions } from '@/sharing/decodeShareState';
 import { numberAssignedTo } from '@/editor/parameterBinding';
@@ -192,7 +193,17 @@ function Workspace({
     setAnimation({ ...DEFAULT_ANIMATION, running: false });
   }, []);
 
-  const actions = useArtworkActions({ preset, state, seed, animation, animationPhase });
+  /*
+   * Worked out once, from the preset's declaration and the ceiling the visible
+   * code currently sets, and given to both the canvas and the export — so a
+   * saved image is coloured exactly the way the screen was.
+   */
+  const escape = useMemo(
+    () => escapeSettingsFor(preset, state.code, state.renderOptions),
+    [preset, state.code, state.renderOptions],
+  );
+
+  const actions = useArtworkActions({ preset, state, seed, animation, animationPhase, escape });
 
   useLocalProject(preset, state);
 
@@ -445,7 +456,14 @@ function Workspace({
    * precisely, and repeating the general note over every press would be noise.
    */
   const viewNote =
-    reading === null && state.stats !== null && preset.valueNotes !== undefined && isUniform(state.stats)
+    reading === null &&
+    state.stats !== null &&
+    preset.valueNotes !== undefined &&
+    isUniform(state.stats) &&
+    // Uniform is not the same as uniformly at the limit. A view far outside the
+    // set is equally flat and has not reached anything, so where the range is
+    // known the note has to check rather than assume.
+    (escape === undefined || state.stats.max >= escape.range.max)
       ? preset.valueNotes.viewAtCeiling
       : null;
 
@@ -595,6 +613,7 @@ function Workspace({
           onAnimationChange={setAnimation}
           onAnimationReset={resetAnimation}
           reducedMotion={reducedMotion}
+          escape={escape}
         />
       </section>
 
@@ -656,6 +675,7 @@ function Workspace({
         // One instance. Focus mode restyles this same element rather than
         // mounting another, so there is one loop however the artwork is shown.
         animation={{ settings: animation, phase: animationPhase }}
+        escape={escape}
       />
 
       <ValueInspector
@@ -663,6 +683,7 @@ function Workspace({
         viewNote={viewNote}
         notes={preset.valueNotes}
         ceiling={ceiling}
+        escape={escape}
         // A tiling's values choose a shape rather than measure anything.
         categorical={preset.renderMode === 'tiles'}
         onDismiss={clearInspection}

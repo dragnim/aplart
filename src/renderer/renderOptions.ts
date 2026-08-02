@@ -8,6 +8,7 @@
 
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { CUSTOM_PALETTE_ID, paletteFromStops, stopsAreUsable, type ColourStop } from './customPalette';
+import { type Colouring } from './escapeColouring';
 import { getPalette, type Palette } from './palettes';
 
 export type Rotation = 0 | 90 | 180 | 270;
@@ -22,6 +23,14 @@ export interface RenderOptions {
    * custom one, and it would be a poor undo if it also deleted it.
    */
   readonly customStops?: readonly ColourStop[];
+  /**
+   * How escape counts become colours.
+   *
+   * Only meaningful for a preset that declares a value range; harmless
+   * elsewhere, and absent from everything saved before it existed. A
+   * presentation choice like the rest of this, so it never re-runs anything.
+   */
+  readonly colouring?: Colouring;
   readonly invert: boolean;
   readonly rotation: Rotation;
   readonly mirrorHorizontally: boolean;

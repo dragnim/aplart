@@ -13,7 +13,7 @@ import { type RenderMode } from '@/presets/schema';
 import { cellBounds, displayedShape, type SourceCell } from './displayMapping';
 import { type Palette } from './palettes';
 import { fitArtwork } from './fitArtwork';
-import { renderArtwork } from './renderArtwork';
+import { renderArtwork, type RenderArtworkOptions } from './renderArtwork';
 import { paletteFor, transformMatrix, type RenderOptions } from './renderOptions';
 
 export interface DrawRequest {
@@ -30,6 +30,8 @@ export interface DrawRequest {
    * rather than something close to it.
    */
   readonly palette?: Palette;
+  /** How escape counts become colours, for a preset that declares a range. */
+  readonly escape?: RenderArtworkOptions['escape'];
 }
 
 /**
@@ -47,6 +49,7 @@ export function buildArtworkImage(request: DrawRequest) {
       mode: request.mode,
       palette,
       invert: request.options.invert,
+      escape: request.escape,
     }),
     palette,
     transformed,

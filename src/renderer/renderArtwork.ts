@@ -11,7 +11,8 @@
 import { type MatrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
-import { renderToRgba, type RgbaImage } from './colourMapping';
+import { renderToRgba, renderWithMapper, type RgbaImage } from './colourMapping';
+import { createEscapeMapper, type Colouring, type ValueRange } from './escapeColouring';
 import { renderMotifsToRgba } from './renderMotifs';
 import { type Palette } from './palettes';
 
@@ -19,6 +20,21 @@ export interface RenderArtworkOptions {
   readonly mode: RenderMode;
   readonly palette: Palette;
   readonly invert?: boolean | undefined;
+  /**
+   * How escape counts become colours, and the range they are counted over.
+   *
+   * Present only for a preset that declares a value range. Everything else
+   * keeps normalising against what its own matrix contains, which is right for
+   * an artwork whose values have no known bounds.
+   */
+  readonly escape?:
+    | {
+        readonly colouring: Colouring;
+        readonly range: ValueRange;
+        /** Palette entries *before* animation extends the ramp. */
+        readonly entries: number;
+      }
+    | undefined;
 }
 
 /**
@@ -39,6 +55,25 @@ export function renderArtwork(
       palette: options.palette,
       ...(options.invert === undefined ? {} : { invert: options.invert }),
     });
+  }
+
+  if (options.escape !== undefined) {
+    /*
+     * A declared range, so the colour of a value does not depend on which crop
+     * it happens to be in. This is the only path that ignores `stats`, and
+     * deliberately: the statistics describe this result, and the point is to
+     * colour by what the calculation can produce.
+     */
+    return renderWithMapper(
+      matrix,
+      createEscapeMapper({
+        palette: options.palette,
+        entries: options.escape.entries,
+        colouring: options.escape.colouring,
+        range: options.escape.range,
+        ...(options.invert === undefined ? {} : { invert: options.invert }),
+      }),
+    );
   }
 
   return renderToRgba(matrix, stats, {

@@ -15,6 +15,8 @@
 
 import { type CellReading } from '@/matrix/matrixInspection';
 import { type ValueNotes } from '@/presets/schema';
+import { bandCountFor, bandNumberFor } from '@/renderer/escapeColouring';
+import { type EscapeSettings } from './escapeSettings';
 import styles from './ValueInspector.module.css';
 
 interface Props {
@@ -24,6 +26,8 @@ interface Props {
   readonly notes: ValueNotes | undefined;
   /** The ceiling as the visible code currently sets it, if it says. */
   readonly ceiling: number | null;
+  /** Present only for a preset that declares the range its values come from. */
+  readonly escape?: EscapeSettings | undefined;
   /**
    * Whether the values name kinds rather than measure something.
    *
@@ -51,13 +55,52 @@ function describeShare(reading: CellReading): string {
   return `${reading.matching.toLocaleString()} cells share it — ${share} of the artwork.`;
 }
 
+/**
+ * Whether the cell holds the largest value the calculation could produce.
+ *
+ * The declared ceiling when the preset states one, and the largest value in
+ * this particular result otherwise. The difference matters: a view where
+ * nothing reaches the limit still has a largest value, and describing that cell
+ * as having "reached the maximum of 28 iterations" would be a claim about a
+ * point that escaped perfectly well.
+ */
+function atCeiling(reading: CellReading, escape: EscapeSettings | undefined): boolean {
+  if (escape === undefined) return reading.isMaximum;
+  return reading.value >= escape.range.max;
+}
+
 function ceilingNote(
   reading: CellReading,
   notes: ValueNotes | undefined,
   ceiling: number | null,
+  escape: EscapeSettings | undefined,
 ): string | null {
-  if (!reading.isMaximum || notes === undefined || ceiling === null) return null;
+  if (!atCeiling(reading, escape)) {
+    /*
+     * The counterpart, and worth stating rather than leaving to inference: it
+     * says what the number means without claiming anything about the set. The
+     * count ran out for some points and not for others, and that is all either
+     * of these sentences asserts.
+     */
+    return escape === undefined ? null : 'Escaped before the iteration limit.';
+  }
+  if (notes === undefined || ceiling === null) return null;
   return notes.cellAtCeiling.replace('{ceiling}', String(ceiling));
+}
+
+/**
+ * Which colour band the cell fell into, when the mode has bands.
+ *
+ * The same arithmetic the renderer used, not a second description of it — so a
+ * reader can tell two cells apart by their number when the colours are close,
+ * and can see why two cells that look identical are identical.
+ */
+function bandNote(reading: CellReading, escape: EscapeSettings | undefined): string | null {
+  if (escape === undefined) return null;
+  const band = bandNumberFor(reading.value, escape.range, escape.colouring, escape.entries);
+  const count = bandCountFor(escape.colouring, escape.entries);
+  if (band === null || count === null) return null;
+  return `Colour band ${String(band)} of ${String(count)}.`;
 }
 
 function extentNote(
@@ -71,13 +114,23 @@ function extentNote(
   return null;
 }
 
-export function ValueInspector({ reading, viewNote, notes, ceiling, categorical, onDismiss }: Props) {
+export function ValueInspector({ reading, viewNote, notes, ceiling, escape, categorical, onDismiss }: Props) {
   if (reading === null && viewNote === null) return null;
 
-  const extra =
+  /*
+   * The raw value is never one of these. It is shown on its own, always, in
+   * every mode — the colouring is a reading of the number and the number is
+   * what the APL produced, so it is the one thing that cannot be replaced by a
+   * description of it.
+   */
+  const extras =
     reading === null
-      ? null
-      : (ceilingNote(reading, notes, ceiling) ?? extentNote(reading, notes, categorical));
+      ? []
+      : [
+          ceilingNote(reading, notes, ceiling, escape),
+          bandNote(reading, escape),
+          extentNote(reading, notes, categorical),
+        ].filter((part) => part !== null);
 
   const spoken =
     reading === null
@@ -86,10 +139,8 @@ export function ValueInspector({ reading, viewNote, notes, ceiling, categorical,
           `Row ${reading.row}, column ${reading.column}.`,
           `Value ${formatValue(reading.value)}.`,
           describeShare(reading),
-          extra,
-        ]
-          .filter((part) => part !== null)
-          .join(' ');
+          ...extras,
+        ].join(' ');
 
   return (
     <div className={styles.panel}>
@@ -116,7 +167,11 @@ export function ValueInspector({ reading, viewNote, notes, ceiling, categorical,
           <div aria-hidden="true">
             <p className={styles.value}>{formatValue(reading.value)}</p>
             <p className={styles.detail}>{describeShare(reading)}</p>
-            {extra !== null && <p className={styles.detail}>{extra}</p>}
+            {extras.map((part) => (
+              <p key={part} className={styles.detail}>
+                {part}
+              </p>
+            ))}
           </div>
         </>
       )}
