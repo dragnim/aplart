@@ -65,7 +65,7 @@
   height: 2.5rem;
   border-radius: 50%;
   border: 3px solid rgb(255 255 255 / 25%);
-  border-top-color: var(--dyalog-orange);
+  border-top-color: var(--accent-orange);
   animation: spin 900ms linear infinite;
 }
 

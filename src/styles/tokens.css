@@ -9,9 +9,9 @@
  */
 
 :root {
-  /* Brand */
-  --dyalog-orange: #ff6a13;
-  --dyalog-orange-strong: #c24500; /* 4.6:1 on --surface, safe for text */
+  /* Accent */
+  --accent-orange: #ff6a13;
+  --accent-orange-strong: #c24500; /* 4.6:1 on --surface, safe for text */
 
   /* Light surfaces */
   --background: #f4f3f1;

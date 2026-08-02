@@ -51,7 +51,7 @@
   width: 100%;
   /* Comfortable to hit on a touch screen without a bulky visual. */
   min-height: var(--tap-target);
-  accent-color: var(--dyalog-orange);
+  accent-color: var(--accent-orange);
   cursor: pointer;
 }
 
@@ -74,7 +74,7 @@
 .toggle input {
   width: 1.15rem;
   height: 1.15rem;
-  accent-color: var(--dyalog-orange);
+  accent-color: var(--accent-orange);
 }
 
 .restore {
@@ -104,7 +104,7 @@
 }
 
 .edgeNote[data-compatible='true'] {
-  border-left-color: var(--dyalog-orange);
+  border-left-color: var(--accent-orange);
 }
 
 .edgeTitle {

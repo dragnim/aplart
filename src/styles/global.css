@@ -68,7 +68,7 @@ textarea {
 }
 
 a {
-  color: var(--dyalog-orange-strong);
+  color: var(--accent-orange-strong);
   text-underline-offset: 0.15em;
 }
 
@@ -119,5 +119,5 @@ a:hover {
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--dyalog-orange) 28%, transparent);
+  background: color-mix(in srgb, var(--accent-orange) 28%, transparent);
 }

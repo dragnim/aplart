@@ -52,7 +52,7 @@ const editorTheme = EditorView.theme(
     '.cm-content': {
       fontFamily: 'var(--font-apl)',
       padding: '12px 0',
-      caretColor: 'var(--dyalog-orange)',
+      caretColor: 'var(--accent-orange)',
     },
     '.cm-gutters': {
       backgroundColor: 'var(--surface-dark)',
@@ -62,7 +62,7 @@ const editorTheme = EditorView.theme(
     },
     '.cm-activeLine': { backgroundColor: 'rgba(255, 255, 255, 0.04)' },
     '.cm-activeLineGutter': { backgroundColor: 'rgba(255, 255, 255, 0.04)', color: '#9aa3af' },
-    '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--dyalog-orange)', borderLeftWidth: '2px' },
+    '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--accent-orange)', borderLeftWidth: '2px' },
     '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection': {
       backgroundColor: 'rgba(255, 106, 19, 0.28)',
     },

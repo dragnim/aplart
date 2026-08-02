@@ -46,7 +46,7 @@ describe('text on light surfaces', () => {
     ['success', 'surface', AA_BODY],
     ['warning', 'surface', AA_BODY],
     ['warning', 'warning-surface', AA_BODY],
-    ['dyalog-orange-strong', 'surface', AA_BODY],
+    ['accent-orange-strong', 'surface', AA_BODY],
   ])('%s on %s meets AA', (foreground, background, minimum) => {
     const ratio = contrastRatio(token(foreground), token(background));
     expect(ratio, `--${foreground} on --${background} is ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(
@@ -89,9 +89,9 @@ describe('the Run button', () => {
   it('has readable text on the brand orange', () => {
     // The label is near-black rather than white for exactly this reason:
     // white on #ff6a13 is about 2.9:1 and fails.
-    const ratio = contrastRatio('#1a0d02', token('dyalog-orange'));
+    const ratio = contrastRatio('#1a0d02', token('accent-orange'));
     expect(ratio).toBeGreaterThanOrEqual(AA_BODY);
-    expect(contrastRatio('#ffffff', token('dyalog-orange'))).toBeLessThan(AA_BODY);
+    expect(contrastRatio('#ffffff', token('accent-orange'))).toBeLessThan(AA_BODY);
   });
 });
 
