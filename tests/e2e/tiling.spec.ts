@@ -341,6 +341,50 @@ test.describe('the value reading', () => {
     }
   });
 
+  test('hiding exposes the covered corner and keeps the selection; clearing removes it', async ({ page }) => {
+    await openAndRun(page);
+
+    const canvas = page.locator('canvas').first();
+    const box = await canvas.boundingBox();
+    if (box === null) throw new Error('the canvas has no size');
+    const size = Math.min(box.width, box.height);
+    const left = box.width / 2 - size / 2;
+    const top = box.height / 2 - size / 2;
+
+    // A cell in the top left, so the reading takes the bottom-right corner.
+    await canvas.click({ position: { x: left + size * 0.12, y: top + size * 0.12 } });
+    const first = await page
+      .locator('[role="status"]')
+      .filter({ hasText: /Row \d+, column/ })
+      .innerText();
+    await expect(page.locator('[data-corner="bottom-right"]')).toBeVisible();
+
+    // The area it covers cannot be pressed while it is there.
+    const underneath = { x: left + size * 0.88, y: top + size * 0.88 };
+    await expect(page.locator('[data-corner]')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Hide', exact: true }).click();
+    await expect(page.locator('[data-corner]')).toBeHidden();
+
+    // The cell is still chosen and still marked: the control that gives it up
+    // is offered, and the reading still names the same cell when asked again.
+    await expect(page.getByRole('button', { name: 'Clear selection' })).toBeEnabled();
+
+    // And the corner it was covering can now be pressed.
+    await canvas.click({ position: underneath });
+    const second = await page
+      .locator('[role="status"]')
+      .filter({ hasText: /Row \d+, column/ })
+      .innerText();
+    const cell = (text: string) => (/Row \d+, column \d+/u.exec(text) ?? [''])[0];
+    expect(cell(second)).not.toBe(cell(first));
+
+    // Clearing removes the reading and the marker together.
+    await page.getByRole('button', { name: 'Clear', exact: true }).click();
+    await expect(page.locator('[data-corner]')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Clear selection' })).toBeDisabled();
+  });
+
   test('hiding the reading keeps the selection; clearing it does not', async ({ page }) => {
     await openAndRun(page);
 

@@ -18,6 +18,7 @@ import { paletteFor } from '@/renderer/renderOptions';
 import { type AnimationSettings } from '@/renderer/paletteAnimation';
 import { AnimationControls } from './AnimationControls';
 import { TilingControls } from './TilingControls';
+import { type EdgeCheck } from '@/renderer/edgeCheck';
 import { DEFAULT_TILING } from '@/renderer/tiling';
 import { ColouringControls } from './ColouringControls';
 import { type EscapeSettings } from './escapeSettings';
@@ -35,6 +36,8 @@ interface Props {
   readonly reducedMotion: boolean;
   /** Present only for a preset that declares the range its values come from. */
   readonly escape?: EscapeSettings | undefined;
+  /** How the base tile's opposite edges compare, or null before a first run. */
+  readonly edges?: EdgeCheck | null;
 }
 
 export function RenderControls({
@@ -46,6 +49,7 @@ export function RenderControls({
   onAnimationReset,
   reducedMotion,
   escape,
+  edges = null,
 }: Props) {
   const available =
     availablePaletteIds === undefined
@@ -197,7 +201,11 @@ export function RenderControls({
         After orientation, because the base tile is what gets repeated: rotating
         and mirroring shape the copy, and the repeat is built from the result.
       */}
-      <TilingControls tiling={options.tiling ?? DEFAULT_TILING} onChange={(tiling) => onChange({ tiling })} />
+      <TilingControls
+        tiling={options.tiling ?? DEFAULT_TILING}
+        edges={edges}
+        onChange={(tiling) => onChange({ tiling })}
+      />
     </div>
   );
 }

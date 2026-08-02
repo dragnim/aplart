@@ -57,3 +57,26 @@
   font-size: var(--text-xs);
   color: var(--text-muted);
 }
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  min-height: var(--tap-target);
+}
+
+.hint {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.reading {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+/* Stated in words as well; the colour is a second signal, never the only one. */
+.reading[data-verdict='mismatch'] {
+  color: var(--text-muted);
+}

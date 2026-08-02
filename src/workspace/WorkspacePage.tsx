@@ -27,7 +27,9 @@ import { type ArtworkParameter, type ArtworkPreset } from '@/presets/schema';
 import { ArtworkCanvas } from '@/renderer/ArtworkCanvas';
 import { DEFAULT_ANIMATION, type AnimationSettings } from '@/renderer/paletteAnimation';
 import { escapeSettingsFor } from './escapeSettings';
-import { isRepeating } from '@/renderer/tiling';
+import { buildArtworkImage } from '@/renderer/CanvasRenderer';
+import { checkEdges } from '@/renderer/edgeCheck';
+import { DEFAULT_TILING, isRepeating } from '@/renderer/tiling';
 import { defaultRenderOptions } from '@/renderer/renderOptions';
 import { decodeShareState, toRenderOptions } from '@/sharing/decodeShareState';
 import { numberAssignedTo } from '@/editor/parameterBinding';
@@ -263,6 +265,71 @@ function Workspace({
   const keepComplete = repeating && partial !== null && state.result !== null;
   const shown = keepComplete ? state.result : (partial ?? state.result);
   const shownEscape = shown === state.result ? escape : partial?.escape;
+
+  /*
+   * The edge check, over the finished base tile.
+   *
+   * Deliberately not the composed view: mirror repeat hides a join by
+   * reflecting one side onto the other, so measuring the composition would let
+   * the reflection mark its own homework. And deliberately not the animated
+   * palette either — the base one, so a running animation does not re-analyse
+   * sixty times a second to reach the same answer.
+   *
+   * Only a completed result is ever analysed, so a delivery in flight leaves the
+   * previous answer standing rather than replacing it with a partial one.
+   */
+  const {
+    paletteId,
+    customStops,
+    colouring,
+    invert,
+    rotation,
+    mirrorHorizontally,
+    mirrorVertically,
+    smoothScaling,
+  } = state.renderOptions;
+
+  const edges = useMemo(() => {
+    if (state.result === null) return null;
+
+    const { image } = buildArtworkImage({
+      matrix: state.result.matrix,
+      stats: state.result.stats,
+      mode: preset.renderMode,
+      /*
+       * Rebuilt from the fields that shape one tile rather than passed whole,
+       * so changing the repeat count does not re-render the artwork to answer
+       * a question the repeat cannot affect. Truchet's motif renderer draws a
+       * quarter of a million pixels; a radio button should not cost that.
+       */
+      options: {
+        paletteId,
+        ...(customStops === undefined ? {} : { customStops }),
+        ...(colouring === undefined ? {} : { colouring }),
+        invert,
+        rotation,
+        mirrorHorizontally,
+        mirrorVertically,
+        smoothScaling,
+        tiling: DEFAULT_TILING,
+      },
+      ...(escape === undefined ? {} : { escape }),
+    });
+
+    return checkEdges(image);
+  }, [
+    state.result,
+    preset.renderMode,
+    escape,
+    paletteId,
+    customStops,
+    colouring,
+    invert,
+    rotation,
+    mirrorHorizontally,
+    mirrorVertically,
+    smoothScaling,
+  ]);
 
   const actions = useArtworkActions({ preset, state, seed, animation, animationPhase, escape });
 
@@ -734,6 +801,7 @@ function Workspace({
           onAnimationReset={resetAnimation}
           reducedMotion={reducedMotion}
           escape={shownEscape}
+          edges={edges}
         />
       </section>
 

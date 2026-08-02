@@ -22,7 +22,13 @@ const CANVAS = { left: 0, top: 0, width: 400, height: 400 };
 
 interface Painted {
   readonly options: {
-    readonly tiling?: { mode: string; columns: number; rows: number; scale: number };
+    readonly tiling?: {
+      mode: string;
+      columns: number;
+      rows: number;
+      scale: number;
+      showSeamGuides: boolean;
+    };
   };
   readonly matrix: { readonly rows: number; readonly columns: number };
   readonly palette?: { readonly colours: readonly string[] };
@@ -583,5 +589,172 @@ describe('mirror repeat', () => {
     await user.click(singleButton());
 
     expect(announced()).toContain('Row 4, column 7');
+  });
+});
+
+const guidesToggle = () => screen.getByLabelText(/Show seam guides/);
+const edgeText = () => screen.getByText(/Left and right edges/).parentElement?.textContent ?? '';
+
+describe('seam guides', () => {
+  it('are offered only where there is a join to mark', async () => {
+    const { user } = await openAndRun();
+    expect(screen.queryByLabelText(/Show seam guides/)).not.toBeInTheDocument();
+
+    await user.click(repeatButton());
+    expect(guidesToggle()).not.toBeChecked();
+
+    await user.click(singleButton());
+    expect(screen.queryByLabelText(/Show seam guides/)).not.toBeInTheDocument();
+  });
+
+  it('are available in mirror repeat too', async () => {
+    const { user } = await openAndRun();
+    await user.click(screen.getByRole('radio', { name: 'Mirror repeat' }));
+    expect(guidesToggle()).toBeInTheDocument();
+  });
+
+  it('cost no execution and change no code', async () => {
+    const { user, service } = await openAndRun();
+    await user.click(repeatButton());
+    const before = service.executionCount;
+    const code = screen.getByRole('textbox', { name: /APL/i }).textContent;
+
+    await user.click(guidesToggle());
+
+    expect(lastTiling()?.showSeamGuides).toBe(true);
+    expect(service.executionCount).toBe(before);
+    expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toBe(code);
+  });
+
+  it('leave the chosen cell exactly where it was', async () => {
+    const { user } = await openAndRun();
+    await user.click(repeatButton());
+    fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: '4' } });
+    fireEvent.change(screen.getByLabelText(/^Column/), { target: { value: '7' } });
+    await user.click(screen.getByRole('button', { name: /^Inspect$/ }));
+
+    await user.click(guidesToggle());
+
+    // An overlay. It marks where the copies join and touches nothing else.
+    expect(announced()).toContain('Row 4, column 7');
+  });
+
+  it('save and restore locally', async () => {
+    const { user } = await openAndRun();
+    await user.click(repeatButton());
+    await user.click(guidesToggle());
+
+    const { readSavedProjectImmediate } = await import('@/workspace/useLocalProject');
+    await waitFor(
+      () => {
+        expect(readSavedProjectImmediate(modularBloom.id)?.renderOptions.tiling?.showSeamGuides).toBe(true);
+      },
+      { timeout: 4000 },
+    );
+  });
+
+  it('come back on through a shared link', async () => {
+    const { encodeShareState } = await import('@/sharing/encodeShareState');
+    const encoded = encodeShareState({
+      v: 1,
+      preset: modularBloom.id,
+      code: modularBloom.code,
+      params: {},
+      palette: 'ember',
+      tiling: { mode: 'repeat', columns: 3, rows: 3, showSeamGuides: true },
+      render: { invert: false, rotation: 0, mirrorH: false, mirrorV: false, smooth: false },
+    });
+
+    await openAndRun(encoded);
+    await screen.findByText(/shared with you/);
+    expect(guidesToggle()).toBeChecked();
+  });
+
+  it('default to off on a link written before they existed', async () => {
+    const { encodeShareState } = await import('@/sharing/encodeShareState');
+    const encoded = encodeShareState({
+      v: 1,
+      preset: modularBloom.id,
+      code: modularBloom.code,
+      params: {},
+      palette: 'ember',
+      tiling: { mode: 'repeat', columns: 3, rows: 3 },
+      render: { invert: false, rotation: 0, mirrorH: false, mirrorV: false, smooth: false },
+    });
+
+    await openAndRun(encoded);
+    await screen.findByText(/shared with you/);
+    expect(guidesToggle()).not.toBeChecked();
+  });
+});
+
+describe('the edge check', () => {
+  it('reports both axes and never claims more than it knows', async () => {
+    await openAndRun();
+
+    expect(screen.getByText('Edge check')).toBeInTheDocument();
+    expect(edgeText()).toMatch(/Left and right edges/);
+    expect(edgeText()).toMatch(/Top and bottom edges/);
+    expect(edgeText()).toContain('not proof of mathematical seamlessness');
+    expect(edgeText()).not.toMatch(/seamless pattern|guaranteed|verified/i);
+  });
+
+  it('describes the base tile, not the composition', async () => {
+    /*
+     * The distinction the whole check rests on. Mirror repeat makes a join
+     * disappear by reflecting one side onto the other; if the check measured
+     * the composed view it would report a match for an artwork whose edges do
+     * not match at all.
+     */
+    const { user } = await openAndRun();
+    const before = edgeText();
+
+    await user.click(screen.getByRole('radio', { name: 'Mirror repeat' }));
+    expect(edgeText()).toBe(before);
+
+    await user.click(repeatButton());
+    await user.click(screen.getByRole('radio', { name: '5 by 5' }));
+    await user.click(screen.getByRole('radio', { name: '200%' }));
+    expect(edgeText()).toBe(before);
+  });
+
+  it('is unchanged by the repeat count, the scale or the guides', async () => {
+    const { user } = await openAndRun();
+    await user.click(repeatButton());
+    const readings = new Set<string>();
+
+    for (const count of ['2 by 2', '3 by 3', '5 by 5']) {
+      await user.click(screen.getByRole('radio', { name: count }));
+      for (const scale of ['50%', '100%', '200%']) {
+        await user.click(screen.getByRole('radio', { name: scale }));
+        readings.add(edgeText());
+      }
+    }
+    await user.click(guidesToggle());
+    readings.add(edgeText());
+
+    expect(readings.size).toBe(1);
+  });
+
+  it('changes when the artwork’s own appearance changes the tile', async () => {
+    // Rotation is part of the base tile, so it can genuinely change which edges
+    // are being compared — the counterpart to the test above.
+    const { user } = await openAndRun();
+    const upright = edgeText();
+
+    await user.click(screen.getByRole('radio', { name: '90°' }));
+    // Rotating swaps the axes, so the two sentences trade places.
+    const turned = edgeText();
+    expect(turned).toMatch(/Left and right edges/);
+    expect(upright).toMatch(/Left and right edges/);
+  });
+
+  it('says nothing before a first run', async () => {
+    const service = new MockAplExecutionService();
+    service.register('default', labelled(8, 8));
+    render(<WorkspacePage presetId={modularBloom.id} sharedState={null} service={service} />);
+
+    // Only a completed result is ever analysed.
+    expect(screen.queryByText('Edge check')).not.toBeInTheDocument();
   });
 });

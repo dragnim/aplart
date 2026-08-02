@@ -174,6 +174,63 @@ export function drawArtwork(
       context.drawImage(from, cell.left, cell.top, cell.width, cell.height);
     }
   }
+
+  /*
+   * Guides last, over the finished composition and inside the same clip.
+   *
+   * Drawn from the grid's own boundary positions, not from a second calculation
+   * — a guide a pixel away from the join it marks would be worse than none,
+   * because somebody is looking at it precisely to judge that join.
+   */
+  if (request.options.tiling?.showSeamGuides === true && grid.columns * grid.rows > 1) {
+    drawSeamGuides(context, grid, devicePixelRatio);
+  }
+
+  context.restore();
+}
+
+/**
+ * Thin lines on the tile boundaries.
+ *
+ * Two strokes, dark under light, so the line is findable on a pale artwork and
+ * a dark one without belonging to either palette. Only the internal boundaries:
+ * the outside of the composition is where the artwork stops, not a join.
+ */
+function drawSeamGuides(
+  context: CanvasRenderingContext2D,
+  grid: ReturnType<typeof tileGrid>,
+  devicePixelRatio: number,
+): void {
+  const top = grid.ys[0] ?? 0;
+  const bottom = grid.ys[grid.rows] ?? top;
+  const left = grid.xs[0] ?? 0;
+  const right = grid.xs[grid.columns] ?? left;
+
+  const line = (x0: number, y0: number, x1: number, y1: number) => {
+    context.beginPath();
+    // Half a pixel over, so a one-pixel stroke lands on the pixel rather than
+    // straddling two and coming out as a two-pixel smudge.
+    context.moveTo(Math.round(x0) + 0.5, Math.round(y0) + 0.5);
+    context.lineTo(Math.round(x1) + 0.5, Math.round(y1) + 0.5);
+    context.stroke();
+  };
+
+  context.save();
+  for (const [colour, width] of [
+    ['rgb(0 0 0 / 55%)', 3],
+    ['rgb(255 255 255 / 90%)', 1],
+  ] as const) {
+    context.strokeStyle = colour;
+    context.lineWidth = width * devicePixelRatio;
+    for (let column = 1; column < grid.columns; column += 1) {
+      const x = grid.xs[column] ?? 0;
+      line(x, top, x, bottom);
+    }
+    for (let row = 1; row < grid.rows; row += 1) {
+      const y = grid.ys[row] ?? 0;
+      line(left, y, right, y);
+    }
+  }
   context.restore();
 }
 

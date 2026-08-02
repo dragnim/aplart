@@ -48,6 +48,13 @@ export interface TilingView {
    * many copies you see, which is why the interface says so in words.
    */
   readonly scale: number;
+  /**
+   * Thin lines on the tile boundaries, for inspecting where copies join.
+   *
+   * An overlay and only an overlay: it changes no tile dimension, no clipping,
+   * no hit-testing and no marker, and it is not exported.
+   */
+  readonly showSeamGuides: boolean;
 }
 
 export const DEFAULT_TILING: TilingView = {
@@ -55,6 +62,7 @@ export const DEFAULT_TILING: TilingView = {
   columns: 3,
   rows: 3,
   scale: 1,
+  showSeamGuides: false,
 };
 
 export const MIN_TILES = 1;
@@ -106,6 +114,9 @@ export function normaliseTiling(value: unknown): TilingView {
     columns: whole(record.columns, DEFAULT_TILING.columns, MIN_TILES, MAX_TILES),
     rows: whole(record.rows, DEFAULT_TILING.rows, MIN_TILES, MAX_TILES),
     scale: within(record.scale, DEFAULT_TILING.scale, MIN_TILE_SCALE, MAX_TILE_SCALE),
+    // Anything but a literal true is off. Guides are a diagnostic overlay and
+    // nobody should find one switched on by a value that was merely truthy.
+    showSeamGuides: record.showSeamGuides === true,
   };
 }
 

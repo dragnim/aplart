@@ -9,10 +9,12 @@
  */
 
 import { TILE_COUNTS, TILE_SCALES, type TilingMode, type TilingView } from '@/renderer/tiling';
+import { EDGE_CHECK_CAVEAT, describeEdge, type EdgeCheck } from '@/renderer/edgeCheck';
 import styles from './TilingControls.module.css';
 
 interface Props {
   readonly tiling: TilingView;
+  readonly edges: EdgeCheck | null;
   readonly onChange: (tiling: TilingView) => void;
 }
 
@@ -22,7 +24,7 @@ const MODE_LABELS: Record<TilingMode, string> = {
   'mirror-repeat': 'Mirror repeat',
 };
 
-export function TilingControls({ tiling, onChange }: Props) {
+export function TilingControls({ tiling, edges, onChange }: Props) {
   const repeating = tiling.mode !== 'single';
 
   return (
@@ -120,11 +122,46 @@ export function TilingControls({ tiling, onChange }: Props) {
         unless it is said plainly: the count sets how many span the artwork at
         full size, and the scale resizes them within that same area.
       */}
+      {/*
+        Offered only where there is a join to look at. In Single mode there are
+        no boundaries between copies, so a guide would have nothing to mark.
+      */}
+      {repeating && (
+        <label className={styles.check}>
+          <input
+            type="checkbox"
+            checked={tiling.showSeamGuides}
+            onChange={(event) => onChange({ ...tiling, showSeamGuides: event.target.checked })}
+          />
+          <span>
+            Show seam guides <span className={styles.hint}>Lines on the joins, for inspection only.</span>
+          </span>
+        </label>
+      )}
+
       {repeating && (
         <p className={styles.note}>
           The preview count sets how many copies span the artwork at 100%. A smaller tile scale fits more
           copies into the same area and a larger one fits fewer, trimming whatever runs past the edge.
         </p>
+      )}
+
+      {/*
+        Named for what it does. "Seamlessness test" would promise a proof this
+        cannot give: it is a look at rendered pixels, and the caveat below says
+        so every time rather than once in a help page nobody opens.
+      */}
+      {edges !== null && (
+        <div className={styles.field}>
+          <span className={styles.label}>Edge check</span>
+          <p className={styles.reading} data-verdict={edges.horizontal.verdict}>
+            {describeEdge('horizontal', edges.horizontal)}
+          </p>
+          <p className={styles.reading} data-verdict={edges.vertical.verdict}>
+            {describeEdge('vertical', edges.vertical)}
+          </p>
+          <p className={styles.note}>{EDGE_CHECK_CAVEAT}</p>
+        </div>
       )}
     </fieldset>
   );

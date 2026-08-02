@@ -64,14 +64,19 @@ describe('reading a tiling setting from outside', () => {
     expect(normaliseTiling({ mode: 'repeat', scale: 'big' }).scale).toBe(1);
   });
 
-  it('ignores a field no interface can honour', () => {
-    // Seam guides belong to a later stage. Reading the key now would commit the
-    // shared format to a setting nothing can act on.
-    expect(normaliseTiling({ mode: 'repeat', showSeamGuides: true })).not.toHaveProperty('showSeamGuides');
+  it('reads seam guides now that something honours them', () => {
+    expect(normaliseTiling({ mode: 'repeat', showSeamGuides: true }).showSeamGuides).toBe(true);
+  });
+
+  it('leaves guides off for anything but a literal true', () => {
+    // A diagnostic overlay nobody asked for is worse than one nobody found.
+    for (const value of [undefined, 'yes', 1, {}]) {
+      expect(normaliseTiling({ mode: 'repeat', showSeamGuides: value }).showSeamGuides).toBe(false);
+    }
   });
 
   it('keeps a usable setting untouched', () => {
-    const settings = { mode: 'repeat' as const, columns: 5, rows: 2, scale: 1 };
+    const settings = { mode: 'repeat' as const, columns: 5, rows: 2, scale: 1, showSeamGuides: false };
     expect(normaliseTiling(settings)).toEqual(settings);
   });
 
