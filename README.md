@@ -39,11 +39,19 @@ changes with it.
 
 ## Local setup
 
-Requires Node 22 or later.
+Requires **Node 22**, not merely Node 22 or later.
+
+The version matters more than it usually does. Node 24 builds this project
+perfectly well, but it does not build it _identically_: the same commit produces
+a different JavaScript bundle hash under 22 and 24, which makes "is the deployed
+site the current commit?" impossible to answer by comparing build output. CI and
+the Pages deploy both use 22, so local should too. `.nvmrc` says so, and
+`engines` now refuses anything newer rather than waving it through.
 
 ```bash
 git clone https://github.com/dragnim/aplart.git
 cd aplart
+nvm use        # reads .nvmrc; CI reads the same file
 npm install
 npm run dev
 ```
