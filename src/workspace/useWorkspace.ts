@@ -115,6 +115,12 @@ export function useWorkspace({ preset, service, initialState }: UseWorkspaceOpti
             type: 'runSucceeded',
             matrix: outcome.matrix,
             stats: outcome.stats,
+            /*
+             * The source this run was given, not `codeRef.current`. By the time
+             * a request comes back the editor may hold something else entirely,
+             * and the matrix means what the code that produced it said.
+             */
+            source,
             warnings: outcome.warnings,
             durationMs: outcome.durationMs,
             requestCount: outcome.requestCount,

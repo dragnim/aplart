@@ -194,13 +194,21 @@ function Workspace({
   }, []);
 
   /*
-   * Worked out once, from the preset's declaration and the ceiling the visible
-   * code currently sets, and given to both the canvas and the export — so a
-   * saved image is coloured exactly the way the screen was.
+   * Read from the source that produced the matrix, not from the editor.
+   *
+   * Those differ the moment somebody edits without running, and the numbers on
+   * screen were produced under the old ceiling. Colouring them against a new
+   * one would repaint the artwork with no execution behind it and make the
+   * inspector describe a cell holding 28 as having escaped before a limit of
+   * 60 — a sentence about a calculation that has not happened.
+   *
+   * Given to both the canvas and the export, so a saved image is coloured
+   * exactly the way the screen was.
    */
   const escape = useMemo(
-    () => escapeSettingsFor(preset, state.code, state.renderOptions),
-    [preset, state.code, state.renderOptions],
+    () =>
+      state.result === null ? undefined : escapeSettingsFor(preset, state.result.source, state.renderOptions),
+    [preset, state.result, state.renderOptions],
   );
 
   const actions = useArtworkActions({ preset, state, seed, animation, animationPhase, escape });
@@ -347,7 +355,19 @@ function Workspace({
    * shows up in a shared link without anything extra being stored.
    */
   const exploration = preset.planeExploration;
-  const viewport = exploration === undefined ? null : readViewport(state.code, exploration);
+  /*
+   * The view the artwork on screen is showing, which is the one every drag,
+   * zoom and pan navigates away from — so it comes from the source that
+   * produced the picture, not from the editor.
+   *
+   * The same boundary as the colouring below, and wrong in the same way if
+   * ignored: with the span edited to 0.5 but not run, the canvas still shows
+   * the 1.4 view, and mapping a dragged rectangle through 0.5 would zoom
+   * somewhere the pointer never was. Falls back to the editor before the first
+   * run, when there is no picture to disagree with.
+   */
+  const viewport =
+    exploration === undefined ? null : readViewport(state.result?.source ?? state.code, exploration);
   const bounds = useMemo(
     () => (exploration === undefined ? null : viewportBounds(preset.parameters, exploration)),
     [exploration, preset.parameters],
@@ -443,13 +463,20 @@ function Workspace({
   }, [inspected, inspectCell]);
 
   const reading = useMemo(() => {
-    if (inspected === null || state.matrix === null || state.stats === null) return null;
-    return readCell(state.matrix, state.stats, inspected.row, inspected.column);
-  }, [inspected, state.matrix, state.stats]);
+    if (inspected === null || state.result === null) return null;
+    return readCell(state.result.matrix, state.result.stats, inspected.row, inspected.column);
+  }, [inspected, state.result]);
 
-  /** The ceiling as the visible code sets it, so a note cannot claim another. */
+  /**
+   * The ceiling the result was produced under, so a note cannot claim another.
+   *
+   * From the result's own source for the same reason as the colouring above: an
+   * unrun edit changes what the next run will mean, not what this one meant.
+   */
   const ceiling =
-    preset.valueNotes === undefined ? null : numberAssignedTo(state.code, preset.valueNotes.ceilingVariable);
+    preset.valueNotes === undefined || state.result === null
+      ? null
+      : numberAssignedTo(state.result.source, preset.valueNotes.ceilingVariable);
 
   /*
    * Only when nothing is chosen: pressing a cell answers the same question more
@@ -457,13 +484,13 @@ function Workspace({
    */
   const viewNote =
     reading === null &&
-    state.stats !== null &&
+    state.result !== null &&
     preset.valueNotes !== undefined &&
-    isUniform(state.stats) &&
+    isUniform(state.result.stats) &&
     // Uniform is not the same as uniformly at the limit. A view far outside the
     // set is equally flat and has not reached anything, so where the range is
     // known the note has to check rather than assume.
-    (escape === undefined || state.stats.max >= escape.range.max)
+    (escape === undefined || state.result.stats.max >= escape.range.max)
       ? preset.valueNotes.viewAtCeiling
       : null;
 
@@ -622,7 +649,7 @@ function Workspace({
         a pointer; this needs neither, and it is in the controls panel so that
         Focus mode gets it too — the drawer holds the same panel.
       */}
-      {state.matrix !== null && (
+      {state.result !== null && (
         <section aria-labelledby="inspect-heading">
           <h2 className={styles.sectionHeading} id="inspect-heading">
             Read a value
@@ -631,8 +658,8 @@ function Workspace({
             Press the artwork, or name a cell here. Neither changes the APL.
           </p>
           <InspectorControls
-            rows={state.matrix.rows}
-            columns={state.matrix.columns}
+            rows={state.result.matrix.rows}
+            columns={state.result.matrix.columns}
             selected={inspected}
             onInspect={setInspected}
           />
@@ -651,8 +678,8 @@ function Workspace({
   const artworkPanel = (
     <div className={styles.artworkPanel}>
       <ArtworkCanvas
-        matrix={state.matrix}
-        stats={state.stats}
+        matrix={state.result?.matrix ?? null}
+        stats={state.result?.stats ?? null}
         mode={preset.renderMode}
         options={state.renderOptions}
         busy={state.status === 'running'}

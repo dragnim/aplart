@@ -55,7 +55,7 @@ export function useLocalProject(
   /** The most recent payload that has not yet been written. */
   const pending = useRef<Project | null>(null);
 
-  const hasWork = state.modified || state.matrix !== null;
+  const hasWork = state.modified || state.result !== null;
 
   /*
    * Flush on the way out, by both routes.
@@ -104,13 +104,13 @@ export function useLocalProject(
       renderOptions: state.renderOptions,
       createdAt: now,
       updatedAt: now,
-      ...(state.matrix === null
+      ...(state.result === null
         ? {}
         : {
             lastSuccessfulMatrix: {
-              rows: state.matrix.rows,
-              columns: state.matrix.columns,
-              values: toNested(state.matrix).flat(),
+              rows: state.result.matrix.rows,
+              columns: state.result.matrix.columns,
+              values: toNested(state.result.matrix).flat(),
             },
           }),
     };
@@ -128,5 +128,5 @@ export function useLocalProject(
     return () => {
       if (timer.current !== null) clearTimeout(timer.current);
     };
-  }, [hasWork, preset.id, preset.title, state.code, state.renderOptions, state.matrix, repository]);
+  }, [hasWork, preset.id, preset.title, state.code, state.renderOptions, state.result, repository]);
 }

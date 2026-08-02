@@ -215,21 +215,22 @@ describe('what the inspector says', () => {
     expect(status).not.toMatch(/in the set|inside the set|member/i);
   });
 
-  it('follows the ceiling when the code changes it', async () => {
+  it('follows the ceiling the result was produced under, not the editor', async () => {
     const { user } = await openAndRun();
     expect(await inspect(user, 3, 3)).toContain('reached the maximum of 28 iterations');
 
     /*
-     * Raised through the control that rewrites the assignment, which is the
-     * route somebody actually takes. The colouring reads the ceiling out of the
-     * visible code, so moving it there is what has to change the wording.
+     * Raised in the editor and not run. The matrix on screen is still a
+     * 28-iteration result, so it still means what 28 iterations produced —
+     * `tests/integration/resultSemantics.test.tsx` covers that boundary in
+     * full, including the failed-run case.
      */
     fireEvent.change(screen.getByLabelText('Maximum iterations'), { target: { value: '60' } });
     await waitFor(() =>
       expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toContain('iterations←60'),
     );
 
-    await waitFor(() => expect(announced()).toContain('Escaped before the iteration limit.'));
+    expect(await inspect(user, 3, 3)).toContain('reached the maximum of 28 iterations');
   });
 });
 

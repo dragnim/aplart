@@ -99,7 +99,7 @@ export function useArtworkActions(options: {
 
   const exportAt = useCallback(
     (size: ExportSize) => {
-      if (state.matrix === null || state.stats === null) {
+      if (state.result === null) {
         announce('Run the artwork before exporting it.');
         return;
       }
@@ -119,8 +119,8 @@ export function useArtworkActions(options: {
       const palette = animatePalette(paletteFor(state.renderOptions), animation.mode, animationPhase.current);
 
       void exportArtworkPng({
-        matrix: state.matrix,
-        stats: state.stats,
+        matrix: state.result.matrix,
+        stats: state.result.stats,
         mode: preset.renderMode,
         options: state.renderOptions,
         palette,
@@ -140,8 +140,7 @@ export function useArtworkActions(options: {
         });
     },
     [
-      state.matrix,
-      state.stats,
+      state.result,
       state.renderOptions,
       state.code,
       preset,

@@ -31,13 +31,32 @@ export interface WorkspaceError {
   readonly detail: string | undefined;
 }
 
+/**
+ * A result, and everything needed to say what it means.
+ *
+ * One object rather than three fields, because they are one fact. The numbers
+ * in a matrix do not interpret themselves: an escape count means "reached the
+ * limit" only against the ceiling the run was given, so the source that
+ * produced the matrix has to travel with it. Editing the code changes what the
+ * *next* run will mean, not what this one meant.
+ *
+ * Grouping them makes that structural. Held apart, `source` could be advanced
+ * on its own by an edit and the matrix would silently be reinterpreted under a
+ * ceiling that never produced it.
+ */
+export interface ArtworkResult {
+  readonly matrix: NumericMatrix;
+  readonly stats: MatrixStats;
+  /** The APL that produced it, exactly as submitted. */
+  readonly source: string;
+}
+
 export interface WorkspaceState {
   readonly code: string;
   readonly renderOptions: RenderOptions;
   readonly status: RunStatus;
   /** The last artwork that ran successfully. Survives later failures. */
-  readonly matrix: NumericMatrix | null;
-  readonly stats: MatrixStats | null;
+  readonly result: ArtworkResult | null;
   readonly error: WorkspaceError | null;
   readonly warnings: readonly string[];
   readonly lastRunAt: number | null;
@@ -64,6 +83,8 @@ export type WorkspaceAction =
       readonly type: 'runSucceeded';
       readonly matrix: NumericMatrix;
       readonly stats: MatrixStats;
+      /** The source submitted for this run, not whatever is in the editor now. */
+      readonly source: string;
       readonly warnings: readonly string[];
       readonly durationMs: number;
       readonly requestCount: number;
@@ -77,8 +98,7 @@ export function initialWorkspaceState(preset: ArtworkPreset): WorkspaceState {
     code: preset.code,
     renderOptions: defaultRenderOptions(preset.defaultPaletteId),
     status: 'ready',
-    matrix: null,
-    stats: null,
+    result: null,
     error: null,
     warnings: [],
     lastRunAt: null,
@@ -120,8 +140,8 @@ export function workspaceReducer(
       // invariant holds however the selection was arrived at.
       const cell =
         action.cell !== null &&
-        state.matrix !== null &&
-        withinMatrix(state.matrix, action.cell.row, action.cell.column)
+        state.result !== null &&
+        withinMatrix(state.result.matrix, action.cell.row, action.cell.column)
           ? action.cell
           : null;
       return { ...state, inspected: cell };
@@ -134,8 +154,13 @@ export function workspaceReducer(
       return {
         ...state,
         status: 'success',
-        matrix: action.matrix,
-        stats: action.stats,
+        /*
+         * The matrix and the source that produced it, replaced together. This
+         * is the boundary at which the artwork's meaning changes; an edit to
+         * the code before this point changes what the next run will mean and
+         * nothing about the result already on screen.
+         */
+        result: { matrix: action.matrix, stats: action.stats, source: action.source },
         /*
          * Dropped outright when the new result has no such cell, rather than
          * merely going unrendered. A selection kept out of sight would come back
@@ -158,8 +183,9 @@ export function workspaceReducer(
         ...state,
         status: 'error',
         error: action.error,
-        // matrix and stats are deliberately untouched: the last good artwork
-        // stays on screen behind the error.
+        // `result` is deliberately untouched: the last good artwork stays on
+        // screen behind the error, still meaning what it meant, because the
+        // source that produced it is part of it.
       };
 
     case 'runCancelled':
@@ -176,7 +202,7 @@ export function describeStatus(state: WorkspaceState): string {
     case 'ready':
       return 'Ready to run.';
     case 'edited':
-      return state.matrix === null ? 'Ready to run.' : 'Edited. Run to update the artwork.';
+      return state.result === null ? 'Ready to run.' : 'Edited. Run to update the artwork.';
     case 'running':
       return 'Running…';
     case 'success': {
