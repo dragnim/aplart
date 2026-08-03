@@ -172,11 +172,127 @@ Costs to accept, stated rather than buried:
 - Non-deterministic pasted programs would be drawn from more than one execution. They already are on
   the two banded presets; this widens it. It deserves a note in the interface, not silence.
 
+## Prototype: the adaptive first request, measured
+
+Built and run against the live service. Not wired into the application. Raw table in
+`docs/data/adaptive-prototype.md`; the expression is `scripts/lib/adaptiveProbe.ts`, driven by
+`npm run prototype:adaptive`.
+
+One request evaluates the source, binds the final result, tests that it is a rank-2 numeric array,
+measures the height and width its printed form would occupy, and then either **prints the matrix** or
+returns **versioned metadata** behind an unmistakable marker.
+
+### The endpoint's glyph set is narrower than Dyalog's
+
+The first attempt was rejected outright:
+
+```
+NOT SUPPORTED: "∈" (⎕UCS 8712)
+```
+
+Membership is therefore spelled out as three comparisons. Any production expression must stay inside
+the set the endpoint actually permits, and that set has to be discovered by asking rather than assumed
+from the language. Dfn guards, `⊣`, `⊃…↓`, `∨`, `⌽`, `⍕` and `⎕DR` were all checked and do work.
+
+### All eight artworks
+
+| Artwork           | Requests today | Adaptive | Route       | Printed lines | Printed width | Same matrix |
+| ----------------- | -------------- | -------- | ----------- | ------------- | ------------- | ----------- |
+| Modular Bloom     | 1              | **1**    | one request | 64            | 188           | identical   |
+| Checker Shift     | 1              | **1**    | one request | 32            | 63            | identical   |
+| Wave Interference | 1              | **1**    | one request | 72            | 351           | identical   |
+| Truchet Grid      | 1              | **1**    | one request | 20            | 39            | identical   |
+| Sierpiński Array  | 1              | **1**    | one request | 64            | 127           | identical   |
+| Cellular Echo     | 1              | **1**    | one request | 81            | 241           | identical   |
+| Mandelbrot Field  | 3              | **3**    | banded      | 128           | 356           | identical   |
+| Julia Set         | 3              | **3**    | banded      | 128           | 383           | identical   |
+
+Every matrix was compared cell for cell against the existing banded path. No artwork costs a request
+more than it does today, and the six small ones still complete in one.
+
+Julia's source therefore runs from any artwork: the adaptive path never consults the preset, so
+"which gallery entry is open" stops being an input.
+
+### Boundaries
+
+| Case                      | Requests | Route                 | Lines | Width |
+| ------------------------- | -------- | --------------------- | ----- | ----- |
+| 91 lines                  | 1        | one request           | 91    | 15    |
+| 92 lines                  | 1        | one request           | 92    | 15    |
+| **93 lines — at the cap** | 2        | **banded**            | 93    | 15    |
+| 94 lines                  | 2        | banded                | 94    | 15    |
+| Width 989 — under         | 1        | one request           | 1     | 989   |
+| **Width 998 — over**      | 2        | **banded**            | 1     | 998   |
+| Width 1169 — well over    | 2        | banded                | 1     | 1169  |
+| Boolean 8×8               | 1        | one request           | 8     | 15    |
+| Integer 8×8               | 1        | one request           | 8     | 23    |
+| Float 8×8                 | 1        | one request           | 8     | 111   |
+| Integer 128²              | 3        | banded                | 128   | 767   |
+| Rank 1                    | 1        | refused with metadata | —     | —     |
+| Rank 3                    | 1        | refused with metadata | —     | —     |
+| Character 4×4             | 1        | refused with metadata | —     | —     |
+| Nested 2×2                | 1        | refused with metadata | —     | —     |
+
+The strict rule holds at the line cap: 92 prints, 93 bands. **The width cap needs the same strictness
+and gets it** — 989 prints and 998 bands. One honest gap: no case landed on _exactly_ 995, because
+formatted widths cannot be dialled to a chosen value, so strictness there rests on the same argument as
+the line cap rather than on an observation. It costs nothing to keep.
+
+Undrawable results are refused **in the first request**, from metadata, with rank, depth and element
+type — no second call and nothing drawn.
+
+### Formatting an undrawable result
+
+`f←⍕r` initially ran before the drawable test, so a large character or nested array was formatted only
+to measure dimensions that would then be discarded. Measured:
+
+| Case              | Eager     | Deferred  |
+| ----------------- | --------- | --------- |
+| Small numeric 8×8 | 178 ms    | 83 ms     |
+| Character 300×300 | 94 ms     | 98 ms     |
+| Nested 120×120    | `WS FULL` | `WS FULL` |
+
+Two things to be careful about in reading that. The timings are round trips and vary more between
+repeats than between the two variants, so they show the guard is **not slower** rather than that it is
+faster. And the nested case fails identically either way, because a 120×120 array of nested vectors
+exhausts the 512 KB workspace _while being constructed_, before anything is formatted — so at the sizes
+this workspace permits, eager formatting has no measurable penalty.
+
+The guard is adopted regardless. It is free, it is supported, and it removes the possibility in
+principle; an undrawable result now reports its size as `0` rather than a number nobody asked for.
+
+### A pre-existing banded-transport defect, surfaced but not caused here
+
+A 128×128 **float** matrix cannot be assembled today. Its rows print 2,175 characters wide, so it bands
+correctly — and the band replies come back containing Dyalog's `···` elision, which the parser rightly
+refuses. `estimateValueWidth` allows 16 characters per float; these need about 18, and the comment
+there says under-estimating "costs a retry", but no retry happens — the reply is unparseable instead.
+
+Confirmed pre-existing: `runArtwork` with `highResolution: true` fails the same way on the same source
+today. The adaptive design neither causes nor fixes it, and it needs its own change — detect `···` and
+re-plan with a narrower line — which should not be folded into this one.
+
+## Recommendation, after measuring
+
+**Adopt the adaptive first request.** It meets every criterion set for it: small artworks stay at one
+request, large ones keep three, pasted Julia runs anywhere, no execution is spent and discarded, and
+`highResolution` becomes unnecessary for correctness.
+
+The earlier reservation about costing small artworks a second request is now settled by measurement
+rather than argument: a small result comes back complete in the first reply, so there is no second
+request to pay for. The direct-first fallback is no longer the safer option — it is simply the one that
+wastes an execution.
+
 ## What to do next, if this is accepted
 
-1. Measure whether the probe can carry a small matrix's values within one reply, since that decides
-   whether D costs an extra request.
-2. Keep the two reproduction tests; invert them when the behaviour changes.
-3. Remove the "mark the preset as high resolution" wording regardless of which option is chosen — it
-   addresses a maintainer in a message shown to a visitor.
-4. Fix the duplicated error message, which is independent of all of this.
+1. Wire the adaptive expression into `runArtwork`, replacing the `highResolution` branch. Keep
+   `outputLimits` for `maxRows`, `maxColumns` and `maxCells`, which are about what the renderer will
+   accept and remain a preset's business.
+2. Note, only when banding is actually used, that a large result is assembled from several evaluations
+   and that code using randomness or changing state may differ between sections. Not shown for
+   one-request results, which are a single evaluation.
+3. Remove "mark the preset as high resolution" from the failure text.
+4. Present detailed failure text once, announced once, rather than in both the status region and the
+   error panel.
+5. Fix the float banding bug separately, with its own reproduction.
+6. Keep the two reproduction tests, inverted, as the proof that a pasted program runs.

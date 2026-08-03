@@ -38,7 +38,8 @@
     "benchmark:report": "tsx --import ./scripts/lib/registerRaw.mjs scripts/report-mandelbrot-benchmark.ts",
     "benchmark:iterations": "tsx --import ./scripts/lib/registerRaw.mjs scripts/benchmark-iterations.ts",
     "benchmark:iterations:report": "tsx --import ./scripts/lib/registerRaw.mjs scripts/report-iteration-benchmark.ts",
-    "preset:compare": "tsx --import ./scripts/lib/registerRaw.mjs scripts/palette-compare.ts"
+    "preset:compare": "tsx --import ./scripts/lib/registerRaw.mjs scripts/palette-compare.ts",
+    "prototype:adaptive": "tsx --import ./scripts/lib/registerRaw.mjs scripts/prototype-adaptive.ts"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",
