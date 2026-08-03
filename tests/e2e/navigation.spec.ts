@@ -1,4 +1,22 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+/**
+ * The count a filter chip advertises.
+ *
+ * Taken from the page rather than from the preset registry, for two reasons. The
+ * registry cannot be imported here — a preset imports its APL with `?raw`, which
+ * Playwright's transpiler does not understand — and this is the better assertion
+ * anyway: the chip claims a number and the gallery renders a list, and the thing
+ * worth checking is that they agree. Adding an artwork then needs no edit here.
+ */
+async function advertised(page: Page, filter: RegExp): Promise<number> {
+  const label = (await page.getByRole('button', { name: filter }).textContent()) ?? '';
+  // The label carries the number twice — once as the visible badge and once in
+  // a phrase for a screen reader, as in "All8, 8 artworks" — so take the first.
+  const count = /(\d+)/u.exec(label)?.[1];
+  expect(count, `no count in filter label "${label}"`).toBeDefined();
+  return Number(count);
+}
 
 test.describe('site navigation', () => {
   test('the gallery is the home page', async ({ page }) => {
@@ -72,8 +90,11 @@ test.describe('the gallery with every artwork', () => {
   test('shows a card per preset, each with a real thumbnail', async ({ page }) => {
     await page.goto('./');
 
+    const artworks = await advertised(page, /^All/);
+    expect(artworks).toBeGreaterThan(0);
+
     const cards = page.getByRole('article');
-    await expect(cards).toHaveCount(7);
+    await expect(cards).toHaveCount(artworks);
 
     // Every thumbnail is a committed PNG generated from real APL output, so a
     // broken path or a missing file must fail rather than show a gap.
@@ -82,9 +103,9 @@ test.describe('the gallery with every artwork', () => {
     // most of them are still below the fold. Each one is scrolled to before it
     // is checked, rather than assuming the browser has fetched them all.
     const images = page.locator('article img');
-    await expect(images).toHaveCount(7);
+    await expect(images).toHaveCount(artworks);
 
-    for (let index = 0; index < 7; index += 1) {
+    for (let index = 0; index < artworks; index += 1) {
       const image = images.nth(index);
       await image.scrollIntoViewIfNeeded();
       await expect
@@ -103,14 +124,20 @@ test.describe('the gallery with every artwork', () => {
   test('filters narrow the gallery and every filter leads somewhere', async ({ page }) => {
     await page.goto('./');
 
+    const fractals = await advertised(page, /^Fractals/);
     await page.getByRole('button', { name: /^Fractals/ }).click();
-    await expect(page.getByRole('article')).toHaveCount(2);
+    await expect(page.getByRole('article')).toHaveCount(fractals);
 
+    const beginner = await advertised(page, /^Beginner/);
     await page.getByRole('button', { name: /^Beginner/ }).click();
-    await expect(page.getByRole('article')).toHaveCount(2);
+    await expect(page.getByRole('article')).toHaveCount(beginner);
 
+    const all = await advertised(page, /^All/);
     await page.getByRole('button', { name: /^All/ }).click();
-    await expect(page.getByRole('article')).toHaveCount(7);
+    await expect(page.getByRole('article')).toHaveCount(all);
+
+    // Every filter leads somewhere: none of them advertises an empty gallery.
+    for (const count of [fractals, beginner, all]) expect(count).toBeGreaterThan(0);
   });
 
   test('every artwork opens', async ({ page }) => {

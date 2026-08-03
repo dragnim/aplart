@@ -68,6 +68,58 @@ function evaluate(expression: string): NumericMatrix | { readonly error: readonl
   const centreX = readNumber('centreX');
   const centreY = readNumber('centreY');
   const zoomSpan = readNumber('zoom');
+
+  /*
+   * Julia Set.
+   *
+   * Recognised before Mandelbrot, and it has to be: Julia declares every name
+   * Mandelbrot does, so the Mandelbrot branch below would happily answer for it
+   * and the artwork on screen would be the wrong fractal. `realC` is the tell.
+   *
+   * Follows the preset's own program: the grid is where z begins, c is the one
+   * constant, the escape test reads the values from the start of the step, and
+   * the magnitude is clamped the same way.
+   */
+  const realC = readNumber('realC');
+  const imagC = readNumber('imagC');
+  if (
+    size !== null &&
+    size > 1 &&
+    iterations !== null &&
+    centreX !== null &&
+    centreY !== null &&
+    zoomSpan !== null &&
+    realC !== null &&
+    imagC !== null
+  ) {
+    const clamp = (value: number) => Math.max(-9, Math.min(9, value));
+    const axis = (centre: number, index: number) => centre + zoomSpan * (-1 + (2 * index) / (size - 1));
+
+    const rows: number[][] = [];
+    for (let row = 0; row < size; row += 1) {
+      const startI = axis(centreY, row);
+      const values: number[] = [];
+      for (let column = 0; column < size; column += 1) {
+        let zr = axis(centreX, column);
+        let zi = startI;
+        let active = true;
+        let count = 0;
+        for (let step = 0; step < iterations; step += 1) {
+          // Recorded, not re-tested: once escaped, never counted again.
+          active = active && zr * zr + zi * zi < 4;
+          if (active) count += 1;
+          const nextR = clamp(realC + zr * zr - zi * zi);
+          const nextI = clamp(imagC + 2 * zr * zi);
+          zr = nextR;
+          zi = nextI;
+        }
+        values.push(count);
+      }
+      rows.push(values);
+    }
+    return fromNested(rows);
+  }
+
   if (
     size !== null &&
     size > 1 &&

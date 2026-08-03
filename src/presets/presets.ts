@@ -9,6 +9,7 @@
 
 import { cellularEcho } from './cellular-echo';
 import { checkerShift } from './checker-shift';
+import { juliaSet } from './julia-set';
 import { mandelbrotField } from './mandelbrot-field';
 import { modularBloom } from './modular-bloom';
 import { sierpinskiArray } from './sierpinski-array';
@@ -21,6 +22,11 @@ import { validatePreset, type ArtworkPreset, type PresetValidationIssue } from '
 //
 // Gallery order, roughly easiest first, so a visitor scrolling down meets the
 // gentle pieces before the fractals.
+//
+// Julia sits after Mandelbrot despite being the easier of the two to read. Its
+// description is written in terms of Mandelbrot's — the whole point of it is the
+// two lines that differ — so meeting it second is what makes the comparison
+// available.
 const authored: readonly ArtworkPreset[] = [
   modularBloom,
   checkerShift,
@@ -29,6 +35,7 @@ const authored: readonly ArtworkPreset[] = [
   sierpinskiArray,
   cellularEcho,
   mandelbrotField,
+  juliaSet,
 ];
 
 const issues: PresetValidationIssue[] = [];

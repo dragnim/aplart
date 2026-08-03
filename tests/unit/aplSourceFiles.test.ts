@@ -133,6 +133,7 @@ describe('the programs are unchanged by the move', () => {
     // 48. Same length, because both are two digits — which is exactly why a
     // character count alone would not have noticed.
     'mandelbrot-field': { digest: '5a8df3d17814', characters: 625, lines: 19 },
+    'julia-set': { digest: 'a27419d64442', characters: 877, lines: 25 },
   };
 
   it('has an expectation for every artwork in the gallery', () => {
