@@ -58,11 +58,18 @@ export function FocusToolbar({ title, state, actions, drawerOpen, onToggleDrawer
           It announces only while the drawer is closed. The Run panel inside the
           drawer says the same thing, and two live regions reporting one run
           means a screen reader reads it out twice.
+
+          Failure is the other case where it stays silent, and for the same
+          reason from the other direction. The drawer is hidden by a transform
+          rather than by `display`, so the Run panel's error alert is in the
+          accessibility tree whether the drawer is open or shut — it announces,
+          assertively, either way. This region would only be a second voice
+          saying less.
         */}
         <p
           className={styles.status}
           role="status"
-          aria-live={drawerOpen ? 'off' : 'polite'}
+          aria-live={drawerOpen || state.status === 'error' ? 'off' : 'polite'}
           data-state={state.status}
         >
           {describeStatus(state)}

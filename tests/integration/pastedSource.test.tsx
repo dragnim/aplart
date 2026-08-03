@@ -169,6 +169,28 @@ describe('pasting Julia’s program into another artwork', () => {
   });
 });
 
+/**
+ * Every region that would actually speak, with the politeness it would speak at.
+ *
+ * `role="status"` implies polite and `role="alert"` implies assertive, so an
+ * element's effective politeness is its explicit `aria-live` when it has one and
+ * the role's implication otherwise. A region set to `off` is in the page but
+ * silent, which is the whole mechanism under test here.
+ */
+function announcingRegions(): { politeness: string; text: string }[] {
+  const candidates = document.querySelectorAll('[aria-live], [role="status"], [role="alert"]');
+  return [...candidates]
+    .map((element) => {
+      const role = element.getAttribute('role');
+      const implied = role === 'alert' ? 'assertive' : role === 'status' ? 'polite' : 'off';
+      return {
+        politeness: element.getAttribute('aria-live') ?? implied,
+        text: element.textContent ?? '',
+      };
+    })
+    .filter((region) => region.politeness !== 'off');
+}
+
 describe('a refusal', () => {
   it('is shown once, and never tells the visitor to edit the application', async () => {
     const user = userEvent.setup();
@@ -200,5 +222,30 @@ describe('a refusal', () => {
     // change the source code of the application.
     expect(alert.textContent).toContain('Reduce the size and run again');
     expect(document.body.textContent).not.toContain('high resolution');
+  });
+
+  it('is announced once, by the alert and not by the status region', async () => {
+    const user = userEvent.setup();
+    const service = limitedService(tall(300));
+    render(<WorkspacePage presetId={modularBloom.id} sharedState={null} service={service} />);
+
+    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await screen.findByRole('alert');
+
+    /*
+     * One voice, not two. Shortening the status region's wording stopped the
+     * detail being read out twice, but both regions still changed at once, so a
+     * single failure arrived as two announcements: "Run failed." politely, then
+     * the message assertively. The status region is now `off` while a run has
+     * failed, so the alert is the only region that speaks.
+     */
+    const speaking = announcingRegions().filter((region) => /failed|too large/u.test(region.text));
+    expect(speaking).toHaveLength(1);
+    expect(speaking[0]?.politeness).toBe('assertive');
+    expect(speaking[0]?.text).toContain('too large for APL Art to draw safely');
+
+    // Still visible, though: silencing the region did not empty it.
+    const statuses = screen.getAllByRole('status').map((status) => status.textContent ?? '');
+    expect(statuses).toContain('Run failed.');
   });
 });

@@ -1,10 +1,13 @@
 /**
  * The Run controls and the status region beneath them.
  *
- * Status is announced through a polite live region rather than shouted, and
+ * Progress is announced through a polite live region rather than shouted, and
  * errors are shown inline with the technical detail folded away. No browser
- * dialogs: an alert would interrupt, and there is nothing here worth
- * interrupting for.
+ * dialogs: a modal would interrupt, and nothing here is worth interrupting for.
+ *
+ * A failure is the one thing that does speak up, and it speaks exactly once: the
+ * error below is an assertive alert, and the polite region falls silent while it
+ * is showing so that one failure is not announced twice.
  */
 
 import { useState } from 'react';
@@ -56,7 +59,22 @@ export function RunPanel({ state, onRun, onStop, onResetCode, onRetry }: Props) 
         region added to the page at the same moment as its text is often not
         announced at all.
       */}
-      <p className={styles.status} role="status" aria-live="polite" data-status={state.status}>
+      <p
+        className={styles.status}
+        role="status"
+        /*
+         * Silent on failure, because the alert below is the announcement.
+         *
+         * Shortening this region's text to "Run failed." stopped the detailed
+         * message being read out twice, but two live regions still changed at
+         * once, so a single failure arrived as two announcements. An explicit
+         * `off` overrides the politeness `role="status"` implies, which leaves
+         * the assertive alert as the only region that speaks. The text stays on
+         * screen: it is a visible state cue, not an announcement.
+         */
+        aria-live={state.status === 'error' ? 'off' : 'polite'}
+        data-status={state.status}
+      >
         {describeStatus(state)}
       </p>
 
