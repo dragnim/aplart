@@ -62,7 +62,7 @@ function clamp(value: number, bounds: Bounds): number {
  * `centreX←¯0.6000000000000001` teaches nothing except that a computer was
  * involved.
  */
-function decimalsFor(span: number): number {
+export function decimalsFor(span: number): number {
   const magnitude = Math.ceil(-Math.log10(Math.max(span, 1e-12)));
   return Math.min(15, Math.max(3, magnitude + 4));
 }

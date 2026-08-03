@@ -49,6 +49,14 @@ interface Props {
   readonly onHide: () => void;
   /** Removes the selection entirely. A different act, so a different control. */
   readonly onDismiss: () => void;
+  /**
+   * Opens the Julia set for the selected point, when there is one to open.
+   *
+   * Present only on Mandelbrot with a completed result and a chosen cell; null
+   * everywhere else, which is what keeps the button from appearing at all rather
+   * than appearing and doing nothing.
+   */
+  readonly onOpenAsJulia?: (() => void) | null;
 }
 
 /** Rounded for reading. A float cell is a measurement, not an identifier. */
@@ -135,6 +143,7 @@ export function ValueInspector({
   corner,
   onHide,
   onDismiss,
+  onOpenAsJulia = null,
 }: Props) {
   if (reading === null && viewNote === null) return null;
 
@@ -194,6 +203,22 @@ export function ValueInspector({
               </button>
             </div>
           </div>
+
+          {/*
+            Outside the header, which is a flex row: in it this became a third
+            control beside Hide and Clear, and the label wrapped in the gap left
+            over. On its own line it reads as what it is — the one control here
+            that goes somewhere.
+
+            An ordinary button, reachable by keyboard like the two above it. The
+            Mandelbrot set is a map of which values of c give a bounded Julia
+            set, so a point chosen on it names one, and this opens it.
+          */}
+          {onOpenAsJulia !== null && (
+            <button type="button" className={styles.handoff} onClick={onOpenAsJulia}>
+              Open as Julia set
+            </button>
+          )}
 
           <div aria-hidden="true">
             <p className={styles.value}>{formatValue(reading.value)}</p>

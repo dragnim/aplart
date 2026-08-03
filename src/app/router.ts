@@ -15,7 +15,19 @@ import { useSyncExternalStore } from 'react';
 
 export type Route =
   | { readonly name: 'gallery' }
-  | { readonly name: 'artwork'; readonly presetId: string; readonly sharedState: string | null }
+  | {
+      readonly name: 'artwork';
+      readonly presetId: string;
+      readonly sharedState: string | null;
+      /**
+       * A session-only handoff, as written by "Open as Julia set".
+       *
+       * Not a share: the payload lives in this tab's session storage and the URL
+       * carries only a token, so a copied link opens the ordinary artwork rather
+       * than running something the recipient did not ask for.
+       */
+      readonly handoff: string | null;
+    }
   | { readonly name: 'about' }
   | { readonly name: 'help' }
   | { readonly name: 'notFound'; readonly path: string };
@@ -43,6 +55,7 @@ export function parseRoute(hash: string): Route {
       // against the preset registry by the page that renders it.
       presetId: safeDecode(second),
       sharedState: query.get('s'),
+      handoff: query.get('h'),
     };
   }
 
@@ -62,6 +75,11 @@ function safeDecode(value: string): string {
 export function hrefForArtwork(presetId: string, sharedState?: string): string {
   const base = `#/art/${encodeURIComponent(presetId)}`;
   return sharedState === undefined ? base : `${base}?s=${encodeURIComponent(sharedState)}`;
+}
+
+/** Where "Open as Julia set" navigates to. The token is meaningless outside this tab. */
+export function hrefForHandoff(presetId: string, token: string): string {
+  return `#/art/${encodeURIComponent(presetId)}?h=${encodeURIComponent(token)}`;
 }
 
 function subscribe(onChange: () => void): () => void {

@@ -23,6 +23,7 @@ import { isUniform, readCell } from '@/matrix/matrixInspection';
 import { matrixStats } from '@/matrix/matrixStats';
 import { migratePresetCode } from '@/presets/codeMigrations';
 import { getPreset } from '@/presets/presets';
+import { hrefForHandoff } from '@/app/router';
 import { type ArtworkParameter, type ArtworkPreset } from '@/presets/schema';
 import { ArtworkCanvas } from '@/renderer/ArtworkCanvas';
 import { DEFAULT_ANIMATION, type AnimationSettings } from '@/renderer/paletteAnimation';
@@ -60,11 +61,21 @@ import { RunPanel } from './RunPanel';
 import { WorkspaceToolbar } from './WorkspaceToolbar';
 import { useWorkspace } from './useWorkspace';
 import { initialWorkspaceState } from './workspaceState';
+import {
+  HANDOFF_FROM,
+  HANDOFF_TO,
+  constantForCell,
+  juliaSourceFor,
+  readHandoff,
+  storeHandoff,
+} from './openAsJulia';
 import styles from './WorkspacePage.module.css';
 
 interface Props {
   readonly presetId: string;
   readonly sharedState: string | null;
+  /** A session-only handoff token, as written by "Open as Julia set". */
+  readonly handoff?: string | null;
   /** Injected by end-to-end tests so runs are deterministic. */
   readonly service?: AplExecutionService;
 }
@@ -74,7 +85,7 @@ type MobileTab = 'artwork' | 'code' | 'controls';
 /** How many views back the Back button can reach. */
 const VIEW_HISTORY_LIMIT = 40;
 
-export function WorkspacePage({ presetId, sharedState, service }: Props) {
+export function WorkspacePage({ presetId, sharedState, handoff = null, service }: Props) {
   const preset = getPreset(presetId);
 
   if (preset === undefined) {
@@ -85,9 +96,10 @@ export function WorkspacePage({ presetId, sharedState, service }: Props) {
     // Keyed on the link as well as the preset, so opening a different shared
     // creation rebuilds the workspace from it rather than keeping the old one.
     <Workspace
-      key={`${preset.id}:${sharedState ?? ''}`}
+      key={`${preset.id}:${sharedState ?? ''}:${handoff ?? ''}`}
       preset={preset}
       sharedState={sharedState}
+      handoff={handoff}
       service={service}
     />
   );
@@ -96,10 +108,12 @@ export function WorkspacePage({ presetId, sharedState, service }: Props) {
 function Workspace({
   preset,
   sharedState,
+  handoff,
   service,
 }: {
   readonly preset: ArtworkPreset;
   readonly sharedState: string | null;
+  readonly handoff: string | null;
   readonly service?: AplExecutionService | undefined;
 }) {
   /*
@@ -111,7 +125,28 @@ function Workspace({
    */
   const shared = useMemo(() => (sharedState === null ? null : decodeShareState(sharedState)), [sharedState]);
 
+  /*
+   * A handoff is applied before the first render too, and for the same reason as
+   * a shared link. It wins over saved work: somebody who has just pressed "Open
+   * as Julia set" is asking for that constant, not for whatever they were last
+   * doing on this artwork.
+   *
+   * An absent, malformed, out-of-date or wrongly-targeted payload reads as null
+   * and the artwork simply opens on its own defaults.
+   */
+  const handedOff = useMemo(() => readHandoff(handoff, preset.id), [handoff, preset.id]);
+
   const initialState = useMemo(() => {
+    if (handedOff !== null) {
+      const code = juliaSourceFor(handedOff);
+      return {
+        ...initialWorkspaceState(preset),
+        code,
+        // Edited, because it is: the constant differs from the preset's own.
+        modified: code !== preset.code,
+      };
+    }
+
     if (shared !== null) {
       if (!shared.ok) return undefined;
       /*
@@ -143,7 +178,7 @@ function Workspace({
       renderOptions: saved.renderOptions,
       modified: code !== preset.code,
     };
-  }, [shared, preset]);
+  }, [handedOff, shared, preset]);
 
   const workspace = useWorkspace({
     preset,
@@ -151,6 +186,24 @@ function Workspace({
     ...(initialState === undefined ? {} : { initialState }),
   });
   const { state, setCode, setRenderOptions, run, runCode, stop, inspectCell } = workspace;
+
+  /*
+   * A handoff runs itself, exactly once.
+   *
+   * Pressing "Open as Julia set" is a request to see that set, so waiting for a
+   * second press would be asking the same question twice. A shared link is
+   * deliberately different and still waits: following somebody else's link is
+   * not the same as asking for a calculation.
+   *
+   * Guarded by a ref rather than by the dependency list, because `run` is
+   * recreated when the code changes and this must not fire again for it.
+   */
+  const handoffRun = useRef(false);
+  useEffect(() => {
+    if (handedOff === null || handoffRun.current) return;
+    handoffRun.current = true;
+    run();
+  }, [handedOff, run]);
 
   const editorHandle = useRef<AplEditorHandle>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -628,6 +681,34 @@ function Workspace({
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [inspected, inspectCell]);
 
+  /**
+   * "Open as Julia set", or null when the action does not apply.
+   *
+   * Offered only from Mandelbrot, only once a run has completed, and only with a
+   * cell selected — there is no coordinate without one. Deliberately not offered
+   * on pointer movement: a hover is not a choice, and previewing one would mean
+   * running an artwork nobody asked for.
+   *
+   * The coordinate comes from the completed result's own source and matrix, so
+   * unrun edits in the editor and controls that have moved since do not affect
+   * it. What is on screen is what the selection belongs to.
+   */
+  const openAsJulia = useMemo(() => {
+    if (preset.id !== HANDOFF_FROM) return null;
+    if (state.result === null || inspected === null) return null;
+
+    const constant = constantForCell(preset, state.result.source, state.result.matrix, inspected);
+    if (constant === null) return null;
+
+    return () => {
+      const token = storeHandoff(constant);
+      if (token === null) return;
+      // A hash change, so the existing router notices and Back returns here
+      // with this artwork exactly as it was left.
+      window.location.hash = hrefForHandoff(HANDOFF_TO, token).slice(1);
+    };
+  }, [preset, state.result, inspected]);
+
   const reading = useMemo(() => {
     if (inspected === null || state.result === null) return null;
     return readCell(state.result.matrix, state.result.stats, inspected.row, inspected.column);
@@ -916,6 +997,7 @@ function Workspace({
         // A tiling's values choose a shape rather than measure anything.
         categorical={preset.renderMode === 'tiles'}
         corner={readingCorner}
+        onOpenAsJulia={openAsJulia}
         onHide={() => setReadingHidden(true)}
         onDismiss={clearInspection}
       />

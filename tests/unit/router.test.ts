@@ -22,6 +22,7 @@ describe('parseRoute', () => {
       name: 'artwork',
       presetId: 'modular-bloom',
       sharedState: null,
+      handoff: null,
     });
   });
 
@@ -30,12 +31,27 @@ describe('parseRoute', () => {
       name: 'artwork',
       presetId: 'modular-bloom',
       sharedState: 'AbC-_123',
+      handoff: null,
     });
   });
 
   it('ignores query parameters other than the shared state', () => {
     const route = parseRoute('#/art/checker-shift?utm_source=elsewhere');
-    expect(route).toEqual({ name: 'artwork', presetId: 'checker-shift', sharedState: null });
+    expect(route).toEqual({
+      name: 'artwork',
+      presetId: 'checker-shift',
+      sharedState: null,
+      handoff: null,
+    });
+
+    // A handoff token is read, and is not a shared link: the two are separate
+    // fields because they mean different things and must not substitute.
+    expect(parseRoute('#/art/julia-set?h=abc123')).toEqual({
+      name: 'artwork',
+      presetId: 'julia-set',
+      sharedState: null,
+      handoff: 'abc123',
+    });
   });
 
   it('percent-decodes the preset id', () => {

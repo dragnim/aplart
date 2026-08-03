@@ -85,7 +85,7 @@ function RouteView({ route }: { readonly route: Route }) {
     case 'artwork':
       return (
         <Suspense fallback={<p className={styles.loading}>Loading the workspace…</p>}>
-          <WorkspacePage presetId={route.presetId} sharedState={route.sharedState} />
+          <WorkspacePage presetId={route.presetId} sharedState={route.sharedState} handoff={route.handoff} />
         </Suspense>
       );
     case 'about':
