@@ -79,6 +79,61 @@ test.describe('Julia Set', () => {
     expect(Buffer.compare(julia, mandelbrot)).not.toBe(0);
   });
 
+  test('is answered with Julia’s arithmetic, not Mandelbrot’s', async ({ page }) => {
+    /*
+     * Guards an ordering requirement in the test stub, and does it through a
+     * property of the mathematics rather than by inspecting the stub.
+     *
+     * Julia declares every parameter name Mandelbrot does, so a stub that checks
+     * for the Mandelbrot shape first will answer a Julia run with a Mandelbrot
+     * matrix — and the picture would look plausible. Comparing the two artworks'
+     * exports would not catch it either, because their default viewports differ
+     * and the bytes would differ regardless.
+     *
+     * What catches it: replacing z by −z leaves z² unchanged, so every Julia set
+     * is exactly symmetric about the origin. With the view centred at the origin
+     * and the axis sampled symmetrically, the image must be invariant under a
+     * 180° rotation. The Mandelbrot set has no such symmetry — it is symmetric
+     * about the real axis only — so a Mandelbrot answer fails this outright.
+     */
+    await openAndRun(page);
+
+    const symmetric = await page.evaluate(
+      async (encoded) => {
+        const bytes = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0));
+        const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+        const canvas = document.createElement('canvas');
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const context = canvas.getContext('2d');
+        if (context === null) return { compared: 0, differing: 0 };
+        context.drawImage(bitmap, 0, 0);
+
+        const { data, width, height } = context.getImageData(0, 0, canvas.width, canvas.height);
+        let compared = 0;
+        let differing = 0;
+        for (let y = 0; y < height; y += 1) {
+          for (let x = 0; x < width; x += 1) {
+            const here = (y * width + x) * 4;
+            const opposite = ((height - 1 - y) * width + (width - 1 - x)) * 4;
+            compared += 1;
+            for (let channel = 0; channel < 3; channel += 1) {
+              if (data[here + channel] !== data[opposite + channel]) {
+                differing += 1;
+                break;
+              }
+            }
+          }
+        }
+        return { compared, differing };
+      },
+      (await save(page)).toString('base64'),
+    );
+
+    expect(symmetric.compared).toBeGreaterThan(0);
+    expect(symmetric.differing).toBe(0);
+  });
+
   test('takes the presentation features unchanged', async ({ page }) => {
     await openAndRun(page);
 
