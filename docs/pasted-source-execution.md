@@ -296,3 +296,24 @@ wastes an execution.
    error panel.
 5. Fix the float banding bug separately, with its own reproduction.
 6. Keep the two reproduction tests, inverted, as the proof that a pasted program runs.
+
+## What was done
+
+All six, with one deliberate departure from point 1: `outputLimits` was **deleted entirely** rather
+than kept for `maxRows`, `maxColumns` and `maxCells`. Those three were the same mechanism as
+`highResolution` — a per-preset override consulted before the code ran — and they turned out to be
+pointing the wrong way. The fractals declared 144×144 and 20,736 cells where the workspace allows
+256×256 and 65,536, so pasting a program _into_ a fractal lost capability rather than gaining it, and
+retaining the escape hatch would have preserved the shape of the fault just fixed.
+
+What remains is two limits, each in the place that can honestly answer for it:
+
+- **Workspace-wide matrix safety limits**, applied to every source alike, from configuration.
+- **Visible parameter limits** — Julia and Mandelbrot's Resolution maximum of 144 — for the 512 KB
+  workspace each program runs in. That is a property of the program, it is already in the parameter
+  metadata, and a visitor can see it on the slider.
+
+One thing was made narrower than first written. The wide-value refusal applies only to **floats**:
+wide integers come back short or cut and the existing widening retry recovers them exactly, which two
+tests in `runArtwork.test.ts` hold it to. Only Dyalog's `···` elision of a long float row is
+unrecoverable, and that is the case refused early — still awaiting the separate fix in point 5.

@@ -289,7 +289,16 @@ export function describeStatus(state: WorkspaceState): string {
     }
     case 'cancelled':
       return 'Stopped.';
+    /*
+     * Short, and deliberately not the message itself.
+     *
+     * The failure is already presented in full by the error panel, which is an
+     * assertive alert. Returning the same sentence here put it on screen twice
+     * and read it out twice — once politely, once assertively — which is how a
+     * refusal came across as two separate problems. The panel says what went
+     * wrong; this says only that something did.
+     */
     case 'error':
-      return state.error?.message ?? 'Something went wrong.';
+      return 'Run failed.';
   }
 }

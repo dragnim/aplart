@@ -83,7 +83,6 @@ async function main(): Promise<number> {
     const run = await runArtwork({
       service: new TryAplExecutionService({ endpoint: ENDPOINT }),
       source: updated.code,
-      highResolution: preset.outputLimits?.highResolution ?? false,
       limits: LIMITS,
       timeoutMs: 30_000,
     });

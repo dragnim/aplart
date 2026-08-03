@@ -193,7 +193,6 @@ async function measure(
       source,
       // As the preset ships: banded transport, so what is timed is what a
       // visitor would actually wait for.
-      highResolution: true,
       limits: LIMITS,
       timeoutMs: TIMEOUT_MS,
     });

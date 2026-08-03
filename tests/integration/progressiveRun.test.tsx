@@ -21,7 +21,8 @@ import {
   type ExecutionCapabilities,
 } from '@/execution/AplExecutionService';
 import { executionError } from '@/execution/errors';
-import { PROBE_MARKER, formatBandReply, formatProbeReply } from '@/execution/transport';
+import { ADAPTIVE_MARKER, formatAdaptiveReply } from '@/execution/adaptiveProbe';
+import { formatBandReply } from '@/execution/transport';
 import { fromNested, type NumericMatrix } from '@/matrix/matrixTypes';
 import { numberAssignedTo } from '@/editor/parameterBinding';
 import { mandelbrotField } from '@/presets/mandelbrot-field';
@@ -149,8 +150,8 @@ class HeldService implements AplExecutionService {
       throw executionError('serverUnavailable');
     }
 
-    const lines = request.code.includes(PROBE_MARKER)
-      ? formatProbeReply(this.matrix)
+    const lines = request.code.includes(ADAPTIVE_MARKER)
+      ? formatAdaptiveReply(this.matrix, this.capabilities)
       : formatBandReply(this.matrix, request.code, this.capabilities);
 
     return { outputLines: lines, rawOutput: lines.join('\n'), durationMs: 1, warnings: [] };

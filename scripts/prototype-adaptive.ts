@@ -3,18 +3,25 @@
  *
  *     npm run prototype:adaptive
  *
- * Nothing here is wired into the application. It answers one question with
- * numbers: how many requests each of the eight artworks would take, and whether
- * a single first request can safely carry a complete small result.
+ * It answers one question with numbers: how many requests each of the eight
+ * artworks takes, and whether a single first request can safely carry a complete
+ * small result. The application now uses the module measured here, so these are
+ * its own numbers rather than a forecast of them.
  *
- * Every artwork is also fetched by the existing banded path and the two results
- * compared cell for cell, because a request count is worthless if the matrix is
- * wrong.
+ * Every artwork is also fetched a second way — through `runArtwork` against a
+ * service reporting caps too small for anything to print, so every cell arrives
+ * in a band — and the two results are compared cell for cell, because a request
+ * count is worthless if the matrix is wrong.
  */
 
 import { writeFile, mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  type AplExecutionRequest,
+  type AplExecutionResult,
+  type AplExecutionService,
+} from '@/execution/AplExecutionService';
 import { flattenToExpression } from '@/execution/aplSource';
 import { TRYAPL_CAPABILITIES, TryAplExecutionService } from '@/execution/TryAplExecutionService';
 import { runArtwork } from '@/execution/runArtwork';
@@ -22,7 +29,7 @@ import { buildBandExpression, estimateValueWidth, isDrawableType, planBands } fr
 import { parseMatrix } from '@/matrix/parseMatrix';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { presets } from '@/presets/presets';
-import { buildAdaptiveExpression, parseAdaptiveReply } from './lib/adaptiveProbe';
+import { buildAdaptiveExpression, parseAdaptiveReply } from '@/execution/adaptiveProbe';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ENDPOINT = process.env.VITE_APL_EXEC_ENDPOINT ?? 'https://tryapl.org/Exec';
@@ -32,6 +39,33 @@ const GAP_MS = 900;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const service = new TryAplExecutionService({ endpoint: ENDPOINT });
+
+/**
+ * The real endpoint, reported as though it could print only a few lines.
+ *
+ * The first request then always comes back as metadata, so `runArtwork` fetches
+ * every cell in bands. That is the independent route the comparison needs: the
+ * band expressions and the reassembly are exercised on their own, against the
+ * same live service, whatever the adaptive path decided for the same source.
+ */
+class BandedOnlyService implements AplExecutionService {
+  readonly capabilities = { ...TRYAPL_CAPABILITIES, maxOutputLines: 20 };
+
+  readonly inner: AplExecutionService;
+
+  constructor(inner: AplExecutionService) {
+    this.inner = inner;
+  }
+
+  async execute(request: AplExecutionRequest): Promise<AplExecutionResult> {
+    requests += 1;
+    return this.inner.execute(request);
+  }
+
+  cancel(): void {
+    this.inner.cancel();
+  }
+}
 
 let requests = 0;
 async function send(expression: string): Promise<readonly string[]> {
@@ -197,16 +231,15 @@ async function main(): Promise<number> {
   rows.push(
     '## The eight artworks',
     '',
-    '| Artwork | Today | Adaptive | Route | Lines | Width | Shape | Same matrix |',
+    '| Artwork | Bands only | Adaptive | Route | Lines | Width | Shape | Same matrix |',
     '| --- | --- | --- | --- | --- | --- | --- | --- |',
   );
 
   for (const preset of presets) {
-    // Ground truth by the existing banded path, which needs no preset metadata.
+    // Ground truth by bands alone, which needs no preset metadata either.
     const truth = await runArtwork({
-      service,
+      service: new BandedOnlyService(service),
       source: preset.code,
-      highResolution: true,
       limits: LIMITS,
       timeoutMs: 30_000,
     });
@@ -214,15 +247,15 @@ async function main(): Promise<number> {
 
     const outcome = await adaptive(preset.title, preset.code);
     const same = digest(outcome.matrix) === digest(truth.matrix);
-    const today = preset.outputLimits?.highResolution === true ? truth.requestCount : 1;
+    const banded = truth.requestCount;
 
     console.log(
-      `  ${preset.id.padEnd(20)} today ${String(today)}  adaptive ${String(outcome.requests)}  ` +
+      `  ${preset.id.padEnd(20)} banded ${String(banded)}  adaptive ${String(outcome.requests)}  ` +
         `${outcome.route.padEnd(11)} lines ${String(outcome.lines)} width ${String(outcome.width)}  ` +
         `${same ? 'identical' : 'DIFFERENT'}`,
     );
     rows.push(
-      `| ${preset.title} | ${String(today)} | ${String(outcome.requests)} | ${outcome.route} | ` +
+      `| ${preset.title} | ${String(banded)} | ${String(outcome.requests)} | ${outcome.route} | ` +
         `${String(outcome.lines)} | ${String(outcome.width)} | ${outcome.shape} | ${same ? 'yes' : '**no**'} |`,
     );
     await sleep(GAP_MS);

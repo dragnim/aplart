@@ -15,25 +15,19 @@ import { setParameterValue } from '@/editor/parameterBinding';
 import { TryAplExecutionService } from '@/execution/TryAplExecutionService';
 import { runArtwork } from '@/execution/runArtwork';
 import { presets } from '@/presets/presets';
-import { type ArtworkPreset, type ArtworkParameter } from '@/presets/schema';
+import { type ArtworkParameter } from '@/presets/schema';
 import { type MatrixLimits } from '@/matrix/validateMatrix';
 
 const ENDPOINT = process.env.VITE_APL_EXEC_ENDPOINT ?? 'https://tryapl.org/Exec';
 
-function limitsFor(preset: ArtworkPreset): MatrixLimits {
-  return {
-    maxRows: preset.outputLimits?.maxRows ?? 256,
-    maxColumns: preset.outputLimits?.maxColumns ?? 256,
-    maxCells: preset.outputLimits?.maxCells ?? 65_536,
-  };
-}
+/** The workspace's limits, which are the same for every source. */
+const LIMITS: MatrixLimits = { maxRows: 256, maxColumns: 256, maxCells: 65_536 };
 
-async function draw(preset: ArtworkPreset, source: string) {
+async function draw(source: string) {
   return runArtwork({
     service: new TryAplExecutionService({ endpoint: ENDPOINT }),
     source,
-    highResolution: preset.outputLimits?.highResolution ?? false,
-    limits: limitsFor(preset),
+    limits: LIMITS,
     timeoutMs: 30_000,
   });
 }
@@ -43,7 +37,7 @@ const pause = () => new Promise((resolve) => setTimeout(resolve, 700));
 
 describe.each(presets.map((preset) => [preset.id, preset] as const))('%s', (_id, preset) => {
   it('runs at its defaults and returns something worth drawing', async () => {
-    const run = await draw(preset, preset.code);
+    const run = await draw(preset.code);
 
     expect(run.matrix.rows).toBeGreaterThanOrEqual(2);
     expect(run.matrix.columns).toBeGreaterThanOrEqual(2);
@@ -52,13 +46,20 @@ describe.each(presets.map((preset) => [preset.id, preset] as const))('%s', (_id,
     await pause();
   }, 60_000);
 
-  it('stays inside the single-request limit unless it declares otherwise', async () => {
-    const run = await draw(preset, preset.code);
+  it('costs one request when it prints, and bands only when it does not', async () => {
+    const run = await draw(preset.code);
 
-    if (preset.outputLimits?.highResolution === true) {
-      expect(run.requestCount).toBeGreaterThan(1);
+    /*
+     * Not compared against anything the preset declares — there is nothing left
+     * to declare. A result that printed came back whole in the first request; one
+     * that did not took that request plus its bands. Either is correct; what
+     * would not be is a small artwork paying for bands it did not need.
+     */
+    const cells = run.matrix.rows * run.matrix.columns;
+    if (run.requestCount === 1) {
+      expect(cells).toBeLessThan(90 * 90);
     } else {
-      expect(run.requestCount).toBe(1);
+      expect(run.requestCount).toBeGreaterThan(1);
     }
     await pause();
   }, 60_000);
@@ -79,7 +80,7 @@ describe.each(presets.map((preset) => [preset.id, preset] as const))('%s', (_id,
         expect(updated.ok).toBe(true);
         if (!updated.ok) return;
 
-        const run = await draw(preset, updated.code);
+        const run = await draw(updated.code);
         expect(run.matrix.rows).toBeGreaterThanOrEqual(2);
         expect(run.matrix.columns).toBeGreaterThanOrEqual(2);
         await pause();
@@ -102,7 +103,7 @@ describe.each(presets.map((preset) => [preset.id, preset] as const))('%s', (_id,
       if (updated.ok) source = updated.code;
     }
 
-    const run = await draw(preset, source);
+    const run = await draw(source);
     expect(run.matrix.rows).toBeGreaterThanOrEqual(2);
     await pause();
   }, 120_000);

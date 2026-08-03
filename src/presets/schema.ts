@@ -55,21 +55,6 @@ export interface ArtworkParameter {
   readonly options?: readonly ParameterOption[];
 }
 
-export interface PresetOutputLimits {
-  readonly maxRows?: number;
-  readonly maxColumns?: number;
-  readonly maxCells?: number;
-  /**
-   * Opt in to banded transport.
-   *
-   * TryAPL truncates a response at 93 lines, so one request cannot return more
-   * than about 90 rows. A preset that sets this is fetched as several banded
-   * requests and reassembled, which costs one execution per band. Leave it off
-   * unless the piece genuinely needs the resolution.
-   */
-  readonly highResolution?: boolean;
-}
-
 /**
  * Declares that a preset's matrix is a patch of a plane, so a region of the
  * artwork can be selected and turned back into code.
@@ -172,7 +157,6 @@ export interface ArtworkPreset {
   readonly defaultPaletteId: string;
   readonly availablePaletteIds?: readonly string[];
   readonly renderMode: RenderMode;
-  readonly outputLimits?: PresetOutputLimits;
   /** Set only by presets whose matrix is a patch of a plane. */
   readonly planeExploration?: PlaneExploration;
   /** Set by presets whose largest value means something worth saying. */

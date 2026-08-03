@@ -2,26 +2,20 @@
  * Runs a preset's source and returns the matrix to draw.
  *
  * This is the seam between "some APL" and "a picture". It flattens the source,
- * chooses a transport strategy, checks that what came back is something the
- * renderer can honestly draw, and turns every failure into a message written
- * for someone who may not know APL.
+ * asks for the result, follows whichever transport the result turns out to need,
+ * checks that what came back is something the renderer can honestly draw, and
+ * turns every failure into a message written for someone who may not know APL.
  */
 
 import { type MatrixLimits, validateMatrix } from '@/matrix/validateMatrix';
 import { matrixStats, type MatrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { parseMatrix } from '@/matrix/parseMatrix';
+import { buildAdaptiveExpression, parseAdaptiveReply, type AdaptiveMetadata } from './adaptiveProbe';
 import { type AplExecutionService } from './AplExecutionService';
 import { flattenToExpression } from './aplSource';
 import { detectAplError, executionError } from './errors';
-import {
-  buildBandExpression,
-  buildProbeExpression,
-  estimateValueWidth,
-  isDrawableType,
-  parseProbeReply,
-  planBands,
-} from './transport';
+import { buildBandExpression, estimateValueWidth, isDrawableType, planBands } from './transport';
 
 /**
  * A ceiling on requests for one artwork, so a pathological re-planning loop
@@ -57,12 +51,10 @@ export interface RunArtworkOptions {
   /**
    * Called as bands arrive, so a tall artwork can be shown building up.
    *
-   * Only banded runs report anything; a direct read has nothing to report
-   * between sending one request and having the whole matrix.
+   * Only banded runs report anything: when the first request returns the whole
+   * matrix there is nothing to report between sending it and having everything.
    */
   readonly onProgress?: ((progress: RunProgress) => void) | undefined;
-  /** Use banded transport to exceed the single-request row limit. */
-  readonly highResolution: boolean;
   readonly limits: MatrixLimits;
   readonly timeoutMs: number;
   readonly signal?: AbortSignal;
@@ -72,7 +64,7 @@ export interface ArtworkRun {
   readonly matrix: NumericMatrix;
   readonly stats: MatrixStats;
   readonly durationMs: number;
-  /** How many backend calls this took; one for a direct read. */
+  /** How many backend calls this took; one when the first request sufficed. */
   readonly requestCount: number;
   readonly warnings: readonly string[];
 }
@@ -85,9 +77,7 @@ export async function runArtwork(options: RunArtworkOptions): Promise<ArtworkRun
 
   const startedAt = Date.now();
 
-  const outcome = options.highResolution
-    ? await runBanded(flattened.statements, options)
-    : await runDirect(flattened.expression, options);
+  const outcome = await runAdaptive(flattened.statements, options);
 
   const validation = validateMatrix(outcome.matrix, options.limits);
   if (!validation.ok) {
@@ -113,76 +103,75 @@ interface TransportOutcome {
   readonly warnings: readonly string[];
 }
 
-/** One request. The matrix is read from the text APL prints. */
-async function runDirect(expression: string, options: RunArtworkOptions): Promise<TransportOutcome> {
-  const result = await execute(expression, options);
+/**
+ * One request, and further requests only when one could not have been enough.
+ *
+ * The first request evaluates the source and returns either the whole artwork
+ * or a single line of metadata describing the result it could not print.
+ * Nothing about the preset is consulted — no identity, no declared size, no
+ * flag. The service's own answer decides which of three things happens:
+ *
+ *   - The matrix arrived whole. Draw it. One request, one evaluation.
+ *   - It did not fit, but it is a rank-2 numeric array of a shape and value
+ *     width that bands can carry. Fetch it in bands.
+ *   - It is something else, or something too large. Refuse, and say what came
+ *     back instead.
+ *
+ * This replaces a preset-declared `highResolution` flag, which chose the
+ * transport before the result existed. Any source could be typed into any
+ * artwork, so a flag set for one program decided the transport for another —
+ * which is how a 128×128 Julia program pasted into a small preset came back
+ * refused as too tall. The decision now belongs to the result.
+ */
+async function runAdaptive(
+  statements: readonly string[],
+  options: RunArtworkOptions,
+): Promise<TransportOutcome> {
+  const first = await execute(buildAdaptiveExpression(statements, options.service.capabilities), options);
 
-  const aplError = detectAplError(result.outputLines);
+  const aplError = detectAplError(first.outputLines);
   if (aplError !== null) {
     throw executionError('aplError', aplError.detail);
   }
 
-  // The backend truncates at its line cap without saying so. A result that
-  // reaches the cap is therefore indistinguishable from one that was cut
-  // short, and drawing it would risk showing an artwork missing its lower
-  // rows. Refuse, and say what to do about it.
-  const { maxOutputLines } = options.service.capabilities;
-  if (result.outputLines.length >= maxOutputLines) {
-    throw executionError(
-      'tooLarge',
-      `the service returned ${result.outputLines.length} lines, its maximum of ${maxOutputLines}`,
-      `This artwork is too tall to fetch in one go. The APL service returns at most ${maxOutputLines - 1} rows. Reduce the size, or mark the preset as high resolution.`,
-    );
+  const reply = parseAdaptiveReply(first.outputLines);
+
+  if (reply.kind === 'error') {
+    throw executionError('badResponse', reply.reason);
   }
 
-  // Truncation by width is more insidious than truncation by height: a row cut
-  // through the middle of a number leaves a value that still parses, just
-  // wrongly. Any line at the limit is therefore treated as cut.
-  const { maxLineLength } = options.service.capabilities;
-  if (result.outputLines.some((line) => line.length >= maxLineLength)) {
-    throw executionError(
-      'tooLarge',
-      `a line reached ${maxLineLength} characters, the service maximum`,
-      'This artwork is too wide to fetch in one go. Reduce the size, or mark the preset as high resolution.',
-    );
+  if (reply.kind === 'matrix') {
+    /*
+     * Complete, and known to be complete rather than assumed so. The wrapper
+     * returns the value itself only when its printed form is strictly inside
+     * both service caps, so a reply that is not metadata cannot be one that was
+     * truncated on the way out.
+     */
+    const parsed = parseMatrix(first.outputLines);
+    if (!parsed.ok) {
+      throw executionError('invalidOutput', first.rawOutput, parsed.failure.message);
+    }
+    return { matrix: parsed.matrix, requestCount: 1, warnings: first.warnings };
   }
 
-  const parsed = parseMatrix(result.outputLines);
-  if (!parsed.ok) {
-    throw executionError('invalidOutput', result.rawOutput, parsed.failure.message);
-  }
-
-  return { matrix: parsed.matrix, requestCount: 1, warnings: result.warnings };
+  return runBanded(statements, options, reply, first.warnings);
 }
 
 /**
- * A shape probe followed by banded reads.
+ * Banded reads, planned from the metadata the first request already returned.
  *
- * The probe rejects anything undrawable before any data is transferred, and
- * gives the exact shape, which is what makes the bands verifiable: the number
- * of values reassembled must equal rows times columns.
+ * There is no second shape probe. The first request measured the shape while
+ * trying to return the whole result, so a banded artwork costs exactly what the
+ * old probe-then-band path cost — the measurement now simply has a chance of
+ * being the answer.
  */
 async function runBanded(
   statements: readonly string[],
   options: RunArtworkOptions,
+  metadata: AdaptiveMetadata,
+  firstWarnings: readonly string[],
 ): Promise<TransportOutcome> {
-  const warnings: string[] = [];
-  let requestCount = 0;
-
-  const probeResult = await execute(buildProbeExpression(statements), options);
-  requestCount += 1;
-
-  const probeError = detectAplError(probeResult.outputLines);
-  if (probeError !== null) {
-    throw executionError('aplError', probeError.detail);
-  }
-
-  const probe = parseProbeReply(probeResult.outputLines);
-  if (!probe.ok) {
-    throw executionError('badResponse', probe.reason);
-  }
-
-  const { rank, depth, elementType, shape } = probe.probe;
+  const { rank, depth, elementType, shape } = metadata;
 
   if (rank !== 2) {
     throw executionError(
@@ -201,23 +190,70 @@ async function runBanded(
   if (!isDrawableType(elementType)) {
     throw executionError(
       'invalidOutput',
-      `⎕DR ${probe.probe.dataRepresentation} (${elementType})`,
+      `⎕DR ${metadata.dataRepresentation} (${elementType})`,
       `This code ran, but it returned ${describeType(elementType)} rather than numbers.`,
     );
   }
 
   const [rows = 0, columns = 0] = shape;
 
-  // Check the size before fetching, so an oversized result costs one request
-  // rather than a dozen.
+  /*
+   * The workspace-wide safety limits, checked before any data is transferred so
+   * that an oversized result costs one request rather than a dozen. These are
+   * the same limits the finished matrix is checked against, applied to a shape
+   * that is now known — not a per-preset override, which is the mechanism that
+   * caused the fault above.
+   */
   const preflight = validateMatrix({ rows, columns, values: new Float64Array(0) }, options.limits);
   if (!preflight.ok) {
     throw executionError(
       preflight.failure.kind === 'tooLarge' ? 'tooLarge' : 'invalidOutput',
-      undefined,
+      `${rows}×${columns} exceeds the workspace matrix limits`,
       preflight.failure.message,
     );
   }
+
+  /*
+   * Refuse now if the values are wide fractions, which bands cannot carry.
+   *
+   * Bands are planned from an assumed width per value, and a value wider than
+   * assumed is normally recoverable: the reply comes back short or cut, the
+   * width is re-estimated from what arrived, and the remaining bands are
+   * re-planned. Wide integers do exactly that, and there are tests below that
+   * hold it to it.
+   *
+   * Wide fractions do not. Dyalog elides a long float row — `1.234···5678` —
+   * rather than truncating it, and an elided number is not a short reply to
+   * widen from, it is an unparseable one. A 128×128 float matrix prints rows
+   * 2,175 characters wide, about 17 per value against a budget of 16, and comes
+   * back like that today.
+   *
+   * That is a defect in band assembly rather than in this decision, and it has
+   * its own fix pending. Until then one refusal naming what to change beats a
+   * dozen requests ending in an unreadable reply. The condition is deliberately
+   * narrow: floats whose printed width is above the budget, not every value
+   * wider than estimated.
+   */
+  const budget = estimateValueWidth(elementType);
+  const perValue = columns === 0 ? 0 : Math.ceil((metadata.width + 1) / columns);
+  if (elementType === 'float' && perValue > budget) {
+    throw executionError(
+      'tooLarge',
+      `float values print about ${perValue} characters wide, above the ${budget} the transport plans for`,
+      `This artwork is too large to return in one piece, and its numbers are too long to fetch in sections — about ${perValue} characters each. Round them, with ⌊ or ⌈ for whole numbers, or return fewer rows and columns.`,
+    );
+  }
+
+  /*
+   * Said once, and only for a result that really is assembled from several runs.
+   * A one-request artwork is a single evaluation and needs no such caveat.
+   */
+  const warnings: string[] = [
+    ...firstWarnings,
+    'This artwork was too large to return in one request, so the program was run several times and the pieces joined together. Code that uses randomness, or that changes state as it runs, may not agree between the pieces.',
+  ];
+  // The first request is already spent; it measured the shape these bands use.
+  let requestCount = 1;
 
   const totalCells = rows * columns;
   const values = new Float64Array(totalCells);

@@ -20,9 +20,11 @@ import { type ArtworkPreset } from './schema';
  * which is the entire point of the application, so the count must not depend on
  * nobody typing that.
  *
- * The only preset that declares high-resolution output. It is worth the extra
- * requests here: the detail is the point of a fractal, and 90 rows is not
- * enough to show it.
+ * At 128² the result is too tall for one reply, so it is fetched in bands — but
+ * that is not something this file declares or knows. The first request finds out
+ * and the transport follows from the result. The detail is the point of a fractal
+ * and 90 rows are not enough to show it, which is a reason for the size, not for
+ * a flag.
  */
 export const mandelbrotField: ArtworkPreset = {
   id: 'mandelbrot-field',
@@ -152,7 +154,6 @@ export const mandelbrotField: ArtworkPreset = {
    */
   defaultPaletteId: 'abyss',
   renderMode: 'continuous',
-  outputLimits: { highResolution: true, maxRows: 144, maxColumns: 144, maxCells: 20_736 },
 
   // The axes above are built in exactly the form this declaration promises,
   // which is what lets a dragged region be turned back into three assignments.

@@ -157,7 +157,6 @@ export const juliaSet: ArtworkPreset = {
    */
   defaultPaletteId: 'poolrooms',
   renderMode: 'continuous',
-  outputLimits: { highResolution: true, maxRows: 144, maxColumns: 144, maxCells: 20_736 },
 
   /*
    * Only the three view variables. `realC` and `imagC` are deliberately absent:

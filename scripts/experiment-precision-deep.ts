@@ -48,7 +48,6 @@ async function run(code: string) {
     const out = await runArtwork({
       service,
       source: code,
-      highResolution: false,
       limits: { maxRows: 320, maxColumns: 320, maxCells: 102_400 },
       timeoutMs: 90_000,
     });

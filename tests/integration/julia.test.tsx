@@ -12,7 +12,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockAplExecutionService } from '@/execution/MockAplExecutionService';
-import { PROBE_MARKER } from '@/execution/transport';
+import { ADAPTIVE_MARKER } from '@/execution/adaptiveProbe';
 import { fromNested, type NumericMatrix } from '@/matrix/matrixTypes';
 import { juliaSet } from '@/presets/julia-set';
 import { encodeShareState } from '@/sharing/encodeShareState';
@@ -97,13 +97,14 @@ function constantLines(text = source()): string[] {
 /**
  * How many runs have happened.
  *
- * Counted by probes, not by requests. This preset declares high-resolution
- * output, so a single run is a probe for the shape followed by one or more bands
- * — counting calls to the service would report a number that depends on the
- * matrix size rather than on how many times the artwork ran.
+ * Counted by first requests, not by all requests. A result this size does not
+ * print, so one run is a first request followed by one or more bands — counting
+ * every call to the service would report a number that depends on the matrix
+ * size rather than on how many times the artwork ran. Exactly one first request
+ * is sent per run, whichever way the result comes back.
  */
 function runCount(received: readonly string[]): number {
-  return received.filter((code) => code.includes(PROBE_MARKER)).length;
+  return received.filter((code) => code.includes(ADAPTIVE_MARKER)).length;
 }
 
 async function setControl(label: string, value: string) {

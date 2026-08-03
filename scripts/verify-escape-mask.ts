@@ -55,7 +55,6 @@ async function run(source: string): Promise<{ matrix: NumericMatrix; ms: number 
   const outcome = await runArtwork({
     service,
     source,
-    highResolution: true,
     limits: LIMITS,
     timeoutMs: 30_000,
   });

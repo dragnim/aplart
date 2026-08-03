@@ -155,20 +155,24 @@ request.** Measured against the live endpoint:
 | `⎕PW`                         | `NOT SUPPORTED` — cannot be raised |
 | Workspace state between calls | Not preserved (`CORRUPT WS`)       |
 
-A `256 256⍴⍳7` therefore comes back as 93 rows, with the rest gone and no error to say so. Two
-consequences shape the design:
+A `256 256⍴⍳7` therefore comes back as 93 rows, with the rest gone and no error to say so. What
+follows from that is the shape of every run:
 
-1. **Default tier — one request, up to 90 rows.** Presets return at most 90 rows so that a piece which
-   grows slightly does not begin losing rows unnoticed. Values are exact and parsing is
-   straightforward.
-2. **High-resolution tier — several requests, up to 256×256.** A preset that sets
-   `outputLimits.highResolution` is fetched in bands: the adapter re-executes the code once per band,
-   each returning a different reshaped slice, and stitches the result together. Values are still
-   exact — nothing is quantised — but the artwork costs one execution per band, so it is reserved for
-   presets that genuinely need the detail.
+The first request asks for the artwork and, in the same expression, measures what it is about to
+print. If the printed form fits strictly inside both caps, that request _is_ the artwork: one request,
+one evaluation, exact values. If it does not, the reply is a single marked line of metadata — rank,
+depth, `⎕DR`, printed height and width, shape — and the adapter falls back to bands: it re-executes
+the code once per band, each returning a different reshaped slice, and stitches the result together.
+Values are still exact, nothing is quantised, but the artwork costs one execution per band.
 
-In both tiers the adapter verifies the reassembled cell count against a shape probe. A short or
-truncated band is a hard error, never a silently incorrect picture.
+Which of the two happens is decided by the result, never by the preset. There is no flag to set, and
+deliberately so: the code in the editor is not the code the preset shipped, so anything declared in
+advance would be a statement about a different program. A preset that once had to declare
+`outputLimits.highResolution` for its own source made that source unrunnable from anywhere else, and
+made every other program unrunnable from it.
+
+The adapter verifies the reassembled cell count against the shape the first request reported. A short
+or truncated band is a hard error, never a silently incorrect picture.
 
 ### The 512 KB workspace
 
@@ -254,7 +258,10 @@ to work around CORS with browser flags or public CORS-anywhere services.
    modulus|∘.×⍨⍳size
    ```
 
-   Keep the result within 90 rows unless the preset declares `highResolution`.
+   There is no row limit to observe and nothing to declare about size: a result that prints comes
+   back in one request, and a larger one is fetched in bands. What a preset does need to keep
+   honest is its **Resolution** maximum, which is about the 512 KB workspace the program runs in
+   rather than about transport — see Julia and Mandelbrot's 144.
 
    The `.apl` file is the source of truth for the program: it is what the editor shows, what is sent
    to TryAPL, and what a saved project is compared against to decide whether it has been edited. There

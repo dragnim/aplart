@@ -1,14 +1,14 @@
 /**
- * The same APL, two artworks, two outcomes.
+ * The same APL, two artworks, one outcome.
  *
- * A reproduction, not a fix. Julia's program pasted into an artwork that does
- * not declare `highResolution` is refused for being too tall, while the
- * identical text runs from the Julia preset — so what decides whether a piece of
- * APL can run is not the APL but which gallery entry happened to be open.
+ * This file began as a reproduction: Julia's program pasted into an artwork that
+ * did not declare `highResolution` was refused for being too tall, while the
+ * identical text ran from the Julia preset — so what decided whether a piece of
+ * APL could run was not the APL but which gallery entry happened to be open.
  *
- * That cuts against the premise the whole application rests on: the visible
- * source is the artwork. These tests exist to hold the current behaviour still
- * while the design is decided, and are expected to change when it is.
+ * It is now the proof that this is fixed, and inverted rather than deleted so
+ * that the fault cannot come back unnoticed. The premise the application rests
+ * on is that the visible source is the artwork; these tests hold it to that.
  */
 
 import { render, screen, waitFor } from '@testing-library/react';
@@ -77,8 +77,8 @@ const editor = () => screen.getByRole('textbox', { name: /APL/i });
  * Through a shared link rather than through the editor: CodeMirror is a
  * contenteditable and does not respond to synthetic events in jsdom, so a
  * "paste" here would silently do nothing and the test would pass for the wrong
- * reason. The paste itself is reproduced in a real browser in
- * `tests/e2e/pastedSource.spec.ts`; what this establishes is the same mismatch —
+ * reason. The paste itself is exercised in a real browser in
+ * `tests/e2e/pastedSource.spec.ts`; what this establishes is the same pairing —
  * this source, that preset's metadata — by a door that works in jsdom.
  */
 function openWithForeignSource(presetId: string, code: string, service: MockAplExecutionService) {
@@ -90,63 +90,115 @@ function openWithForeignSource(presetId: string, code: string, service: MockAplE
     palette: 'ember',
     render: { invert: false, rotation: 0, mirrorH: false, mirrorV: false, smooth: false },
   });
-  render(<WorkspacePage presetId={presetId} sharedState={encoded} service={service} />);
+  return render(<WorkspacePage presetId={presetId} sharedState={encoded} service={service} />);
+}
+
+async function runAndFinish(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /^Run/ }));
+  await waitFor(() => expect(screen.getByText(/Finished in/)).toBeInTheDocument(), { timeout: 5000 });
 }
 
 describe('pasting Julia’s program into another artwork', () => {
-  it('is refused for being too tall, and says to change the preset', async () => {
+  it('draws all 128 rows of it, from a preset that never declared it could', async () => {
     const user = userEvent.setup();
     const service = limitedService();
     openWithForeignSource(modularBloom.id, juliaSet.code, service);
 
     await screen.findByText(/shared with you/);
     expect(editor().textContent).toContain('realC←');
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
 
-    /*
-     * The current failure, recorded as it is. Two things are wrong with it: the
-     * artwork was refused for a property of the destination rather than of the
-     * source, and the remedy offered is an instruction to edit the source code
-     * of the application.
-     */
-    const shown = await screen.findAllByText(/too tall to fetch in one go/);
+    await runAndFinish(user);
 
-    /*
-     * Twice, which is the third thing wrong with it. The same sentence is
-     * rendered by the run status — a polite live region — and again by the error
-     * panel beneath it, so it is seen twice and heard twice.
-     */
-    expect(shown).toHaveLength(2);
-    expect(shown[0]?.getAttribute('role')).toBe('status');
-
-    // And the remedy is an instruction to edit the application's own source.
-    expect(shown[0]?.textContent).toContain('mark the preset as high resolution');
-
-    // 92, because a reply of exactly 93 lines cannot be told from a truncated
-    // one, so the last usable row is one below the cap.
-    expect(shown[0]?.textContent).toContain('at most 92 rows');
-
-    // One request: refused after the direct read came back at the cap. The
-    // program ran on the service and its result was thrown away.
-    expect(service.executionCount).toBe(1);
+    // The whole artwork, not a refusal and not a truncation.
+    expect(screen.getByRole('img', { name: /grid/ })).toHaveAccessibleName(/128 by 128/);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(service.executionCount).toBeGreaterThan(1);
   });
 
-  it('runs from Julia’s own preset, with the identical source', async () => {
+  it('costs the same as running it from Julia’s own preset', async () => {
     /*
-     * The control. Character for character the same program, and the only
-     * difference is which gallery entry is open — which is the whole finding.
+     * The control, and now the equality. Character for character the same
+     * program; the gallery entry that happens to be open no longer changes what
+     * it costs or whether it runs at all.
      */
     const user = userEvent.setup();
-    const service = limitedService();
-    render(<WorkspacePage presetId={juliaSet.id} sharedState={null} service={service} />);
 
+    const pasted = limitedService();
+    const mounted = openWithForeignSource(modularBloom.id, juliaSet.code, pasted);
+    await screen.findByText(/shared with you/);
+    await runAndFinish(user);
+    const pastedRequests = pasted.executionCount;
+
+    // Unmounted rather than emptied, so the second render starts from nothing and
+    // the queries below cannot find the first artwork's elements.
+    mounted.unmount();
+
+    const own = limitedService();
+    render(<WorkspacePage presetId={juliaSet.id} sharedState={null} service={own} />);
     expect(editor().textContent).toContain('realC←');
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await runAndFinish(user);
 
-    await waitFor(() => expect(screen.getByText(/Finished in/)).toBeInTheDocument(), { timeout: 5000 });
     expect(screen.getByRole('img', { name: /grid/ })).toHaveAccessibleName(/128 by 128/);
+    expect(own.executionCount).toBe(pastedRequests);
+  });
 
-    // Banded: a probe and then slices, each re-running the whole program.
-    expect(service.executionCount).toBeGreaterThan(1);
+  it('says the program was run more than once, because it was', async () => {
+    const user = userEvent.setup();
+    openWithForeignSource(modularBloom.id, juliaSet.code, limitedService());
+    await screen.findByText(/shared with you/);
+    await runAndFinish(user);
+
+    /*
+     * Once, not twice: a banded result really is several evaluations joined
+     * together, and code that uses randomness can differ between the joins. It is
+     * worth saying, and worth saying only where it is true.
+     */
+    const notes = screen.getAllByText(/run several times/);
+    expect(notes).toHaveLength(1);
+  });
+
+  it('says nothing of the sort for an artwork that came back in one request', async () => {
+    const user = userEvent.setup();
+    const service = limitedService(tall(8));
+    render(<WorkspacePage presetId={modularBloom.id} sharedState={null} service={service} />);
+
+    await runAndFinish(user);
+
+    expect(service.executionCount).toBe(1);
+    expect(screen.queryByText(/run several times/)).not.toBeInTheDocument();
+  });
+});
+
+describe('a refusal', () => {
+  it('is shown once, and never tells the visitor to edit the application', async () => {
+    const user = userEvent.setup();
+    // Past the workspace's matrix limits, which is the one size question left.
+    const service = limitedService(tall(300));
+    render(<WorkspacePage presetId={modularBloom.id} sharedState={null} service={service} />);
+
+    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    const alert = await screen.findByRole('alert');
+
+    /*
+     * The detailed sentence used to appear in the polite status region as well as
+     * in this alert, so it was read out twice as though two things had gone
+     * wrong. The status region now says only that the run failed.
+     */
+    const shown = screen.getAllByText(/too large for APL Art to draw safely/);
+    expect(shown).toHaveLength(1);
+    expect(alert).toContainElement(shown[0] ?? null);
+    /*
+     * Checked across every status region, because there is more than one on the
+     * page: one of them says that the run failed, and none of them repeats what
+     * the alert has already said.
+     */
+    const statuses = screen.getAllByRole('status').map((status) => status.textContent ?? '');
+    expect(statuses).toContain('Run failed.');
+    expect(statuses.some((text) => text.includes('too large'))).toBe(false);
+
+    // And the remedy is something the visitor can act on, not an instruction to
+    // change the source code of the application.
+    expect(alert.textContent).toContain('Reduce the size and run again');
+    expect(document.body.textContent).not.toContain('high resolution');
   });
 });

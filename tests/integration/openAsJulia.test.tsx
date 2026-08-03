@@ -24,7 +24,7 @@ import { fromNested, type NumericMatrix } from '@/matrix/matrixTypes';
 import { juliaSet } from '@/presets/julia-set';
 import { mandelbrotField } from '@/presets/mandelbrot-field';
 import { modularBloom } from '@/presets/modular-bloom';
-import { PROBE_MARKER } from '@/execution/transport';
+import { ADAPTIVE_MARKER } from '@/execution/adaptiveProbe';
 import { decodeShareState } from '@/sharing/decodeShareState';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
 
@@ -123,9 +123,13 @@ function pressDisplayCell(row: number, column: number) {
   fireEvent.pointerUp(target, { button: 0, pointerId: 1, clientX: x, clientY: y });
 }
 
-/** How many runs have happened, counted by probes rather than by requests. */
+/**
+ * How many runs have happened, counted by first requests rather than by every
+ * request: one run sends exactly one first request, and then as many bands as
+ * the result needs.
+ */
 function runCount(received: readonly string[]): number {
-  return received.filter((code) => code.includes(PROBE_MARKER)).length;
+  return received.filter((code) => code.includes(ADAPTIVE_MARKER)).length;
 }
 
 /** The token the action navigated to, or null if it did not navigate. */

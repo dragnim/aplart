@@ -129,13 +129,12 @@ describe('the type probe', () => {
 });
 
 describe('running a whole artwork', () => {
-  it('draws a direct-transport preset end to end', async () => {
+  it('draws a small artwork end to end in one request', async () => {
     const outcome = await runArtwork({
       service: service(),
       source: ['⍝ Controls', 'size←64', 'modulus←9', '', '⍝ Generate the artwork', 'modulus|∘.×⍨⍳size'].join(
         '\n',
       ),
-      highResolution: false,
       limits: LIMITS,
       timeoutMs: 20_000,
     });
@@ -149,11 +148,10 @@ describe('running a whole artwork', () => {
     await pause();
   });
 
-  it('reassembles a banded preset that exceeds the single-request limit', async () => {
+  it('reassembles an artwork too large to print, in bands', async () => {
     const outcome = await runArtwork({
       service: service(),
       source: 'size←160\n9|∘.×⍨⍳size',
-      highResolution: true,
       limits: LIMITS,
       timeoutMs: 20_000,
     });
@@ -181,7 +179,6 @@ describe('running a whole artwork', () => {
       runArtwork({
         service: service(),
         source: "size←3\nsize size⍴'abcdefghi'",
-        highResolution: true,
         limits: LIMITS,
         timeoutMs: 20_000,
       }),

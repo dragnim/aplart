@@ -1,19 +1,19 @@
 /**
- * A prototype of a single adaptive first request.
+ * A single adaptive first request.
  *
- * Not wired into the application. The question it exists to answer: can one
- * request evaluate the source, decide whether the result is drawable, measure
- * how wide and how tall its printed form would be, and then either return the
- * whole matrix or say precisely why it could not — so that no execution is ever
- * spent and discarded.
+ * One request evaluates the source, decides whether the result is drawable,
+ * measures how wide and how tall its printed form would be, and then either
+ * returns the whole matrix or says precisely why it could not — so no execution
+ * is ever spent and discarded, and no preset metadata is consulted.
  *
  * The decision is made in APL, because only APL knows how it will format its own
  * numbers. Deciding on the client from the row count alone would miss a short
  * matrix of very wide values, which truncates at the line-length cap instead.
  */
 
-import { type ExecutionCapabilities } from '@/execution/AplExecutionService';
-import { elementTypeOf, type AplElementType } from '@/execution/transport';
+import { type NumericMatrix } from '@/matrix/matrixTypes';
+import { type ExecutionCapabilities } from './AplExecutionService';
+import { bindResult, elementTypeOf, formatBandReply, type AplElementType } from './transport';
 
 /**
  * The token that says "this is metadata, not an artwork".
@@ -25,22 +25,16 @@ import { elementTypeOf, type AplElementType } from '@/execution/transport';
  */
 export const ADAPTIVE_MARKER = '⍝APLART1';
 
-/** The APL name the wrapper binds the user's result to. */
+/** The APL name `bindResult` binds the user's result to. */
 const RESULT = 'r';
-
-function bindResult(statements: readonly string[]): string {
-  const leading = statements.slice(0, -1);
-  const final = statements[statements.length - 1] ?? '';
-  return [...leading, `${RESULT}←(${final})`].join(' ⋄ ');
-}
 
 /**
  * One request that returns the artwork, or the reason it cannot.
  *
  * `n<lines` and `w<width` are both strict. At exactly the line cap a reply is
- * indistinguishable from one truncated there, which is the rule the existing
- * direct path already applies; the same argument holds at the width cap, and
- * whether it is needed in practice is one of the things the prototype measures.
+ * indistinguishable from one truncated there; the same argument holds at the
+ * width cap. Measured: 92 lines print and 93 band, 989 characters print and 998
+ * band.
  */
 export function buildAdaptiveExpression(
   statements: readonly string[],
@@ -114,9 +108,22 @@ export function parseAdaptiveReply(lines: readonly string[]): AdaptiveReply {
     dataRepresentation === undefined ||
     count === undefined ||
     width === undefined ||
-    !Number.isFinite(rank)
+    !numbers.every((value) => Number.isFinite(value))
   ) {
     return { kind: 'error', reason: `could not read the metadata: "${first}"` };
+  }
+
+  /*
+   * One axis length per axis, or the line is not describing what it claims to.
+   * Nothing downstream would notice a missing axis — a rank-2 reply with one
+   * number would simply be read as a matrix with zero columns — so the reply is
+   * refused here instead.
+   */
+  if (shape.length !== rank) {
+    return {
+      kind: 'error',
+      reason: `the metadata reported rank ${String(rank)} but gave ${String(shape.length)} axis lengths`,
+    };
   }
 
   return {
@@ -129,4 +136,45 @@ export function parseAdaptiveReply(lines: readonly string[]): AdaptiveReply {
     width,
     shape,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Reply formatting, used by the mock service and the end-to-end stub to
+// imitate the backend. Nothing here runs in the production build.
+// ---------------------------------------------------------------------------
+
+/**
+ * Formats what the adaptive request would return for a given matrix.
+ *
+ * The same decision the APL makes, made the same way: print the whole thing,
+ * measure it, and hand back metadata instead if it would not have fitted. A
+ * stub that returned the matrix unconditionally would never exercise the banded
+ * path, and one that returned metadata unconditionally would never exercise the
+ * complete path.
+ */
+export function formatAdaptiveReply(matrix: NumericMatrix, capabilities: ExecutionCapabilities): string[] {
+  // Printed against no caps at all, because the width that decides the outcome
+  // is the width before the backend would have cut it.
+  const printed = formatBandReply(matrix, '', {
+    ...capabilities,
+    maxOutputLines: Number.MAX_SAFE_INTEGER,
+    maxLineLength: Number.MAX_SAFE_INTEGER,
+  });
+  const count = printed.length;
+  const width = printed.reduce((widest, line) => Math.max(widest, line.length), 0);
+
+  // Strict on both, as the APL is: at either cap the reply is indistinguishable
+  // from one truncated there.
+  if (count < capabilities.maxOutputLines && width < capabilities.maxLineLength) {
+    return printed;
+  }
+
+  const onlyZeroAndOne = matrix.values.every((value) => value === 0 || value === 1);
+  const everyValueIsInteger = matrix.values.every((value) => Number.isInteger(value));
+  const dataRepresentation = onlyZeroAndOne ? 11 : everyValueIsInteger ? 83 : 645;
+
+  return [
+    `${ADAPTIVE_MARKER} 2 1 ${String(dataRepresentation)} ${String(count)} ${String(width)} ` +
+      `${String(matrix.rows)} ${String(matrix.columns)}`,
+  ];
 }

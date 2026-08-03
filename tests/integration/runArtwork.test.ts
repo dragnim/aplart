@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ADAPTIVE_MARKER } from '@/execution/adaptiveProbe';
 import { MockAplExecutionService } from '@/execution/MockAplExecutionService';
 import { TRYAPL_CAPABILITIES } from '@/execution/TryAplExecutionService';
 import { AplExecutionError } from '@/execution/errors';
@@ -29,7 +30,7 @@ async function expectFailure(promise: Promise<unknown>): Promise<AplExecutionErr
   throw new Error('expected the run to fail, but it succeeded');
 }
 
-describe('runArtwork, direct transport', () => {
+describe('runArtwork, running a source', () => {
   it('runs a preset and returns its matrix', async () => {
     const service = constrainedService();
     service.register(
@@ -44,7 +45,6 @@ describe('runArtwork, direct transport', () => {
     const run = await runArtwork({
       service,
       source: '⍝ Controls\nsize←3\n\n⍝ Draw\nsize size⍴⍳9',
-      highResolution: false,
       limits: LIMITS,
       timeoutMs: 5000,
     });
@@ -70,12 +70,15 @@ describe('runArtwork, direct transport', () => {
     await runArtwork({
       service,
       source: '⍝ Controls\nsize←2 ⍝ how big\n\nsize size⍴⍳4',
-      highResolution: false,
       limits: LIMITS,
       timeoutMs: 5000,
     });
 
-    expect(service.received[0]).toBe('size←2 ⋄ size size⍴⍳4');
+    // Wrapped, never replaced: the artwork is still computed by the statements
+    // the editor showed, with only the comments gone.
+    expect(service.received[0]).toContain('size←2 ⋄ r←(size size⍴⍳4)');
+    expect(service.received[0]).not.toContain('how big');
+    expect(service.received[0]).not.toContain('Controls');
   });
 
   it('reports the value range for the accessible description', async () => {
@@ -91,7 +94,6 @@ describe('runArtwork, direct transport', () => {
     const run = await runArtwork({
       service,
       source: 'x←1\n2 2⍴0 5 10 5',
-      highResolution: false,
       limits: LIMITS,
       timeoutMs: 5000,
     });
@@ -108,7 +110,6 @@ describe('runArtwork, direct transport', () => {
       runArtwork({
         service,
         source: 'size←3\nsize size⍴⍳8',
-        highResolution: false,
         limits: LIMITS,
         timeoutMs: 5000,
       }),
@@ -128,7 +129,6 @@ describe('runArtwork, direct transport', () => {
       runArtwork({
         service,
         source: "x←1\n2 3⍴'abcdef'",
-        highResolution: false,
         limits: LIMITS,
         timeoutMs: 5000,
       }),
@@ -137,24 +137,26 @@ describe('runArtwork, direct transport', () => {
     expect(error.kind).toBe('invalidOutput');
   });
 
-  it('refuses a result that reaches the line cap rather than drawing a truncated one', async () => {
-    // The backend truncates silently, so a result at the cap cannot be
-    // distinguished from one that was cut short.
+  it('fetches a result too tall to print, rather than refusing it', async () => {
+    /*
+     * This used to be a refusal. The backend truncates silently, so a printed
+     * result at the line cap cannot be told from one cut short — but that is an
+     * argument for not printing it, not for declining to fetch it. Nothing about
+     * this source says it is large; the first request finds out.
+     */
     const service = constrainedService();
-    service.register('default', gradient(200, 4));
+    const expected = gradient(200, 4);
+    service.register('default', expected);
 
-    const error = await expectFailure(
-      runArtwork({
-        service,
-        source: 'size←200\nsize 4⍴⍳800',
-        highResolution: false,
-        limits: LIMITS,
-        timeoutMs: 5000,
-      }),
-    );
+    const run = await runArtwork({
+      service,
+      source: 'size←200\nsize 4⍴⍳800',
+      limits: LIMITS,
+      timeoutMs: 5000,
+    });
 
-    expect(error.kind).toBe('tooLarge');
-    expect(error.message).toContain('high resolution');
+    expect(Array.from(run.matrix.values)).toEqual(Array.from(expected.values));
+    expect(run.requestCount).toBeGreaterThan(1);
   });
 
   it('rejects a result smaller than 2x2', async () => {
@@ -164,7 +166,6 @@ describe('runArtwork, direct transport', () => {
       runArtwork({
         service,
         source: 'x←1\n1 1⍴7',
-        highResolution: false,
         limits: LIMITS,
         timeoutMs: 5000,
       }),
@@ -181,7 +182,6 @@ describe('runArtwork, direct transport', () => {
       runArtwork({
         service,
         source: '⍝ nothing to run',
-        highResolution: false,
         limits: LIMITS,
         timeoutMs: 5000,
       }),
@@ -201,7 +201,6 @@ describe('runArtwork, banded transport', () => {
     const run = await runArtwork({
       service,
       source: 'size←256\nsize size⍴⍳65536',
-      highResolution: true,
       limits: LIMITS,
       timeoutMs: 5000,
     });
@@ -211,34 +210,32 @@ describe('runArtwork, banded transport', () => {
     // Every one of the 65,536 cells, in the right order.
     expect(Array.from(run.matrix.values)).toEqual(Array.from(expected.values));
 
-    // One probe plus the bands, and far fewer than a request per row.
+    // The first request plus the bands, and far fewer than a request per row.
     expect(run.requestCount).toBeGreaterThan(1);
     expect(run.requestCount).toBeLessThanOrEqual(10);
   });
 
-  it('probes for the shape before transferring anything', async () => {
+  it('measures the result in its first request, before transferring anything', async () => {
     const service = constrainedService();
     service.register('default', gradient(120, 120));
 
     await runArtwork({
       service,
       source: 'size←120\nsize size⍴⍳14400',
-      highResolution: true,
       limits: LIMITS,
       timeoutMs: 5000,
     });
 
-    expect(service.received[0]).toContain('(≢⍴r),(≡r),(⎕DR r)');
+    expect(service.received[0]).toContain(ADAPTIVE_MARKER);
   });
 
-  it('rejects a nested result from the probe alone, transferring no data', async () => {
-    const service = new MockAplExecutionService({ cannedOutput: ['2 2 326 2 2'] });
+  it('rejects a nested result from the first request alone, transferring no data', async () => {
+    const service = new MockAplExecutionService({ cannedOutput: [`${ADAPTIVE_MARKER} 2 2 326 0 0 2 2`] });
 
     const error = await expectFailure(
       runArtwork({
         service,
         source: 'x←1\n2 2⍴(1 2)(3 4)(5 6)(7 8)',
-        highResolution: true,
         limits: LIMITS,
         timeoutMs: 5000,
       }),
@@ -249,14 +246,13 @@ describe('runArtwork, banded transport', () => {
     expect(service.executionCount).toBe(1);
   });
 
-  it('rejects complex numbers from the probe', async () => {
-    const service = new MockAplExecutionService({ cannedOutput: ['2 1 1289 2 2'] });
+  it('rejects complex numbers from the first request', async () => {
+    const service = new MockAplExecutionService({ cannedOutput: [`${ADAPTIVE_MARKER} 2 1 1289 0 0 2 2`] });
 
     const error = await expectFailure(
       runArtwork({
         service,
         source: 'x←1\n2 2⍴1J2 3J4 5 6',
-        highResolution: true,
         limits: LIMITS,
         timeoutMs: 5000,
       }),
@@ -265,14 +261,13 @@ describe('runArtwork, banded transport', () => {
     expect(error.message).toContain('complex numbers');
   });
 
-  it('rejects the wrong rank from the probe', async () => {
-    const service = new MockAplExecutionService({ cannedOutput: ['1 1 83 5'] });
+  it('rejects the wrong rank from the first request', async () => {
+    const service = new MockAplExecutionService({ cannedOutput: [`${ADAPTIVE_MARKER} 1 1 83 0 0 5`] });
 
     const error = await expectFailure(
       runArtwork({
         service,
         source: 'x←1\n⍳5',
-        highResolution: true,
         limits: LIMITS,
         timeoutMs: 5000,
       }),
@@ -281,21 +276,25 @@ describe('runArtwork, banded transport', () => {
     expect(error.message).toContain('rank-1');
   });
 
-  it('rejects an oversized result after the probe, before fetching any of it', async () => {
-    const service = new MockAplExecutionService({ cannedOutput: ['2 1 83 700 700'] });
+  it('rejects an oversized result after one request, before fetching any of it', async () => {
+    const service = new MockAplExecutionService({
+      cannedOutput: [`${ADAPTIVE_MARKER} 2 1 83 700 2100 700 700`],
+    });
 
     const error = await expectFailure(
       runArtwork({
         service,
         source: 'size←700\nsize size⍴1',
-        highResolution: true,
         limits: LIMITS,
         timeoutMs: 5000,
       }),
     );
 
     expect(error.kind).toBe('tooLarge');
-    expect(error.message).toBe('This artwork returned a 700×700 matrix. The current limit is 256×256.');
+    expect(error.message).toBe(
+      'This matrix is too large for APL Art to draw safely: 700×700, where the limit is 256×256. ' +
+        'Reduce the size and run again.',
+    );
     expect(service.executionCount).toBe(1);
   });
 
@@ -311,7 +310,6 @@ describe('runArtwork, banded transport', () => {
     const run = await runArtwork({
       service,
       source: 'size←120\nsize size⍴x',
-      highResolution: true,
       limits: LIMITS,
       timeoutMs: 5000,
     });
@@ -334,7 +332,6 @@ describe('runArtwork, banded transport', () => {
     const run = await runArtwork({
       service,
       source: 'size←100\nsize size⍴x',
-      highResolution: true,
       limits: LIMITS,
       timeoutMs: 5000,
     });
@@ -353,7 +350,6 @@ describe('runArtwork, reporting progress', () => {
     const run = await runArtwork({
       service,
       source: ['size←256', 'size size⍴⍳65536'].join('\n'),
-      highResolution: true,
       limits: LIMITS,
       timeoutMs: 5000,
       onProgress: (progress) => reports.push(progress),
@@ -378,7 +374,6 @@ describe('runArtwork, reporting progress', () => {
     await runArtwork({
       service,
       source: ['size←256', 'size size⍴⍳65536'].join('\n'),
-      highResolution: true,
       limits: LIMITS,
       timeoutMs: 5000,
       onProgress: (progress) => reports.push(progress),
@@ -413,7 +408,6 @@ describe('runArtwork, reporting progress', () => {
     await runArtwork({
       service,
       source: ['size←256', 'size size⍴⍳65536'].join('\n'),
-      highResolution: true,
       limits: LIMITS,
       timeoutMs: 5000,
       onProgress: (progress) => reports.push(progress),
@@ -430,7 +424,7 @@ describe('runArtwork, reporting progress', () => {
     expect(first.values.every((value) => value === 0)).toBe(true);
   });
 
-  it('says nothing at all for a direct run', async () => {
+  it('says nothing at all for a one-request run', async () => {
     const service = constrainedService();
     service.register(
       'default',
@@ -444,7 +438,6 @@ describe('runArtwork, reporting progress', () => {
     await runArtwork({
       service,
       source: '2 2⍴1 2 3 4',
-      highResolution: false,
       limits: LIMITS,
       timeoutMs: 5000,
       onProgress: (progress) => reports.push(progress),

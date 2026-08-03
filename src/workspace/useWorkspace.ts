@@ -106,11 +106,22 @@ export function useWorkspace({ preset, service, initialState }: UseWorkspaceOpti
               if (!mounted.current || token !== runToken.current) return;
               dispatch({ type: 'runProgressed', progress: { ...progress, source } });
             },
-            highResolution: preset.outputLimits?.highResolution ?? false,
+            /*
+             * The workspace's limits, and the same ones for every source.
+             *
+             * A preset used to be able to override these, and to declare which
+             * transport its source needed. Both were decided before the code ran
+             * — and the code in the editor is not the code the preset shipped, so
+             * the declaration could be about a different program entirely. How to
+             * fetch a result is now settled by the result; how large a matrix
+             * this application will draw is settled here, once. A program's own
+             * memory ceiling stays where a visitor can see it, as the Resolution
+             * slider's maximum.
+             */
             limits: {
-              maxRows: preset.outputLimits?.maxRows ?? config.maxMatrixRows,
-              maxColumns: preset.outputLimits?.maxColumns ?? config.maxMatrixColumns,
-              maxCells: preset.outputLimits?.maxCells ?? config.maxMatrixCells,
+              maxRows: config.maxMatrixRows,
+              maxColumns: config.maxMatrixColumns,
+              maxCells: config.maxMatrixCells,
             },
             timeoutMs: config.requestTimeoutMs,
             signal: controller.signal,

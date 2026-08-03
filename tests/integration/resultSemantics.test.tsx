@@ -153,9 +153,14 @@ async function openAndRun(options: { readonly at60?: NumericMatrix | 'oversized'
   if (options.at60 !== undefined) {
     service.register(
       'iterations←60',
-      // Beyond the preset's declared cell limit, so the run fails on validation
-      // the way a genuinely too-large result would.
-      options.at60 === 'oversized' ? counts(60, 200) : options.at60,
+      /*
+       * Beyond the workspace's matrix limits, so the run fails on validation the
+       * way a genuinely too-large result would. It used to be 200², which was
+       * beyond a limit this preset declared for itself; those are gone, and 200²
+       * now draws — which is the point of removing them. 300² is past the limits
+       * that remain.
+       */
+      options.at60 === 'oversized' ? counts(60, 300) : options.at60,
     );
   }
   service.register('default', counts(CEILING));

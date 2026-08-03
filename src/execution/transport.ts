@@ -2,16 +2,16 @@
  * Getting a matrix out of a backend that truncates its output.
  *
  * TryAPL cuts every response at 93 lines of 995 characters, silently, and does
- * not keep variables between requests. Two strategies follow from that:
+ * not keep variables between requests.
  *
- * **Direct** — send the expression, read the matrix APL prints. One request,
- * exact values, but limited to roughly 90 rows. This is what almost every
- * preset uses.
+ * The first request — built in `adaptiveProbe.ts` — returns the whole matrix
+ * whenever its printed form fits inside those caps, which is almost every
+ * artwork. What is left here is the fallback for the ones that do not: fetch the
+ * flattened result in slices, re-executing the expression for each one, and
+ * stitch them back together. Several requests, still exact, and it reaches
+ * 256×256.
  *
- * **Banded** — ask APL for the shape and type first, then fetch the flattened
- * result in slices, re-executing the expression for each one, and stitch them
- * back together. Several requests, still exact, and it reaches 256x256. Only
- * presets that declare `highResolution` pay for it.
+ * Which of the two happens is decided by the result, never by the preset.
  *
  * The APL generated here wraps the user's expression; it never replaces it.
  * The artwork is still computed by the code shown in the editor.
@@ -21,13 +21,12 @@ import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type ExecutionCapabilities } from './AplExecutionService';
 
 /**
- * Distinctive fragments of the generated expressions.
+ * A distinctive fragment of the generated band expression.
  *
- * The mock service matches on these to tell a probe from a band read. They are
- * substrings of real APL rather than injected comments, because comments are
+ * The mock service matches on it to tell a band read from a first request. It is
+ * a substring of real APL rather than an injected comment, because comments are
  * stripped before anything is sent.
  */
-export const PROBE_MARKER = '(≢⍴r),(≡r),(⎕DR r)';
 export const BAND_MARKER = '⌈(≢b)÷';
 
 /** The APL name the wrapper binds the user's result to. */
@@ -72,74 +71,10 @@ export function isDrawableType(type: AplElementType): boolean {
  * returns a rank-1 result for it. The setup statements have to stay outside
  * the assignment.
  */
-function bindResult(statements: readonly string[]): string {
+export function bindResult(statements: readonly string[]): string {
   const leading = statements.slice(0, -1);
   const final = statements[statements.length - 1] ?? '';
   return [...leading, `${RESULT}←(${final})`].join(' ⋄ ');
-}
-
-/**
- * Asks for the shape and type of the result without transferring it.
- *
- * Rank, depth and `⎕DR` together reject everything the renderer cannot draw —
- * nested arrays, character data, complex numbers, wrong rank — before a single
- * cell crosses the wire, and with a precise reason rather than a guess made
- * from the printed text.
- */
-export function buildProbeExpression(statements: readonly string[]): string {
-  return `${bindResult(statements)} ⋄ ${PROBE_MARKER},(⍴${RESULT})`;
-}
-
-export interface ProbeReply {
-  readonly rank: number;
-  readonly depth: number;
-  readonly dataRepresentation: number;
-  readonly elementType: AplElementType;
-  readonly shape: readonly number[];
-}
-
-export type ProbeParseResult =
-  { readonly ok: true; readonly probe: ProbeReply } | { readonly ok: false; readonly reason: string };
-
-export function parseProbeReply(lines: readonly string[]): ProbeParseResult {
-  const text = lines.join(' ').trim();
-  if (text === '') return { ok: false, reason: 'the shape probe returned nothing' };
-
-  const tokens = text.split(/\s+/u);
-  const numbers: number[] = [];
-  for (const token of tokens) {
-    const value = Number(token.replaceAll('¯', '-'));
-    if (!Number.isFinite(value)) {
-      return { ok: false, reason: `the shape probe returned “${token}”, which is not a number` };
-    }
-    numbers.push(value);
-  }
-
-  // rank, depth and ⎕DR, then one value per axis.
-  if (numbers.length < 3) {
-    return { ok: false, reason: `the shape probe returned only ${numbers.length} values` };
-  }
-
-  const [rank, depth, dataRepresentation] = numbers as [number, number, number];
-  const shape = numbers.slice(3);
-
-  if (shape.length !== rank) {
-    return {
-      ok: false,
-      reason: `the shape probe reported rank ${rank} but gave ${shape.length} axis lengths`,
-    };
-  }
-
-  return {
-    ok: true,
-    probe: {
-      rank,
-      depth,
-      dataRepresentation,
-      elementType: elementTypeOf(dataRepresentation),
-      shape,
-    },
-  };
 }
 
 /**
@@ -227,15 +162,6 @@ export function estimateValueWidth(type: AplElementType): number {
 // ---------------------------------------------------------------------------
 // Reply formatting, used by MockAplExecutionService to imitate the backend.
 // ---------------------------------------------------------------------------
-
-/** Formats what `buildProbeExpression` would return for a given matrix. */
-export function formatProbeReply(matrix: NumericMatrix): string[] {
-  const everyValueIsInteger = matrix.values.every((value) => Number.isInteger(value));
-  const onlyZeroAndOne = matrix.values.every((value) => value === 0 || value === 1);
-  const dataRepresentation = onlyZeroAndOne ? 11 : everyValueIsInteger ? 83 : 645;
-
-  return [`2 1 ${dataRepresentation} ${matrix.rows} ${matrix.columns}`];
-}
 
 /**
  * Formats what a band read — or a direct read — would return.

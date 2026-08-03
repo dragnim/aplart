@@ -45,7 +45,6 @@ for (const precision of [645, 1287] as const) {
   const run = await runArtwork({
     service,
     source: source(precision),
-    highResolution: false,
     limits: { maxRows: 320, maxColumns: 320, maxCells: 102_400 },
     timeoutMs: 120_000,
   });

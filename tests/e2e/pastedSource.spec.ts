@@ -1,14 +1,16 @@
 /**
  * Pasting one artwork's program into another, for real.
  *
- * A reproduction, not a fix. Only a browser can do the actual paste — CodeMirror
- * is a contenteditable and ignores synthetic events — so this is where the
- * problem is demonstrated as a visitor meets it: select all, paste Julia's
- * program into Modular Bloom, press Run, and be told the artwork is too tall and
- * that the remedy is to mark the preset as high resolution.
+ * This began as a reproduction: only a browser can do the actual paste —
+ * CodeMirror is a contenteditable and ignores synthetic events — so this is
+ * where the problem was demonstrated as a visitor met it. Select all, paste
+ * Julia's program into Modular Bloom, press Run, and be told the artwork was too
+ * tall and that the remedy was to mark the preset as high resolution.
  *
- * Expected to change when the design does. It is here so the current behaviour
- * is written down rather than described.
+ * It is now the proof that a pasted program runs, inverted rather than deleted so
+ * that the fault cannot return unnoticed. The claim under test is the one the
+ * application rests on: what a piece of APL does is decided by the APL, not by
+ * which gallery entry happens to be open.
  */
 
 import { expect, test, type Page } from '@playwright/test';
@@ -39,43 +41,64 @@ function runStatus(page: Page) {
   return page.locator('[role="status"][data-status]');
 }
 
+/** Pastes the program into whichever artwork is open, and runs it. */
+async function pasteAndRun(page: Page) {
+  await page.locator('.cm-content').fill(JULIA);
+  await expect(page.locator('.cm-content')).toContainText('realC←¯0.8');
+  await page.getByRole('button', { name: /^Run/ }).click();
+  await expect(runStatus(page).first()).not.toHaveText(/Running/, { timeout: 30_000 });
+}
+
 test.describe('a pasted program', () => {
   test.use({ viewport: WIDE });
 
-  test('is refused by an artwork that does not declare high resolution', async ({ page }) => {
-    await stubTryApl(page);
+  test('draws in an artwork that never declared it could be this large', async ({ page }) => {
+    const stub = await stubTryApl(page);
     await page.goto('./#/art/modular-bloom');
 
-    // Exactly what a visitor does: replace the contents and press Run.
-    await page.locator('.cm-content').fill(JULIA);
-    await expect(page.locator('.cm-content')).toContainText('realC←¯0.8');
-    await page.getByRole('button', { name: /^Run/ }).click();
-    await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
+    await pasteAndRun(page);
 
-    /*
-     * Refused for a property of the destination artwork rather than of the
-     * program, with a remedy addressed to whoever maintains the application.
-     */
-    await expect(page.getByText(/too tall to fetch in one go/).first()).toBeVisible();
-    await expect(page.getByText(/mark the preset as high resolution/).first()).toBeVisible();
+    // All 128 rows of somebody else's program, drawn from Modular Bloom.
+    await expect(page.locator('canvas').first()).toHaveAttribute('aria-label', /128 by 128/);
+    await expect(page.getByText(/too tall/)).toHaveCount(0);
+    await expect(page.getByText(/high resolution/)).toHaveCount(0);
 
-    // Said twice: once by the run status and once by the error panel.
-    expect(await page.getByText(/too tall to fetch in one go/).count()).toBe(2);
+    // More than one request, because a 128-row result cannot be printed.
+    expect(stub.requests.length).toBeGreaterThan(1);
 
-    // The source is untouched, which is the one thing that is right about it.
+    // The source is untouched: what ran is what is on screen.
     await expect(page.locator('.cm-content')).toContainText('realC←¯0.8');
   });
 
-  test('runs when the identical program is opened as Julia', async ({ page }) => {
-    await stubTryApl(page);
+  test('costs the same as the identical program opened as Julia', async ({ page }) => {
+    const stub = await stubTryApl(page);
     await page.goto('./#/art/julia-set');
 
-    await page.locator('.cm-content').fill(JULIA);
-    await page.getByRole('button', { name: /^Run/ }).click();
-    await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
+    await pasteAndRun(page);
 
-    // The same text, and no complaint. What differs is the preset it sits in.
     await expect(page.locator('canvas').first()).toHaveAttribute('aria-label', /128 by 128/);
-    await expect(page.getByText(/too tall/)).toHaveCount(0);
+
+    /*
+     * Recorded rather than compared across tests, which would need shared state
+     * between two Playwright workers. The count is asserted against the arithmetic
+     * instead: one first request, then a band per slice of 16,384 values, which is
+     * a handful and nothing like a request per row.
+     */
+    expect(stub.requests.length).toBeGreaterThan(1);
+    expect(stub.requests.length).toBeLessThan(12);
+  });
+
+  test('says the program was run more than once, and only when it was', async ({ page }) => {
+    await stubTryApl(page);
+    await page.goto('./#/art/modular-bloom');
+
+    // Small: Modular Bloom's own 64×64 result prints, so it is one evaluation.
+    await page.getByRole('button', { name: /^Run/ }).click();
+    await expect(runStatus(page).first()).not.toHaveText(/Running/, { timeout: 30_000 });
+    await expect(page.getByText(/run several times/)).toHaveCount(0);
+
+    // Large: the pasted program is assembled from several, and says so once.
+    await pasteAndRun(page);
+    await expect(page.getByText(/run several times/)).toHaveCount(1);
   });
 });

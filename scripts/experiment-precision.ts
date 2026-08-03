@@ -114,7 +114,7 @@ interface Measured {
   readonly errorKind: string | null;
 }
 
-async function measure(source: string, banded: boolean): Promise<Measured> {
+async function measure(source: string): Promise<Measured> {
   const startedAt = Date.now();
   let requests = 0;
   const counting = {
@@ -131,7 +131,6 @@ async function measure(source: string, banded: boolean): Promise<Measured> {
     const run = await runArtwork({
       service: counting,
       source,
-      highResolution: banded,
       limits: LIMITS,
       timeoutMs: 40_000,
     });
@@ -222,9 +221,9 @@ async function main(): Promise<number> {
   for (const view of VIEWS) {
     for (const size of [64, 128]) {
       for (const iterations of [28, 40, 60]) {
-        const standard = await measure(sourceFor(view, size, iterations, 645), false);
+        const standard = await measure(sourceFor(view, size, iterations, 645));
         await sleep(GAP_MS);
-        const high = await measure(sourceFor(view, size, iterations, 1287), false);
+        const high = await measure(sourceFor(view, size, iterations, 1287));
         await sleep(GAP_MS);
 
         const row = {
@@ -261,10 +260,10 @@ async function main(): Promise<number> {
     }
   }
 
-  // ---- Banded transport. ----
-  console.log('\nBanded transport at high precision\n');
+  // ---- The largest size, where banding is what actually carries the result. ----
+  console.log('\n144² at high precision\n');
   for (const precision of [645, 1287] as const) {
-    const banded = await measure(sourceFor(VIEWS[0] as View, 144, 28, precision), true);
+    const banded = await measure(sourceFor(VIEWS[0] as View, 144, 28, precision));
     await record({
       kind: 'banded',
       precision,
@@ -283,18 +282,24 @@ async function main(): Promise<number> {
     await sleep(GAP_MS);
   }
 
-  // ---- How large each precision can go in one request, and banded. ----
+  /*
+   * ---- How large each precision can go. ----
+   *
+   * One pass rather than two. Banding used to be something a caller asked for,
+   * so this measured with and without it; it is now decided by the result, and
+   * the record says which happened rather than which was asked for.
+   */
   console.log('\nResolution ceiling\n');
   for (const precision of [645, 1287] as const) {
-    for (const banded of [false, true]) {
+    {
       let highest = 0;
       let failures = 0;
       for (const size of [64, 90, 112, 128, 144, 160, 176]) {
-        const outcome = await measure(sourceFor(VIEWS[0] as View, size, 28, precision), banded);
+        const outcome = await measure(sourceFor(VIEWS[0] as View, size, 28, precision));
         await record({
           kind: 'ceiling',
           precision,
-          banded,
+          banded: outcome.requests > 1,
           size,
           ok: outcome.matrix !== null,
           ms: outcome.ms,
@@ -310,9 +315,7 @@ async function main(): Promise<number> {
         }
         await sleep(GAP_MS);
       }
-      console.log(
-        `  ⎕FR ${String(precision).padEnd(5)} ${banded ? 'banded  ' : 'unbanded'} → highest ${String(highest)}²`,
-      );
+      console.log(`  ⎕FR ${String(precision).padEnd(5)} → highest ${String(highest)}²`);
     }
   }
 

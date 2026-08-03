@@ -51,7 +51,6 @@ async function draw(source: string) {
   return runArtwork({
     service: new TryAplExecutionService({ endpoint: ENDPOINT }),
     source,
-    highResolution: mandelbrotField.outputLimits?.highResolution ?? false,
     limits: LIMITS,
     timeoutMs: 30_000,
   });

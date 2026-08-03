@@ -9,7 +9,8 @@
 
 import type { Page, Route } from '@playwright/test';
 import { TRYAPL_CAPABILITIES } from '@/execution/TryAplExecutionService';
-import { PROBE_MARKER, formatBandReply, formatProbeReply } from '@/execution/transport';
+import { ADAPTIVE_MARKER, formatAdaptiveReply } from '@/execution/adaptiveProbe';
+import { formatBandReply } from '@/execution/transport';
 import { fromNested, type NumericMatrix } from '@/matrix/matrixTypes';
 
 export const EXEC_URL = 'https://tryapl.org/Exec';
@@ -200,16 +201,17 @@ function evaluate(expression: string): NumericMatrix | { readonly error: readonl
 /**
  * Formats a reply the way the backend would.
  *
- * The runner asks for a shape before reading a high-resolution artwork in
- * bands, and the same helpers the in-process mock uses are reused here so the
- * two cannot disagree about the wire format.
+ * The first request either carries the whole artwork or reports what would not
+ * fit, and the same helpers the in-process mock uses are reused here so the two
+ * cannot disagree about the wire format — including about which results are
+ * small enough to arrive in one reply.
  */
 function reply(expression: string): readonly string[] {
   const evaluated = evaluate(expression);
   if ('error' in evaluated) return evaluated.error;
 
-  return expression.includes(PROBE_MARKER)
-    ? formatProbeReply(evaluated)
+  return expression.includes(ADAPTIVE_MARKER)
+    ? formatAdaptiveReply(evaluated, TRYAPL_CAPABILITIES)
     : formatBandReply(evaluated, expression, TRYAPL_CAPABILITIES);
 }
 

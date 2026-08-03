@@ -48,7 +48,7 @@ export function validateMatrix(matrix: NumericMatrix, limits: MatrixLimits): Mat
       ok: false,
       failure: {
         kind: 'tooLarge',
-        message: `This artwork returned a ${rows}×${columns} matrix. The current limit is ${limits.maxRows}×${limits.maxColumns}.`,
+        message: `This matrix is too large for APL Art to draw safely: ${rows}×${columns}, where the limit is ${limits.maxRows}×${limits.maxColumns}. Reduce the size and run again.`,
         rows,
         columns,
       },
@@ -61,7 +61,7 @@ export function validateMatrix(matrix: NumericMatrix, limits: MatrixLimits): Mat
       ok: false,
       failure: {
         kind: 'tooLarge',
-        message: `This artwork returned ${cells.toLocaleString('en-GB')} cells. The current limit is ${limits.maxCells.toLocaleString('en-GB')}.`,
+        message: `This matrix is too large for APL Art to draw safely: ${cells.toLocaleString('en-GB')} cells, where the limit is ${limits.maxCells.toLocaleString('en-GB')}. Reduce the size and run again.`,
         rows,
         columns,
       },

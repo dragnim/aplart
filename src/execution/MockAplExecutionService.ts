@@ -2,7 +2,7 @@
  * An in-process APL execution service for tests and offline UI work.
  *
  * It does not interpret APL. It recognises the handful of expression shapes
- * the runner generates — the type probe and the banded reads — and serves them
+ * the runner generates — the adaptive first request and the banded reads — and serves them
  * from matrices registered against a preset id. That is enough to drive the
  * whole application deterministically, which is what end-to-end tests need:
  * CI must not fail because a public service is busy.
@@ -17,8 +17,9 @@ import {
   type AplExecutionService,
   type ExecutionCapabilities,
 } from './AplExecutionService';
+import { ADAPTIVE_MARKER, formatAdaptiveReply } from './adaptiveProbe';
 import { executionError } from './errors';
-import { PROBE_MARKER, BAND_MARKER, formatProbeReply, formatBandReply } from './transport';
+import { BAND_MARKER, formatBandReply } from './transport';
 
 export interface MockAplExecutionServiceOptions {
   /** Milliseconds of simulated latency, so loading states are exercised. */
@@ -98,8 +99,8 @@ export class MockAplExecutionService implements AplExecutionService {
       return ['VALUE ERROR: Undefined name: mock', ` ${expression}`, '  ∧'];
     }
 
-    if (expression.includes(PROBE_MARKER)) {
-      return formatProbeReply(matrix);
+    if (expression.includes(ADAPTIVE_MARKER)) {
+      return formatAdaptiveReply(matrix, this.capabilities);
     }
 
     if (expression.includes(BAND_MARKER)) {
