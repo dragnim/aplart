@@ -14,6 +14,7 @@ import { juliaSet } from './julia-set';
 import { mandelbrotField } from './mandelbrot-field';
 import { modularBloom } from './modular-bloom';
 import { sierpinskiArray } from './sierpinski-array';
+import { tricorn } from './tricorn';
 import { truchetGrid } from './truchet-grid';
 import { waveInterference } from './wave-interference';
 import { validatePreset, type ArtworkPreset, type PresetValidationIssue } from './schema';
@@ -39,6 +40,7 @@ const authored: readonly ArtworkPreset[] = [
   mandelbrotField,
   juliaSet,
   burningShip,
+  tricorn,
 ];
 
 const issues: PresetValidationIssue[] = [];

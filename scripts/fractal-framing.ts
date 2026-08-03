@@ -1,11 +1,14 @@
 /**
- * Fetches candidate Burning Ship viewports from the live service.
+ * Fetches candidate viewports for a fractal from the live service.
  *
- *     npx tsx --import ./scripts/lib/registerRaw.mjs scripts/ship-framing.ts
+ *     npm run preset:framing -- burning-ship '¯1.755,¯0.02,0.06' '¯1.755,¯0.03,0.05'
  *
- * Then draw them with `scripts/ship-viewports.ts` and look. The default view has
- * to be chosen by seeing the ship, and a picture of a matrix the service did not
- * return would prove nothing about the artwork.
+ * Then draw them with `scripts/fractal-viewports.ts` and look. A default view has
+ * to be chosen by seeing the artwork, and a picture of a matrix the service did
+ * not return would prove nothing about it.
+ *
+ * Written once and used by each fractal in turn, because the question is always
+ * the same one: which centre and span shows the thing the artwork is named for.
  *
  * Sequential, with a pause between runs, because the service is public and
  * shared. Each view at 128² costs the same handful of requests the application
@@ -17,11 +20,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TryAplExecutionService } from '../src/execution/TryAplExecutionService';
 import { runArtwork } from '../src/execution/runArtwork';
-import source from '../src/presets/apl/burning-ship.apl?raw';
-import { artworkSource } from '../src/presets/artworkSource';
+import { presets } from '../src/presets/presets';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = join(REPO_ROOT, '.preview', 'ship');
 const ENDPOINT = process.env.VITE_APL_EXEC_ENDPOINT ?? 'https://tryapl.org/Exec';
 const LIMITS = { maxRows: 256, maxColumns: 256, maxCells: 65_536 };
 const GAP_MS = 1200;
@@ -36,17 +37,29 @@ interface View {
   readonly zoom: number;
 }
 
-/** Candidate framings around the structure the first round found. */
-const VIEWS: readonly View[] = [
-  { name: 'a-050', centreX: -1.755, centreY: -0.03, zoom: 0.05 },
-  { name: 'b-060', centreX: -1.755, centreY: -0.02, zoom: 0.06 },
-  { name: 'c-045', centreX: -1.757, centreY: -0.035, zoom: 0.045 },
-  { name: 'd-080', centreX: -1.75, centreY: -0.04, zoom: 0.08 },
-];
+/**
+ * Candidate views, as `centreX,centreY,zoom` triples on the command line.
+ *
+ * APL's high minus is accepted as well as a hyphen, so a candidate can be copied
+ * straight out of a preset's control lines without being retyped.
+ */
+function viewsFrom(argv: readonly string[]): readonly View[] {
+  return argv.map((triple, index) => {
+    const parts = triple.split(',').map((part) => Number(part.trim().replace('¯', '-')));
+    const [centreX, centreY, zoom] = parts;
+    if (parts.length !== 3 || centreX === undefined || centreY === undefined || zoom === undefined) {
+      throw new Error(`expected centreX,centreY,zoom but got "${triple}"`);
+    }
+    if (!parts.every((part) => Number.isFinite(part))) {
+      throw new Error(`not all numbers in "${triple}"`);
+    }
+    return { name: `v${String(index + 1)}-${String(zoom)}`, centreX, centreY, zoom };
+  });
+}
 
 /** The shipped program with its control lines rewritten, as the sliders do. */
-function sourceFor(view: View, size: number, iterations: number): string {
-  return artworkSource(source)
+function sourceFor(code: string, view: View, size: number, iterations: number): string {
+  return code
     .split('\n')
     .map((line) => {
       if (line.startsWith('size←')) return `size←${String(size)}`;
@@ -60,14 +73,32 @@ function sourceFor(view: View, size: number, iterations: number): string {
 }
 
 async function main(): Promise<number> {
-  await mkdir(OUT, { recursive: true });
+  const [presetId, ...triples] = process.argv.slice(2);
+  const preset = presets.find((candidate) => candidate.id === presetId);
+  if (preset === undefined) {
+    console.error(`Pass a preset id and at least one centreX,centreY,zoom triple.`);
+    console.error(`Known ids: ${presets.map((candidate) => candidate.id).join(', ')}`);
+    return 1;
+  }
+  if (triples.length === 0) {
+    console.error('Pass at least one centreX,centreY,zoom triple.');
+    return 1;
+  }
+
+  const views = viewsFrom(triples);
+  const out = join(REPO_ROOT, '.preview', presetId ?? 'fractal');
+  await mkdir(out, { recursive: true });
+
   const service = new TryAplExecutionService({ endpoint: ENDPOINT });
   const recorded: Record<string, unknown> = {};
 
-  for (const view of VIEWS) {
+  console.log(`${preset.title}, ${String(views.length)} view(s) at 128²
+`);
+
+  for (const view of views) {
     const run = await runArtwork({
       service,
-      source: sourceFor(view, 128, 48),
+      source: sourceFor(preset.code, view, 128, 48),
       limits: LIMITS,
       timeoutMs: 40_000,
     });
@@ -83,7 +114,7 @@ async function main(): Promise<number> {
     await sleep(GAP_MS);
   }
 
-  const file = join(OUT, 'framing.json');
+  const file = join(out, 'framing.json');
   await writeFile(file, JSON.stringify(recorded), 'utf8');
   console.log(`\nWrote ${file.replace(REPO_ROOT, '.')}`);
   return 0;

@@ -272,12 +272,37 @@ describe('state written before Abyss existed', () => {
     expect(CUSTOM_PALETTE_ID).not.toBe('abyss');
   });
 
-  it('did not take any other artwork with it', () => {
-    // One preset was measured and reviewed; the rest were not, and a palette
-    // added for a fractal has no business changing a cellular automaton.
+  it('did not take any artwork with it that was not argued for', () => {
+    /*
+     * The guard is against drift, not against a second use. A palette added for a
+     * fractal has no business changing a cellular automaton, and nothing should
+     * adopt this ramp because it happened to be nearby.
+     *
+     * Two artworks use it, each for a reason recorded in its own module.
+     * Mandelbrot was measured and reviewed under comparison montages. Tricorn came
+     * later and chose it deliberately *because* it is Mandelbrot's: that artwork's
+     * entire claim is that it differs by one character, and holding the colours
+     * constant leaves the shape as the only difference between the two thumbnails.
+     *
+     * Julia went the other way on purpose, and the two decisions are consistent
+     * rather than contradictory. Julia is almost all boundary — a thin dendrite
+     * that Abyss renders as black on blue, losing the form — so it needed a ramp
+     * that put the pale end where the surviving points are. Tricorn is a solid
+     * mass whose silhouette reads clearly in this one.
+     *
+     * Adding a third name here should mean writing the reason down too.
+     */
+    const deliberate = new Set([mandelbrotField.id, 'tricorn']);
     for (const preset of presets) {
-      if (preset.id === mandelbrotField.id) continue;
+      if (deliberate.has(preset.id)) continue;
       expect(preset.defaultPaletteId, preset.id).not.toBe('abyss');
+    }
+
+    // And both of the named ones really do use it, so this cannot rot into an
+    // allowlist of artworks that have since moved on.
+    for (const id of deliberate) {
+      const preset = presets.find((candidate) => candidate.id === id);
+      expect(preset?.defaultPaletteId, id).toBe('abyss');
     }
   });
 });

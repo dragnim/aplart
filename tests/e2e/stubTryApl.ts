@@ -65,14 +65,16 @@ function evaluate(expression: string): NumericMatrix | { readonly error: readonl
    * responds to the view assignments rather than returning a fixed picture —
    * a zoom that changed nothing on screen would let a broken drag pass.
    *
-   * The two share one branch because they are one program apart, and they are
-   * told apart the way the interpreter tells them apart: by whether the step
-   * takes the magnitude of each component before squaring it. Burning Ship
-   * declares exactly the names Mandelbrot does, so without this it would be
-   * answered with Mandelbrot's arithmetic and the artwork on screen would be the
-   * wrong fractal — the same trap `realC` avoids for Julia below.
+   * The three share one branch because they are one line apart, and they are told
+   * apart the way the interpreter tells them apart: by what the step does.
+   * Burning Ship takes the magnitude of each component before squaring; Tricorn
+   * subtracts where Mandelbrot adds. Both declare exactly the names Mandelbrot
+   * does, so without these tells they would be answered with Mandelbrot's
+   * arithmetic and the artwork on screen would be the wrong fractal — the same
+   * trap `realC` avoids for Julia below.
    */
   const absolute = /x←\|zr/u.test(expression);
+  const conjugated = /ci-2×zr×zi/u.test(expression);
   const iterations = read('iterations');
   const centreX = readNumber('centreX');
   const centreY = readNumber('centreY');
@@ -156,7 +158,9 @@ function evaluate(expression: string): NumericMatrix | { readonly error: readonl
           const x = absolute ? Math.abs(zr) : zr;
           const y = absolute ? Math.abs(zi) : zi;
           const nextR = clamp(cr + x * x - y * y);
-          const nextI = clamp(ci + 2 * x * y);
+          // Tricorn's one difference, again taken from the source rather than from
+          // a preset id.
+          const nextI = clamp(conjugated ? ci - 2 * x * y : ci + 2 * x * y);
           zr = nextR;
           zi = nextI;
         }

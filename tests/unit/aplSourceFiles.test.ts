@@ -137,6 +137,9 @@ describe('the programs are unchanged by the move', () => {
     // Added in Stage 7. Mandelbrot's program plus two absolute values and the
     // comment that points at them, at the framing chosen from live output.
     'burning-ship': { digest: '4041cee8def3', characters: 779, lines: 21 },
+    // Added in Stage 8. Mandelbrot's program with one sign changed, and the
+    // comment that says which one.
+    tricorn: { digest: 'b525aec01318', characters: 843, lines: 22 },
   };
 
   it('has an expectation for every artwork in the gallery', () => {

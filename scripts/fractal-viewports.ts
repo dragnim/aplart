@@ -1,7 +1,7 @@
 /**
- * Renders candidate Burning Ship viewports so the default can be chosen by eye.
+ * Renders candidate fractal viewports so a default can be chosen by eye.
  *
- *     npx tsx --import ./scripts/lib/registerRaw.mjs scripts/ship-viewports.ts <views.json>
+ *     npm run preset:viewports -- .preview/tricorn/framing.json
  *
  * The matrices come from the live service — this script draws them and nothing
  * else, so what is being judged is the artwork's real output at each view rather
@@ -23,10 +23,10 @@ import { drawLabel, labelHeight } from './lib/label';
 import { montage } from './lib/montage';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = join(REPO_ROOT, '.preview', 'ship');
-const PALETTES = (process.env.SHIP_PALETTES ?? 'heat,abyss,ember,poolrooms').split(',');
+// Written beside the JSON it was given, so each fractal's sheets stay together.
+const PALETTES = (process.env.PALETTES ?? 'heat,abyss,ember,poolrooms').split(',');
 const CEILING = 48;
-const SCALE = Number(process.env.SHIP_SCALE ?? '3');
+const SCALE = Number(process.env.SCALE ?? '2');
 const LABEL_SCALE = 2;
 
 interface Recorded {
@@ -81,7 +81,8 @@ async function main(): Promise<number> {
   }
 
   const recorded = JSON.parse(await readFile(source, 'utf8')) as Record<string, Recorded>;
-  await mkdir(OUT, { recursive: true });
+  const out = dirname(join(REPO_ROOT, source));
+  await mkdir(out, { recursive: true });
 
   const cells: RgbaSource[] = [];
   for (const entry of Object.values(recorded)) {
@@ -107,7 +108,7 @@ async function main(): Promise<number> {
   }
 
   const sheet = montage(cells, { columns: PALETTES.length, gap: 12 });
-  const file = join(OUT, `${process.env.SHIP_OUT ?? 'viewports'}.png`);
+  const file = join(out, 'viewports.png');
   await writeFile(file, encodePng(sheet));
   console.log(`\nWrote ${file.replace(REPO_ROOT, '.')}`);
   return 0;
