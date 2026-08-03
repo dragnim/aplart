@@ -46,18 +46,44 @@ async function canvasDigest(page: Page): Promise<string> {
 test.describe('Burning Ship', () => {
   test.use({ viewport: WIDE });
 
-  test('is in the gallery with a thumbnail and its own description', async ({ page }) => {
+  /*
+   * Reachability, asserted by name.
+   *
+   * The gallery's own tests count cards against the number a filter chip
+   * advertises, and both come from the page — so they agree with each other
+   * whatever the registry contains, and an artwork that never reached the gallery
+   * would not fail them. Everything else about this artwork was proved by reading
+   * its matrix, which says nothing about whether a visitor can get to it. This is
+   * the test that says a named artwork is on the front page and opens.
+   */
+  test('is in the gallery with a thumbnail, and the card opens the artwork', async ({ page }) => {
     await stubTryApl(page);
     await page.goto('./#/');
 
-    const card = page.getByRole('link', { name: /Burning Ship/ }).first();
-    await expect(card).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Burning Ship', exact: true })).toBeVisible();
     await expect(page.getByText(/absolute value of each component before squaring/)).toBeVisible();
 
     // A thumbnail rendered from its own fixture, not a placeholder.
     const thumbnail = page.locator('img[src*="burning-ship"]').first();
+    await thumbnail.scrollIntoViewIfNeeded();
     await expect(thumbnail).toBeVisible();
     expect(await thumbnail.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+
+    // The card leads to this artwork and not to a neighbour or a not-found page.
+    await page.getByRole('link', { name: 'Open Burning Ship' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Burning Ship' })).toBeVisible();
+    expect(page.url()).toContain('#/art/burning-ship');
+    await expect(page.locator('.cm-content')).toContainText('x←|zr');
+  });
+
+  test('opens from its own route, visited directly', async ({ page }) => {
+    // The other way in: a shared link, a bookmark, or a typed address, which does
+    // not pass through the gallery at all.
+    await stubTryApl(page);
+    await page.goto('./#/art/burning-ship');
+
+    await expect(page.getByRole('heading', { level: 1, name: 'Burning Ship' })).toBeVisible();
+    await expect(page.locator('.cm-content')).toContainText('x←|zr');
   });
 
   test('runs from its own source and draws its own fractal', async ({ page }) => {
