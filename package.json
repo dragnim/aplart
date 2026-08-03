@@ -35,7 +35,10 @@
     "preset:debug": "tsx --import ./scripts/lib/registerRaw.mjs scripts/debug-preset.ts",
     "verify:deployment": "node scripts/verify-deployment.mjs",
     "benchmark:mandelbrot": "tsx --import ./scripts/lib/registerRaw.mjs scripts/benchmark-mandelbrot.ts",
-    "benchmark:report": "tsx --import ./scripts/lib/registerRaw.mjs scripts/report-mandelbrot-benchmark.ts"
+    "benchmark:report": "tsx --import ./scripts/lib/registerRaw.mjs scripts/report-mandelbrot-benchmark.ts",
+    "benchmark:iterations": "tsx --import ./scripts/lib/registerRaw.mjs scripts/benchmark-iterations.ts",
+    "benchmark:iterations:report": "tsx --import ./scripts/lib/registerRaw.mjs scripts/report-iteration-benchmark.ts",
+    "preset:compare": "tsx --import ./scripts/lib/registerRaw.mjs scripts/palette-compare.ts"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",

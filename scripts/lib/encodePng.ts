@@ -78,6 +78,55 @@ export function scaleNearest(image: RgbaSource, factor: number): RgbaSource {
   return { width, height, data };
 }
 
+/**
+ * Enlarges by interpolating between cells, as a browser does under Smooth.
+ *
+ * Representative, not identical: each engine has its own filter, and this is a
+ * plain bilinear sample. Anything drawn with it must be labelled as
+ * representative interpolation rather than presented as what a visitor sees.
+ *
+ * Edges are clamped rather than sampled beyond the image, so the border does not
+ * fade towards transparency — the artefact that makes an otherwise flat panel
+ * look as though it had detail in it.
+ */
+export function scaleBilinear(image: RgbaSource, factor: number): RgbaSource {
+  if (factor === 1) return image;
+
+  const width = Math.round(image.width * factor);
+  const height = Math.round(image.height * factor);
+  const data = new Uint8ClampedArray(width * height * 4);
+
+  const clamp = (value: number, limit: number) => Math.min(limit - 1, Math.max(0, value));
+
+  for (let y = 0; y < height; y += 1) {
+    // Sampled at pixel centres, which is what puts the first and last cell
+    // fully inside the result rather than half of each.
+    const sourceY = (y + 0.5) / factor - 0.5;
+    const y0 = Math.floor(sourceY);
+    const fy = sourceY - y0;
+
+    for (let x = 0; x < width; x += 1) {
+      const sourceX = (x + 0.5) / factor - 0.5;
+      const x0 = Math.floor(sourceX);
+      const fx = sourceX - x0;
+
+      const target = (y * width + x) * 4;
+      for (let channel = 0; channel < 4; channel += 1) {
+        const read = (cx: number, cy: number) =>
+          image.data[
+            (clamp(cy, image.height) * image.width + clamp(cx, image.width)) * 4 + channel
+          ] as number;
+
+        const top = read(x0, y0) * (1 - fx) + read(x0 + 1, y0) * fx;
+        const bottom = read(x0, y0 + 1) * (1 - fx) + read(x0 + 1, y0 + 1) * fx;
+        data[target + channel] = Math.round(top * (1 - fy) + bottom * fy);
+      }
+    }
+  }
+
+  return { width, height, data };
+}
+
 function chunk(type: string, payload: Buffer): Buffer {
   const length = Buffer.alloc(4);
   length.writeUInt32BE(payload.length, 0);
