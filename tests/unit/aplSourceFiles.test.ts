@@ -140,6 +140,9 @@ describe('the programs are unchanged by the move', () => {
     // Added in Stage 8. Mandelbrot's program with one sign changed, and the
     // comment that says which one.
     tricorn: { digest: 'b525aec01318', characters: 843, lines: 22 },
+    // Added in Stage 9. The longest of the family, because the exponent needs a
+    // helper: one line of multiplication, applied power-1 times.
+    multibrot: { digest: '3cbdd36350e5', characters: 1057, lines: 27 },
   };
 
   it('has an expectation for every artwork in the gallery', () => {

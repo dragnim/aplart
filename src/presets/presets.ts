@@ -13,6 +13,7 @@ import { checkerShift } from './checker-shift';
 import { juliaSet } from './julia-set';
 import { mandelbrotField } from './mandelbrot-field';
 import { modularBloom } from './modular-bloom';
+import { multibrot } from './multibrot';
 import { sierpinskiArray } from './sierpinski-array';
 import { tricorn } from './tricorn';
 import { truchetGrid } from './truchet-grid';
@@ -41,6 +42,7 @@ const authored: readonly ArtworkPreset[] = [
   juliaSet,
   burningShip,
   tricorn,
+  multibrot,
 ];
 
 const issues: PresetValidationIssue[] = [];

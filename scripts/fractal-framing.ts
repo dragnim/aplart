@@ -2,6 +2,10 @@
  * Fetches candidate viewports for a fractal from the live service.
  *
  *     npm run preset:framing -- burning-ship '¯1.755,¯0.02,0.06' '¯1.755,¯0.03,0.05'
+ *     npm run preset:framing -- multibrot '0,0,1.4,3' '0,0,1.4,4'
+ *
+ * A fourth number is Multibrot's exponent, so the choice of default power is made
+ * the same way as the choice of default view: by looking at candidates.
  *
  * Then draw them with `scripts/fractal-viewports.ts` and look. A default view has
  * to be chosen by seeing the artwork, and a picture of a matrix the service did
@@ -35,6 +39,8 @@ interface View {
   readonly centreX: number;
   readonly centreY: number;
   readonly zoom: number;
+  /** Multibrot's exponent, when the artwork has one. */
+  readonly power?: number;
 }
 
 /**
@@ -46,14 +52,24 @@ interface View {
 function viewsFrom(argv: readonly string[]): readonly View[] {
   return argv.map((triple, index) => {
     const parts = triple.split(',').map((part) => Number(part.trim().replace('¯', '-')));
-    const [centreX, centreY, zoom] = parts;
-    if (parts.length !== 3 || centreX === undefined || centreY === undefined || zoom === undefined) {
+    const [centreX, centreY, zoom, power] = parts;
+    if (parts.length < 3 || parts.length > 4) {
+      throw new Error(`expected centreX,centreY,zoom and optionally power, but got "${triple}"`);
+    }
+    if (centreX === undefined || centreY === undefined || zoom === undefined) {
       throw new Error(`expected centreX,centreY,zoom but got "${triple}"`);
     }
     if (!parts.every((part) => Number.isFinite(part))) {
       throw new Error(`not all numbers in "${triple}"`);
     }
-    return { name: `v${String(index + 1)}-${String(zoom)}`, centreX, centreY, zoom };
+    // The artwork only accepts whole exponents of two or more, so a candidate
+    // outside that is a typing mistake rather than a measurement worth spending
+    // live requests on.
+    if (power !== undefined && (!Number.isInteger(power) || power < 2)) {
+      throw new Error(`power must be an integer of at least 2 in "${triple}"`);
+    }
+    const name = power === undefined ? `v${String(index + 1)}-${String(zoom)}` : `p${String(power)}`;
+    return { name, centreX, centreY, zoom, ...(power === undefined ? {} : { power }) };
   });
 }
 
@@ -67,6 +83,7 @@ function sourceFor(code: string, view: View, size: number, iterations: number): 
       if (line.startsWith('centreX←')) return `centreX←${apl(view.centreX)}`;
       if (line.startsWith('centreY←')) return `centreY←${apl(view.centreY)}`;
       if (line.startsWith('zoom←')) return `zoom←${apl(view.zoom)}`;
+      if (view.power !== undefined && line.startsWith('power←')) return `power←${apl(view.power)}`;
       return line;
     })
     .join('\n');

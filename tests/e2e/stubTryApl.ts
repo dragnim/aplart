@@ -65,16 +65,19 @@ function evaluate(expression: string): NumericMatrix | { readonly error: readonl
    * responds to the view assignments rather than returning a fixed picture —
    * a zoom that changed nothing on screen would let a broken drag pass.
    *
-   * The three share one branch because they are one line apart, and they are told
-   * apart the way the interpreter tells them apart: by what the step does.
+   * Four artworks share one branch because they are a line apart, and they are
+   * told apart the way the interpreter tells them apart: by what the step does.
    * Burning Ship takes the magnitude of each component before squaring; Tricorn
-   * subtracts where Mandelbrot adds. Both declare exactly the names Mandelbrot
-   * does, so without these tells they would be answered with Mandelbrot's
-   * arithmetic and the artwork on screen would be the wrong fractal — the same
-   * trap `realC` avoids for Julia below.
+   * subtracts where Mandelbrot adds; Multibrot raises z to a declared power
+   * instead of squaring it. All three declare exactly the names Mandelbrot does,
+   * so without these tells they would be answered with Mandelbrot's arithmetic and
+   * the artwork on screen would be the wrong fractal — the same trap `realC`
+   * avoids for Julia below.
    */
   const absolute = /x←\|zr/u.test(expression);
   const conjugated = /ci-2×zr×zi/u.test(expression);
+  // Two when nothing says otherwise, which is what squaring means.
+  const exponent = read('power') ?? 2;
   const iterations = read('iterations');
   const centreX = readNumber('centreX');
   const centreY = readNumber('centreY');
@@ -157,10 +160,23 @@ function evaluate(expression: string): NumericMatrix | { readonly error: readonl
           // from a preset id, exactly as the interpreter would see it.
           const x = absolute ? Math.abs(zr) : zr;
           const y = absolute ? Math.abs(zi) : zi;
-          const nextR = clamp(cr + x * x - y * y);
+
+          // (x + iy) raised to the exponent, by repeated multiplication, which is
+          // what the APL does. At the default exponent of two this is one
+          // multiplication and exactly the square the other three artworks use.
+          let wr = x;
+          let wi = y;
+          for (let again = 1; again < exponent; again += 1) {
+            const nr = wr * x - wi * y;
+            const ni = wr * y + wi * x;
+            wr = nr;
+            wi = ni;
+          }
+
+          const nextR = clamp(cr + wr);
           // Tricorn's one difference, again taken from the source rather than from
           // a preset id.
-          const nextI = clamp(conjugated ? ci - 2 * x * y : ci + 2 * x * y);
+          const nextI = clamp(conjugated ? ci - wi : ci + wi);
           zr = nextR;
           zi = nextI;
         }

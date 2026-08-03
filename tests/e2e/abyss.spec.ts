@@ -100,6 +100,20 @@ test.describe('Abyss in the studio', () => {
   });
 
   test('survives Focus mode and comes back', async ({ page }) => {
+    /*
+     * Entering Focus mode and leaving it each remount the canvas and redraw a
+     * 128² matrix at export size, twice, in the slowest of the two browsers. That
+     * had been finishing inside the default assertion timeout until the suite grew
+     * past three hundred tests; with both projects contending it began exceeding it
+     * — four of six full runs, at this test and at the tiling one below, while
+     * passing alone and passing when its own project runs alone.
+     *
+     * No assertion is relaxed and no wait is lengthened by hand: the work is real
+     * and it is given the time it needs, exactly as `tilingExport.spec.ts` does for
+     * its eighteen encode-and-decode cycles.
+     */
+    test.slow();
+
     await openAndRun(page);
     await chooseAbyss(page);
 
@@ -136,6 +150,10 @@ test.describe('Abyss with repeated copies', () => {
   test.use({ viewport: WIDE });
 
   test('gives every copy the same colours, repeated and mirrored', async ({ page }) => {
+    // Full-canvas pixel reads at several repeat counts, in both orientations. As
+    // with the Focus mode test above: legitimate work, given the time it needs.
+    test.slow();
+
     await openAndRun(page);
     await chooseAbyss(page);
 
