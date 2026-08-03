@@ -39,7 +39,9 @@
     "benchmark:iterations": "tsx --import ./scripts/lib/registerRaw.mjs scripts/benchmark-iterations.ts",
     "benchmark:iterations:report": "tsx --import ./scripts/lib/registerRaw.mjs scripts/report-iteration-benchmark.ts",
     "preset:compare": "tsx --import ./scripts/lib/registerRaw.mjs scripts/palette-compare.ts",
-    "prototype:adaptive": "tsx --import ./scripts/lib/registerRaw.mjs scripts/prototype-adaptive.ts"
+    "prototype:adaptive": "tsx --import ./scripts/lib/registerRaw.mjs scripts/prototype-adaptive.ts",
+    "preset:ship-framing": "tsx --import ./scripts/lib/registerRaw.mjs scripts/ship-framing.ts",
+    "preset:ship-viewports": "tsx --import ./scripts/lib/registerRaw.mjs scripts/ship-viewports.ts"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",

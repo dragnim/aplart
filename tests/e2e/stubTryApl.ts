@@ -57,14 +57,22 @@ function evaluate(expression: string): NumericMatrix | { readonly error: readonl
   const multiplier = read('multiplier') ?? 1;
 
   /*
-   * Mandelbrot Field.
+   * Mandelbrot Field, and Burning Ship.
    *
    * Written to follow the preset's own step function: the escape test uses the
    * values from the start of the step, both new parts are computed from the old
    * ones, and the magnitude is clamped the same way. It matters that this
    * responds to the view assignments rather than returning a fixed picture —
    * a zoom that changed nothing on screen would let a broken drag pass.
+   *
+   * The two share one branch because they are one program apart, and they are
+   * told apart the way the interpreter tells them apart: by whether the step
+   * takes the magnitude of each component before squaring it. Burning Ship
+   * declares exactly the names Mandelbrot does, so without this it would be
+   * answered with Mandelbrot's arithmetic and the artwork on screen would be the
+   * wrong fractal — the same trap `realC` avoids for Julia below.
    */
+  const absolute = /x←\|zr/u.test(expression);
   const iterations = read('iterations');
   const centreX = readNumber('centreX');
   const centreY = readNumber('centreY');
@@ -143,8 +151,12 @@ function evaluate(expression: string): NumericMatrix | { readonly error: readonl
         let count = 0;
         for (let step = 0; step < iterations; step += 1) {
           if (zr * zr + zi * zi < 4) count += 1;
-          const nextR = clamp(cr + zr * zr - zi * zi);
-          const nextI = clamp(ci + 2 * zr * zi);
+          // Burning Ship's one difference, taken from the source rather than
+          // from a preset id, exactly as the interpreter would see it.
+          const x = absolute ? Math.abs(zr) : zr;
+          const y = absolute ? Math.abs(zi) : zi;
+          const nextR = clamp(cr + x * x - y * y);
+          const nextI = clamp(ci + 2 * x * y);
           zr = nextR;
           zi = nextI;
         }

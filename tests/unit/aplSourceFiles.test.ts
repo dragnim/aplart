@@ -134,6 +134,9 @@ describe('the programs are unchanged by the move', () => {
     // character count alone would not have noticed.
     'mandelbrot-field': { digest: '5a8df3d17814', characters: 625, lines: 19 },
     'julia-set': { digest: 'a27419d64442', characters: 877, lines: 25 },
+    // Added in Stage 7. Mandelbrot's program plus two absolute values and the
+    // comment that points at them, at the framing chosen from live output.
+    'burning-ship': { digest: '4041cee8def3', characters: 779, lines: 21 },
   };
 
   it('has an expectation for every artwork in the gallery', () => {

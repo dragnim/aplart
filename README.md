@@ -302,7 +302,15 @@ to work around CORS with browser flags or public CORS-anywhere services.
 
    ```bash
    npm run validate:presets
+   npm run refresh:fixtures -- your-preset-id   # live service; writes the fixture
+   npx prettier --write tests/fixtures/your-preset-id.json
+   npm run generate:thumbnails                  # from the committed fixture, no network
    ```
+
+   Run Prettier on the fixture afterwards. `refresh:fixtures` writes its JSON with `JSON.stringify`,
+   which is not how Prettier would format it, so `format:check` fails on a freshly written fixture and
+   the pre-commit gate stops. Formatting it is not cosmetic tidying — the alternative is a gate failure
+   at the end of an otherwise finished stage.
 
 `validate:presets` checks the things the compiler cannot: that ranges make sense, that defaults sit
 inside them, and — importantly — that every parameter actually has a matching top-level assignment in
