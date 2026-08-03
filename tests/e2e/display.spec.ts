@@ -22,6 +22,21 @@ function radio(page: Page, name: string) {
   return page.getByRole('radio', { name, exact: true });
 }
 
+/**
+ * Selects a radio, having first brought it into view.
+ *
+ * On the narrow layout the appearance controls are a long scrolling column, and
+ * a plain click has to wait for the element to be both visible and stable.
+ * Under parallel load that occasionally exceeded the timeout — an intermittent
+ * failure of the test rather than of the control.
+ */
+async function choose(page: Page, name: string) {
+  const control = radio(page, name);
+  await control.scrollIntoViewIfNeeded();
+  await control.click();
+  await expect(control).toHaveAttribute('aria-checked', 'true');
+}
+
 async function openAndRun(page: Page) {
   await stubTryApl(page);
   await page.goto('./#/art/mandelbrot-field');
@@ -54,25 +69,41 @@ async function save(page: Page, label = '512 × 512') {
   return readFile(path);
 }
 
-/** Distinct colours in a PNG, decoded in the page. */
-async function coloursIn(page: Page, png: Buffer) {
-  return page.evaluate(async (encoded) => {
-    const bytes = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0));
-    const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
-    const canvas = document.createElement('canvas');
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    const context = canvas.getContext('2d');
-    if (context === null) return -1;
-    context.drawImage(bitmap, 0, 0);
+/**
+ * Distinct colours in a PNG, decoded in the page.
+ *
+ * `margin` is a fraction of each side to ignore. Canvas smoothing samples
+ * outside the image at its border, so the outermost pixels of a scaled-up
+ * export can blend towards transparency — an edge artefact of the filter, not
+ * something about the matrix. Excluding a margin asks about the picture rather
+ * than about its frame.
+ */
+async function coloursIn(page: Page, png: Buffer, margin = 0) {
+  return page.evaluate(
+    async ([encoded, inset]) => {
+      const bytes = Uint8Array.from(atob(encoded as string), (character) => character.charCodeAt(0));
+      const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const context = canvas.getContext('2d');
+      if (context === null) return -1;
+      context.drawImage(bitmap, 0, 0);
 
-    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
-    const seen = new Set<number>();
-    for (let at = 0; at < data.length; at += 4) {
-      seen.add(((data[at] as number) << 16) | ((data[at + 1] as number) << 8) | (data[at + 2] as number));
-    }
-    return seen.size;
-  }, png.toString('base64'));
+      const skip = Math.max(0, Math.floor(canvas.width * (inset as number)));
+      const width = canvas.width - skip * 2;
+      const height = canvas.height - skip * 2;
+      if (width <= 0 || height <= 0) return -1;
+
+      const { data } = context.getImageData(skip, skip, width, height);
+      const seen = new Set<number>();
+      for (let at = 0; at < data.length; at += 4) {
+        seen.add(((data[at] as number) << 16) | ((data[at + 1] as number) << 8) | (data[at + 2] as number));
+      }
+      return seen.size;
+    },
+    [png.toString('base64'), margin] as const,
+  );
 }
 
 test.describe('Pixel and Smooth on screen', () => {
@@ -88,7 +119,7 @@ test.describe('Pixel and Smooth on screen', () => {
      * that rise is the whole of what Smooth does.
      */
     const crisp = await distinctColours(page);
-    await radio(page, 'Smooth').click();
+    await choose(page, 'Smooth');
     const softened = await distinctColours(page);
 
     expect(crisp).toBeGreaterThan(0);
@@ -101,7 +132,7 @@ test.describe('Pixel and Smooth on screen', () => {
      * has to hold is that Pixel is once again drawing only the colours the
      * matrix maps to.
      */
-    await radio(page, 'Pixel').click();
+    await choose(page, 'Pixel');
     expect(await distinctColours(page)).toBeLessThan(softened / 2);
   });
 
@@ -112,16 +143,16 @@ test.describe('Pixel and Smooth on screen', () => {
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 
     const sent = stub.requests.length;
-    await radio(page, 'Smooth').click();
-    await radio(page, 'Pixel').click();
-    await radio(page, 'Smooth').click();
+    await choose(page, 'Smooth');
+    await choose(page, 'Pixel');
+    await choose(page, 'Smooth');
 
     expect(stub.requests.length).toBe(sent);
   });
 
   test('is kept in Focus mode and on the way back', async ({ page }) => {
     await openAndRun(page);
-    await radio(page, 'Smooth').click();
+    await choose(page, 'Smooth');
 
     await page.getByRole('button', { name: 'Focus mode' }).click();
     await expect(page.locator('canvas').first()).toHaveAttribute('aria-label', /smooth interpolation/);
@@ -139,48 +170,64 @@ test.describe('Pixel and Smooth on screen', () => {
      * not display modes.
      */
     const softened = await distinctColours(page);
-    await radio(page, 'Pixel').click();
+    await choose(page, 'Pixel');
     const crisp = await distinctColours(page);
     expect(softened).toBeGreaterThan(crisp * 2);
   });
 
   test('applies to every copy of a repeat, not just the first', async ({ page }) => {
     await openAndRun(page);
-    await radio(page, 'Smooth').click();
+    await choose(page, 'Smooth');
+    await choose(page, 'Repeat');
+    await choose(page, '2 by 2');
+
+    await page.getByRole('button', { name: 'Export' }).click();
+    await page.getByRole('menuitemcheckbox', { name: /Export current tiling/ }).click();
+    await page.keyboard.press('Escape');
 
     for (const view of ['Repeat', 'Mirror repeat']) {
-      await radio(page, view).click();
-      await radio(page, '2 by 2').click();
+      await choose(page, view);
 
-      const quadrantsAgree = await page.evaluate(() => {
-        const canvas = document.querySelector('canvas');
-        const context = canvas?.getContext('2d') ?? null;
-        if (canvas === null || context === null) return false;
+      /*
+       * Compared in the exported composition rather than on screen. The canvas
+       * is letterboxed inside its box — more so on a narrow viewport — so its
+       * halves are not where the copies meet, and comparing them measures the
+       * layout instead of the display mode.
+       *
+       * Counted per half. A copy drawn crisply beside a softened one would hold
+       * far fewer distinct colours, whichever way it was reflected.
+       */
+      const halvesAgree = await page.evaluate(
+        async (encoded) => {
+          const bytes = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0));
+          const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+          const canvas = document.createElement('canvas');
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          const context = canvas.getContext('2d');
+          if (context === null) return false;
+          context.drawImage(bitmap, 0, 0);
 
-        /*
-         * Counted per quadrant. A copy drawn crisply beside a softened one
-         * would hold far fewer distinct colours, whichever way it was
-         * reflected.
-         */
-        const half = Math.floor(canvas.width / 2);
-        const quarter = Math.floor(canvas.height / 2);
-        const count = (x: number) => {
-          const { data } = context.getImageData(x, 0, half, quarter);
-          const seen = new Set<number>();
-          for (let at = 0; at < data.length; at += 4) {
-            seen.add(
-              ((data[at] as number) << 16) | ((data[at + 1] as number) << 8) | (data[at + 2] as number),
-            );
-          }
-          return seen.size;
-        };
+          const half = Math.floor(canvas.width / 2);
+          const count = (x: number) => {
+            const { data } = context.getImageData(x, 0, half, canvas.height);
+            const seen = new Set<number>();
+            for (let at = 0; at < data.length; at += 4) {
+              seen.add(
+                ((data[at] as number) << 16) | ((data[at + 1] as number) << 8) | (data[at + 2] as number),
+              );
+            }
+            return seen.size;
+          };
 
-        const left = count(0);
-        const right = count(half);
-        return Math.abs(left - right) < Math.max(left, right) * 0.25;
-      });
+          const left = count(0);
+          const right = count(half);
+          return Math.abs(left - right) < Math.max(left, right) * 0.25;
+        },
+        (await save(page)).toString('base64'),
+      );
 
-      expect(quadrantsAgree, view).toBe(true);
+      expect(halvesAgree, view).toBe(true);
     }
   });
 });
@@ -207,45 +254,73 @@ test.describe('what neither mode may do', () => {
     // Confirmed flat by the interface's own account of it before measuring.
     await expect(page.locator('canvas').first()).toHaveAttribute('aria-label', /every cell holds the value/);
 
+    /*
+     * Measured in the exported image rather than on screen. The canvas is
+     * letterboxed inside its box, and with smoothing enabled WebKit blends the
+     * artwork's outer edge with the backdrop behind it — a real effect at the
+     * border, and nothing to do with whether the matrix has detail in it. The
+     * export is the artwork at exact size with no surround, so it answers the
+     * question actually being asked.
+     */
     for (const display of ['Pixel', 'Smooth']) {
-      await radio(page, display).click();
-      expect(await distinctColours(page), display).toBe(1);
+      await choose(page, display);
+      // Two per cent of each side ignored, which is the filter's edge and
+      // nothing more. Everything inside it must be the one colour.
+      expect(await coloursIn(page, await save(page), 0.02), display).toBe(1);
     }
   });
 
   test('keeps one animation phase across every copy in both modes', async ({ page }) => {
     await openAndRun(page);
+    await choose(page, 'Repeat');
+    await choose(page, '2 by 2');
+
+    // Turned on once. It persists, and toggling it per pass would mean opening
+    // the menu twice as often for no gain.
+    await page.getByRole('button', { name: 'Export' }).click();
+    await page.getByRole('menuitemcheckbox', { name: /Export current tiling/ }).click();
+    await page.keyboard.press('Escape');
 
     for (const display of ['Pixel', 'Smooth']) {
-      await radio(page, display).click();
-      await radio(page, 'Repeat').click();
-      await radio(page, '2 by 2').click();
+      await choose(page, display);
 
       await page.getByRole('button', { name: 'Animate palette' }).click();
       await page.waitForTimeout(600);
+      await page.getByRole('button', { name: 'Pause' }).click();
 
       /*
-       * The copies come from one prepared tile, so a phase read per copy would
-       * show the quadrants disagreeing. Compared while it is still running,
-       * which is when they would.
+       * Compared in the exported composition, not on screen. The four copies
+       * come from one prepared tile, so a phase read per copy would show the
+       * quadrants disagreeing — but the on-screen canvas is letterboxed inside
+       * its box, so its halves are not the copy boundaries. The export is the
+       * composition at exact size, where they are.
+       *
+       * Paused first so both halves are read from the same frame.
        */
-      const quadrantsAgree = await page.evaluate(() => {
-        const canvas = document.querySelector('canvas');
-        const context = canvas?.getContext('2d') ?? null;
-        if (canvas === null || context === null) return false;
+      const quadrantsAgree = await page.evaluate(
+        async (encoded) => {
+          const bytes = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0));
+          const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+          const canvas = document.createElement('canvas');
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          const context = canvas.getContext('2d');
+          if (context === null) return false;
+          context.drawImage(bitmap, 0, 0);
 
-        const half = Math.floor(canvas.width / 2);
-        const quarter = Math.floor(canvas.height / 2);
-        const left = context.getImageData(0, 0, half, quarter).data;
-        const right = context.getImageData(half, 0, half, quarter).data;
-        for (let at = 0; at < left.length; at += 4) {
-          if (Math.abs((left[at] as number) - (right[at] as number)) > 6) return false;
-        }
-        return true;
-      });
+          const half = Math.floor(canvas.width / 2);
+          const quarter = Math.floor(canvas.height / 2);
+          const left = context.getImageData(0, 0, half, quarter).data;
+          const right = context.getImageData(half, 0, half, quarter).data;
+          for (let at = 0; at < left.length; at += 4) {
+            if (Math.abs((left[at] as number) - (right[at] as number)) > 6) return false;
+          }
+          return true;
+        },
+        (await save(page)).toString('base64'),
+      );
 
       expect(quadrantsAgree, display).toBe(true);
-      await page.getByRole('button', { name: 'Reset animation' }).click();
     }
   });
 });
@@ -257,7 +332,7 @@ test.describe('Pixel and Smooth in the exported image', () => {
     await openAndRun(page);
     const crisp = await save(page);
 
-    await radio(page, 'Smooth').click();
+    await choose(page, 'Smooth');
     const softened = await save(page);
 
     expect(Buffer.compare(softened, crisp)).not.toBe(0);
@@ -266,15 +341,15 @@ test.describe('Pixel and Smooth in the exported image', () => {
 
   test('reaches a tiled export', async ({ page }) => {
     await openAndRun(page);
-    await radio(page, 'Repeat').click();
-    await radio(page, '2 by 2').click();
+    await choose(page, 'Repeat');
+    await choose(page, '2 by 2');
 
     await page.getByRole('button', { name: 'Export' }).click();
     await page.getByRole('menuitemcheckbox', { name: /Export current tiling/ }).click();
     await page.keyboard.press('Escape');
 
     const crisp = await save(page);
-    await radio(page, 'Smooth').click();
+    await choose(page, 'Smooth');
     const softened = await save(page);
 
     expect(Buffer.compare(softened, crisp)).not.toBe(0);
