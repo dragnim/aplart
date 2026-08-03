@@ -18,10 +18,18 @@ function runStatus(page: Page) {
 /**
  * How much of the canvas is the "not here yet" hatch.
  *
- * Grey, and grey is the one thing the heat palette never produces: its ramp
- * runs black through purple and orange to near-white, all of them saturated or
- * neutral-at-the-ends. A pixel whose channels agree but is neither black nor
- * white came from the hatch.
+ * The hatch is a translucent grey laid over the palette background, so a hatched
+ * pixel is nearly neutral and neither black nor white. No colour in either
+ * Mandelbrot palette is: Heat runs black through purple and orange to
+ * near-white, and Abyss runs deep blue through cyan to pure black — every stop
+ * of both is either saturated or at an extreme of brightness.
+ *
+ * "Nearly" neutral rather than exactly, and this is what the test originally got
+ * wrong: it required the channels to agree within two, which held while the
+ * background was Heat's `#000004` and stopped holding the moment the default
+ * became Abyss, whose `#05070f` background gives the composited hatch a faint
+ * blue cast. The hatch was perfectly visible; the measurement was tuned to one
+ * palette.
  */
 async function hatchFraction(page: Page): Promise<number> {
   return page.evaluate(() => {
@@ -38,8 +46,9 @@ async function hatchFraction(page: Page): Promise<number> {
       const g = data[index + 1] as number;
       const b = data[index + 2] as number;
       total += 1;
-      const grey = Math.abs(r - g) <= 2 && Math.abs(g - b) <= 2;
-      if (grey && r > 20 && r < 200) hatch += 1;
+      const spread = Math.max(r, g, b) - Math.min(r, g, b);
+      const brightness = (r + g + b) / 3;
+      if (spread <= 12 && brightness > 18 && brightness < 200) hatch += 1;
     }
     return total === 0 ? 0 : hatch / total;
   });

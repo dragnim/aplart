@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockAplExecutionService } from '@/execution/MockAplExecutionService';
 import { fromNested, type NumericMatrix } from '@/matrix/matrixTypes';
 import { mandelbrotField } from '@/presets/mandelbrot-field';
+import { presets } from '@/presets/presets';
 import { CUSTOM_PALETTE_ID } from '@/renderer/customPalette';
 import { COLOURING_MODES } from '@/renderer/escapeColouring';
 import { encodeShareState } from '@/sharing/encodeShareState';
@@ -238,11 +239,27 @@ describe('state written before Abyss existed', () => {
     await openAndRun(encoded);
     expect(canvas()).toHaveAccessibleName(/Heat palette/);
     expect(canvas()).not.toHaveAccessibleName(/Abyss/);
+
+    /*
+     * And it reads "Original", because that badge is about the APL and nothing
+     * else. The palette is presentation: it is already shown, selected, in the
+     * palette control, so calling the artwork edited on account of it would be
+     * describing a change to the code that nobody made.
+     *
+     * Pinned rather than assumed, because a default palette change is exactly
+     * when somebody might be tempted to make the badge mean two things.
+     */
+    expect(screen.getByText('Original')).toBeInTheDocument();
+    expect(screen.queryByText('Edited')).not.toBeInTheDocument();
   });
 
-  it('leaves an unrelated preset on its own default', async () => {
-    // Abyss is a candidate for Mandelbrot only, and nothing else should have
-    // moved because it was added.
+  it('is what Mandelbrot now opens on', async () => {
+    /*
+     * Changed deliberately after the comparison montages were reviewed. When
+     * Abyss was added this test asserted the opposite — that adding a palette
+     * moves nobody's default — which was right then and is the reason the change
+     * had to be argued for separately.
+     */
     const user = userEvent.setup();
     const service = new MockAplExecutionService();
     service.register('default', escapeCounts());
@@ -250,9 +267,17 @@ describe('state written before Abyss existed', () => {
     await user.click(screen.getByRole('button', { name: /^Run/ }));
     await waitFor(() => expect(canvas()).toBeInTheDocument());
 
-    // Mandelbrot's own default is unchanged by this stage.
-    expect(canvas()).toHaveAccessibleName(/Heat palette/);
-    expect(mandelbrotField.defaultPaletteId).toBe('heat');
+    expect(canvas()).toHaveAccessibleName(/Abyss palette/);
+    expect(mandelbrotField.defaultPaletteId).toBe('abyss');
     expect(CUSTOM_PALETTE_ID).not.toBe('abyss');
+  });
+
+  it('did not take any other artwork with it', () => {
+    // One preset was measured and reviewed; the rest were not, and a palette
+    // added for a fractal has no business changing a cellular automaton.
+    for (const preset of presets) {
+      if (preset.id === mandelbrotField.id) continue;
+      expect(preset.defaultPaletteId, preset.id).not.toBe('abyss');
+    }
   });
 });

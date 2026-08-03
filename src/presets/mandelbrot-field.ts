@@ -137,7 +137,20 @@ export const mandelbrotField: ArtworkPreset = {
     },
   ],
 
-  defaultPaletteId: 'heat',
+  /*
+   * Abyss, because of where it puts the ceiling.
+   *
+   * An escape count is mapped by position, so the top of the range is the cells
+   * that never escaped — the one part of the image holding no information at
+   * all. Heat renders that as its brightest, most saturated area, which on a
+   * zoomed view where most cells are at the ceiling reads as detail that is not
+   * there. Abyss ends at black, so the same region reads as a void, which is
+   * what it is.
+   *
+   * Chosen after looking: the montages in .preview/compare, built from the
+   * matrices the benchmark returned, at four ceilings under both palettes.
+   */
+  defaultPaletteId: 'abyss',
   renderMode: 'continuous',
   outputLimits: { highResolution: true, maxRows: 144, maxColumns: 144, maxCells: 20_736 },
 
