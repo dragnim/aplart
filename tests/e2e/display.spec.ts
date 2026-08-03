@@ -185,6 +185,71 @@ test.describe('Pixel and Smooth on screen', () => {
   });
 });
 
+test.describe('what neither mode may do', () => {
+  test.use({ viewport: WIDE });
+
+  test('leaves a flat result flat, crisp or interpolated', async ({ page }) => {
+    await stubTryApl(page);
+    await page.goto('./#/art/mandelbrot-field');
+
+    /*
+     * A view deep inside the set, where every point reaches the ceiling. There
+     * is nothing between the cells to interpolate, so softening must not
+     * conjure variation — the one case where a display mode could most
+     * plausibly look like it had calculated something.
+     */
+    // Home takes the range to its minimum. The default centre is already inside
+    // the main cardioid, so the smallest span is entirely interior.
+    await page.getByLabel('Span').press('Home');
+    await page.getByRole('button', { name: /^Run/ }).click();
+    await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
+
+    // Confirmed flat by the interface's own account of it before measuring.
+    await expect(page.locator('canvas').first()).toHaveAttribute('aria-label', /every cell holds the value/);
+
+    for (const display of ['Pixel', 'Smooth']) {
+      await radio(page, display).click();
+      expect(await distinctColours(page), display).toBe(1);
+    }
+  });
+
+  test('keeps one animation phase across every copy in both modes', async ({ page }) => {
+    await openAndRun(page);
+
+    for (const display of ['Pixel', 'Smooth']) {
+      await radio(page, display).click();
+      await radio(page, 'Repeat').click();
+      await radio(page, '2 by 2').click();
+
+      await page.getByRole('button', { name: 'Animate palette' }).click();
+      await page.waitForTimeout(600);
+
+      /*
+       * The copies come from one prepared tile, so a phase read per copy would
+       * show the quadrants disagreeing. Compared while it is still running,
+       * which is when they would.
+       */
+      const quadrantsAgree = await page.evaluate(() => {
+        const canvas = document.querySelector('canvas');
+        const context = canvas?.getContext('2d') ?? null;
+        if (canvas === null || context === null) return false;
+
+        const half = Math.floor(canvas.width / 2);
+        const quarter = Math.floor(canvas.height / 2);
+        const left = context.getImageData(0, 0, half, quarter).data;
+        const right = context.getImageData(half, 0, half, quarter).data;
+        for (let at = 0; at < left.length; at += 4) {
+          if (Math.abs((left[at] as number) - (right[at] as number)) > 6) return false;
+        }
+        return true;
+      });
+
+      expect(quadrantsAgree, display).toBe(true);
+      await page.getByRole('button', { name: 'Reset animation' }).click();
+    }
+  });
+});
+
 test.describe('Pixel and Smooth in the exported image', () => {
   test.use({ viewport: WIDE });
 

@@ -147,6 +147,36 @@ describe('a view entirely at the ceiling', () => {
   });
 });
 
+describe('a uniform view under either display mode', () => {
+  it('stays one colour whether cells are crisp or interpolated', () => {
+    /*
+     * Interpolation blends neighbouring cells. When every cell holds the same
+     * value there is nothing to blend, so a flat result must stay flat — this is
+     * the case where a display mode could most plausibly appear to invent
+     * detail, and it must not.
+     *
+     * Checked against the mapping rather than a canvas, because the mapping is
+     * what decides the colours; that the browser interpolates between them is
+     * covered where a real canvas exists.
+     */
+    const uniform = fromNested(Array.from({ length: 6 }, () => Array.from({ length: 6 }, () => ITERATIONS)));
+
+    for (const mode of COLOURING_MODES) {
+      const image = renderArtwork(uniform, matrixStats(uniform), {
+        mode: 'continuous',
+        palette: abyss,
+        escape: { colouring: { ...DEFAULT_COLOURING, mode }, range: RANGE, entries: abyss.colours.length },
+      });
+
+      const colours = new Set<string>();
+      for (let at = 0; at < image.data.length; at += 4) {
+        colours.add(`${String(image.data[at])},${String(image.data[at + 1])},${String(image.data[at + 2])}`);
+      }
+      expect(colours.size, mode).toBe(1);
+    }
+  });
+});
+
 describe('the descent into the void', () => {
   it('passes through navy rather than grey', () => {
     /*

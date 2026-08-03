@@ -254,6 +254,27 @@ describe('state that says nothing about display', () => {
     expect(mode('Pixel')).toHaveAttribute('aria-checked', 'true');
   });
 
+  it('restores a stored true as Smooth, unchanged from the old behaviour', () => {
+    // The tick this replaces wrote the same boolean. Somebody who left it on
+    // must find the artwork softened, not reset to crisp because the control
+    // was renamed.
+    const outcome = migrateProject({
+      schemaVersion: 1,
+      id: 'old-smooth',
+      sourcePresetId: mandelbrotField.id,
+      title: 'Mandelbrot Field',
+      code: mandelbrotField.code,
+      parameterValues: {},
+      paletteId: 'heat',
+      renderOptions: { invert: false, rotation: 0, smoothScaling: true },
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.ok ? outcome.project.renderOptions.smoothScaling : false).toBe(true);
+  });
+
   it.each([undefined, null, 'yes', 1, {}])('reads %s as Pixel in a stored project', (value) => {
     const outcome = migrateProject({
       schemaVersion: 1,
