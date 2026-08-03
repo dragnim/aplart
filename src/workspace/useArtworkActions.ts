@@ -40,6 +40,14 @@ export interface ArtworkActions {
   /** Only true when the artwork is actually repeated; otherwise the choice is moot. */
   readonly canExportTiling: boolean;
   readonly exportAt: (size: ExportSize) => void;
+  /**
+   * The shape of the matrix an export would be drawn from, or null before a run.
+   *
+   * Shown beside the sizes so that choosing 1024 from a 128-cell result is an
+   * informed choice rather than an implied promise that every pixel was
+   * calculated. Read from the completed result, never from the editor.
+   */
+  readonly sourceShape: { readonly rows: number; readonly columns: number } | null;
 }
 
 export function useArtworkActions(options: {
@@ -197,5 +205,7 @@ export function useArtworkActions(options: {
     copyApl,
     share,
     exportAt,
+    sourceShape:
+      state.result === null ? null : { rows: state.result.matrix.rows, columns: state.result.matrix.columns },
   };
 }

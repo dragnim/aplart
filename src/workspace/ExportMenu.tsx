@@ -89,6 +89,18 @@ export function ExportMenu({ actions, triggerClassName, label = 'Export' }: Prop
 
           <li role="separator" className={styles.separator} />
 
+          {/*
+            What the image is drawn from, next to the sizes it can be drawn at.
+            A 1024-pixel export of a 128-cell result is a legitimate thing to
+            want; what would not be legitimate is letting the number imply that
+            every one of those pixels was calculated.
+          */}
+          {actions.sourceShape !== null && (
+            <li role="presentation" className={styles.note}>
+              Source matrix: {actions.sourceShape.columns} × {actions.sourceShape.rows}
+            </li>
+          )}
+
           {EXPORT_SIZES.map((size) => (
             <li key={String(size)} role="none">
               <button

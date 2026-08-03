@@ -75,3 +75,11 @@
   margin: var(--space-1) 0;
   background: var(--border);
 }
+
+/* What the export is drawn from. Not selectable: it is a fact, not a choice. */
+.note {
+  padding: var(--space-1) var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}

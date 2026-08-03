@@ -38,6 +38,14 @@ interface Props {
   readonly escape?: EscapeSettings | undefined;
   /** How the base tile's opposite edges compare, or null before a first run. */
   readonly edges?: EdgeCheck | null;
+  /**
+   * Whether this artwork draws one square per matrix cell.
+   *
+   * Only the Display control's wording depends on it: "each calculated matrix
+   * cell as a crisp square" is true of a cell-rendered artwork and false of one
+   * that draws a motif per cell.
+   */
+  readonly cells?: boolean;
 }
 
 export function RenderControls({
@@ -50,6 +58,7 @@ export function RenderControls({
   reducedMotion,
   escape,
   edges = null,
+  cells = true,
 }: Props) {
   const available =
     availablePaletteIds === undefined
@@ -188,14 +197,14 @@ export function RenderControls({
             checked={options.invert}
             onChange={(value) => onChange({ invert: value })}
           />
-          <Toggle
-            label="Smooth scaling"
-            checked={options.smoothScaling}
-            onChange={(value) => onChange({ smoothScaling: value })}
-            hint="Off keeps cell edges crisp."
-          />
         </div>
       </fieldset>
+
+      <DisplayControl
+        smooth={options.smoothScaling}
+        cells={cells}
+        onChange={(smoothScaling) => onChange({ smoothScaling })}
+      />
 
       {/*
         After orientation, because the base tile is what gets repeated: rotating
@@ -207,6 +216,70 @@ export function RenderControls({
         onChange={(tiling) => onChange({ tiling })}
       />
     </div>
+  );
+}
+
+/**
+ * Crisp cells, or interpolation between them.
+ *
+ * Two named choices rather than the "smooth scaling" tick this replaces, because
+ * the honest description of each is a sentence and a tick had room for neither.
+ * What the wording has to protect: one of these shows the matrix and the other
+ * blurs the gaps between its cells. Neither calculates anything, so neither may
+ * be called more detail, higher resolution or better quality — there is exactly
+ * as much information on screen either way.
+ */
+function DisplayControl({
+  smooth,
+  cells,
+  onChange,
+}: {
+  readonly smooth: boolean;
+  /** Whether this artwork draws one square per matrix cell, or motifs. */
+  readonly cells: boolean;
+  readonly onChange: (smooth: boolean) => void;
+}) {
+  const choices = [
+    {
+      smooth: false,
+      label: 'Pixel',
+      description: cells
+        ? 'Shows each calculated matrix cell as a crisp square.'
+        : 'Keeps the drawn edges crisp.',
+    },
+    {
+      smooth: true,
+      label: 'Smooth',
+      description: cells
+        ? 'Softens the display between calculated cells. It does not calculate additional detail.'
+        : 'Softens the drawn edges. It does not calculate additional detail.',
+    },
+  ];
+
+  return (
+    <fieldset className={styles.group}>
+      <legend className={styles.legend}>Display</legend>
+      <div className={styles.displayModes} role="radiogroup" aria-label="Display">
+        {choices.map((choice) => (
+          <button
+            key={choice.label}
+            type="button"
+            role="radio"
+            aria-checked={smooth === choice.smooth}
+            className={styles.displayMode}
+            data-selected={smooth === choice.smooth ? 'true' : undefined}
+            onClick={() => onChange(choice.smooth)}
+          >
+            {choice.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Only the chosen one, so the panel stays compact. */}
+      <p className={styles.displayNote}>
+        {choices.find((choice) => choice.smooth === smooth)?.description ?? ''}
+      </p>
+    </fieldset>
   );
 }
 

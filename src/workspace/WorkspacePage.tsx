@@ -822,6 +822,7 @@ function Workspace({
           reducedMotion={reducedMotion}
           escape={shownEscape}
           edges={edges}
+          cells={preset.renderMode !== 'tiles'}
         />
       </section>
 

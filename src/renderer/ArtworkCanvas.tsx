@@ -238,9 +238,15 @@ export function ArtworkCanvas({
          * setting moves focus through a radio group that announces itself; a
          * third polite region would talk over that to say the same thing.
          */
+        /*
+         * The display mode is named here too. It changes what the picture looks
+         * like without changing what it contains, so somebody who cannot see it
+         * should still be told which of the two is in use — and told in words
+         * that do not suggest one holds more than the other.
+         */
         aria-label={`${describeMatrix(displayed, stats, palette.name)}${
-          isRepeating(options.tiling) ? ` ${describeTiling(options.tiling as TilingView)}` : ''
-        }`}
+          options.smoothScaling ? ' Displayed with smooth interpolation.' : ' Shown as crisp cells.'
+        }${isRepeating(options.tiling) ? ` ${describeTiling(options.tiling as TilingView)}` : ''}`}
         onPointerDown={pointer.onPointerDown}
         onPointerMove={pointer.onPointerMove}
         onPointerUp={pointer.onPointerUp}
