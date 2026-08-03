@@ -129,7 +129,10 @@ describe('the programs are unchanged by the move', () => {
     'truchet-grid': { digest: '2c9ef6399089', characters: 458, lines: 12 },
     'sierpinski-array': { digest: 'd380643951cd', characters: 220, lines: 13 },
     'cellular-echo': { digest: 'e6c5c2c033b2', characters: 489, lines: 18 },
-    'mandelbrot-field': { digest: '8ca8df188fb7', characters: 625, lines: 19 },
+    // Changed deliberately in Stage 4: the iteration default moved from 28 to
+    // 48. Same length, because both are two digits — which is exactly why a
+    // character count alone would not have noticed.
+    'mandelbrot-field': { digest: '5a8df3d17814', characters: 625, lines: 19 },
   };
 
   it('has an expectation for every artwork in the gallery', () => {

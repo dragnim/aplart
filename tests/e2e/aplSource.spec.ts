@@ -40,7 +40,7 @@ test.describe('artwork source in a production build', () => {
     // Present before anything could have been fetched for it.
     const editor = await editorOn(page);
     await expect(editor).toContainText('step←{(zr zi a n)←⍵');
-    await expect(editor).toContainText('iterations←28');
+    await expect(editor).toContainText('iterations←48');
 
     // Visit a second artwork too: a per-artwork fetch would only show up on
     // whichever one was not part of the first chunk.

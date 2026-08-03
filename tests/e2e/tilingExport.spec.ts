@@ -123,6 +123,15 @@ test.describe('exporting a repeat', () => {
   });
 
   test('has no seam at any count, scale or mode', async ({ page }) => {
+    /*
+     * Eighteen combinations, each encoding a 512-pixel PNG and decoding it again
+     * to count empty lines. That is genuinely a minute's work and it had been
+     * finishing within a hair of the default timeout — 28.8s, then 29.8s, then
+     * 30.2s as the suite grew — so it began timing out under parallel load
+     * rather than failing. Given the time it needs, it passes.
+     */
+    test.slow();
+
     await openAndRun(page);
     await chooseRepeat(page, 'Repeat', '3 by 3');
     await turnOnRepeatExport(page);

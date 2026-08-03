@@ -139,10 +139,10 @@ Not for speed, and not for the full-set view. The case rests on one row of the t
 | Distinct values               | 4     | 16    | 24    | 36    |
 
 At the current default, a visitor who drags to zoom two or three times arrives at a view that is 90%
-one value and contains four distinct numbers. There is almost nothing there to colour. The interface
+one value and contains four distinct values. There is almost nothing there to colour. The interface
 correctly refuses to invent detail, so what they see is a flat wash — and the honest reading of that
 is not "this artwork is subtle" but "the ceiling is too low for this view". At 40 it becomes a
-fractal; at 48 there are six times as many bands as at 28.
+fractal; at 48 the matrix holds six times as many distinct values as at 28.
 
 The cost is small and, at three runs, mostly unmeasurable. Median service time at the default
 resolution moves from 400 ms to 548 ms on that view, and from 402 ms to 442 ms on the boundary view.
@@ -150,11 +150,16 @@ Of the thirty-two ceiling pairs compared, only two separate at all — `28 → 4
 moderate zoom at 128². Every combination returned its matrix in three or four requests, and 96 of 96
 runs succeeded with no timeouts.
 
-48 rather than 60 because 48 captures nearly all of the structural gain — 59.3% against 58.1% at the
-ceiling, 24 bands against 36 — while sitting further from the limit, and because 60 showed the widest
-timing spread of the four: a median absolute deviation of 266 ms at 144² on the full-set view against
-69 ms at 48. 48 rather than 40 because the extra eight iterations cost nothing measurable and add
-half again as many bands.
+48 rather than 60 because 48 captures nearly all of the reduction in ceiling saturation that 60
+reaches — 59.3% against 58.1% — while sitting further from the limit, and because 60 showed the
+widest timing spread of the four: a median absolute deviation of 266 ms at 144² on the full-set view
+against 69 ms at 48. That is not the whole story, and should not be stated as though it were: 60 does
+keep going on distinct values, 36 against 24, so it genuinely offers the colouring more to work with.
+The recommendation of 48 rests on the saturation curve flattening, not on 60 having nothing left to
+give.
+
+48 rather than 40 because the extra eight iterations cost nothing measurable and lift the distinct
+values from 16 to 24 — fifty per cent more.
 
 What this does not justify: raising the maximum, which stays at 60; changing resolution; or
 increasing iterations automatically while zooming. The value stays visible as `iterations←48`, and a

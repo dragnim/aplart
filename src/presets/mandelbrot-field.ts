@@ -57,9 +57,27 @@ export const mandelbrotField: ArtworkPreset = {
       description: 'How long to keep testing each point. Higher shows finer detail but takes longer.',
       type: 'integer',
       min: 8,
+      /*
+       * Sixty stays the ceiling. Measured against the live service, the cost of
+       * raising it is barely detectable — thirty of thirty-two ceiling pairs
+       * could not be separated at three runs each — so what limits it is not
+       * time but the workspace this preset already runs close to.
+       */
       max: 60,
       step: 1,
-      defaultValue: 28,
+      /*
+       * Forty-eight, not twenty-eight.
+       *
+       * At twenty-eight a view two or three drags in was ninety per cent one
+       * value, with four distinct values in the whole matrix: almost nothing to
+       * colour, and nothing the renderer is willing to invent. Forty-eight
+       * brings that to fifty-nine per cent and twenty-four values. Sixty goes
+       * further still on values, but the saturation curve has flattened by
+       * forty-eight and sixty showed the widest timing spread of the four.
+       *
+       * docs/mandelbrot-iterations.md has the measurements and the argument.
+       */
+      defaultValue: 48,
       randomisable: false,
     },
     {
@@ -130,7 +148,7 @@ export const mandelbrotField: ArtworkPreset = {
   /*
    * One, not zero. The step counts before it tests, and the first test is on
    * z = 0, so no cell can come back with less than one — checked against the
-   * committed fixture, which runs 1 to 28 with no zero in it.
+   * committed fixture, which runs 1 to 48 with no zero in it.
    */
   valueRange: { min: 1, maxVariable: 'iterations' },
 

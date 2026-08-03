@@ -11,7 +11,18 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockAplExecutionService } from '@/execution/MockAplExecutionService';
 import { fromNested } from '@/matrix/matrixTypes';
+import { numberAssignedTo } from '@/editor/parameterBinding';
 import { mandelbrotField } from '@/presets/mandelbrot-field';
+
+/**
+ * The preset's own iteration ceiling, read from its code.
+ *
+ * Derived rather than written out, because these tests are about what a
+ * value *means* against the ceiling that produced it. Restating the number
+ * made them all fail when the default moved from 28 to 48, which told us
+ * nothing except that the number had moved.
+ */
+const CEILING = numberAssignedTo(mandelbrotField.code, 'iterations') ?? 0;
 import { modularBloom } from '@/presets/modular-bloom';
 import { truchetGrid } from '@/presets/truchet-grid';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
@@ -492,14 +503,17 @@ describe('what is announced', () => {
       mandelbrotField.id,
       fromNested([
         [1, 2],
-        [3, 28],
+        [3, CEILING],
       ]),
     );
     press(300, 300);
 
     await screen.findByText('Row 2, column 2');
     expect(announced()).toMatch(
-      /Row 2, column 2\. Value 28\..*This point reached the maximum of 28 iterations\./u,
+      new RegExp(
+        `Row 2, column 2\\. Value ${String(CEILING)}\\..*This point reached the maximum of ${String(CEILING)} iterations\\.`,
+        'u',
+      ),
     );
   });
 
@@ -555,12 +569,14 @@ describe('what a preset can add', () => {
   it('quotes the ceiling from the visible code', async () => {
     const ceiling = fromNested([
       [1, 2],
-      [3, 28],
+      [3, CEILING],
     ]);
     await openAndRun(mandelbrotField.id, ceiling);
 
     press(300, 300);
-    expect(await screen.findByText('This point reached the maximum of 28 iterations.')).toBeInTheDocument();
+    expect(
+      await screen.findByText(`This point reached the maximum of ${String(CEILING)} iterations.`),
+    ).toBeInTheDocument();
   });
 
   it('quotes the limit the code now sets, not the one it shipped with', async () => {
@@ -585,8 +601,8 @@ describe('what a preset can add', () => {
     await openAndRun(
       mandelbrotField.id,
       fromNested([
-        [28, 28],
-        [28, 28],
+        [CEILING, CEILING],
+        [CEILING, CEILING],
       ]),
     );
 
@@ -600,8 +616,8 @@ describe('what a preset can add', () => {
     await openAndRun(
       mandelbrotField.id,
       fromNested([
-        [28, 28],
-        [28, 28],
+        [CEILING, CEILING],
+        [CEILING, CEILING],
       ]),
     );
     await waitFor(() => expect(announced()).toMatch(/Every point in this view/u));
@@ -611,7 +627,7 @@ describe('what a preset can add', () => {
     // Pressing answers the same question more precisely; repeating the general
     // note over it would be noise in a live region.
     await waitFor(() => expect(announced()).not.toMatch(/Every point in this view/u));
-    expect(announced()).toContain('This point reached the maximum of 28 iterations.');
+    expect(announced()).toContain(`This point reached the maximum of ${String(CEILING)} iterations.`);
   });
 
   it('says nothing of the sort for an artwork with no ceiling to speak of', async () => {

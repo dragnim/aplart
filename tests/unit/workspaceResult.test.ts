@@ -10,12 +10,23 @@
 import { describe, expect, it } from 'vitest';
 import { matrixStats } from '@/matrix/matrixStats';
 import { fromNested, type NumericMatrix } from '@/matrix/matrixTypes';
+import { numberAssignedTo } from '@/editor/parameterBinding';
 import { mandelbrotField } from '@/presets/mandelbrot-field';
+
+/**
+ * The preset's own iteration ceiling, read from its code.
+ *
+ * Derived rather than written out, because these tests are about what a
+ * value *means* against the ceiling that produced it. Restating the number
+ * made them all fail when the default moved from 28 to 48, which told us
+ * nothing except that the number had moved.
+ */
+const CEILING = numberAssignedTo(mandelbrotField.code, 'iterations') ?? 0;
 import { initialWorkspaceState, workspaceReducer, type WorkspaceState } from '@/workspace/workspaceState';
 
 const AT_28 = fromNested([
   [1, 14],
-  [7, 28],
+  [7, CEILING],
 ]);
 const AT_60 = fromNested([
   [1, 30],
@@ -23,7 +34,7 @@ const AT_60 = fromNested([
 ]);
 
 const SOURCE_28 = mandelbrotField.code;
-const SOURCE_60 = mandelbrotField.code.replace('iterations←28', 'iterations←60');
+const SOURCE_60 = mandelbrotField.code.replace(`iterations←${String(CEILING)}`, 'iterations←60');
 
 function reduce(state: WorkspaceState, ...actions: Parameters<typeof workspaceReducer>[1][]) {
   return actions.reduce((current, action) => workspaceReducer(current, action, mandelbrotField), state);
@@ -57,7 +68,7 @@ describe('a successful run', () => {
 
     expect(state.result?.matrix).toBe(AT_28);
     expect(state.result?.source).toBe(SOURCE_28);
-    expect(state.result?.stats.max).toBe(28);
+    expect(state.result?.stats.max).toBe(CEILING);
   });
 
   it('records the source it was given, not the code in the editor', () => {
@@ -101,7 +112,7 @@ describe('a run that does not produce a result', () => {
 
     /*
      * The dangerous case. The code says 60, no result at 60 ever arrived, and
-     * the matrix on screen is the 28 one. Anything reading `code` here would
+     * the matrix on screen is the CEILING one. Anything reading `code` here would
      * reinterpret it permanently with nothing to explain why.
      */
     expect(after.result).toBe(before.result);

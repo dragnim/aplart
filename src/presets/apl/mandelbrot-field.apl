@@ -1,6 +1,6 @@
 ⍝ Controls
 size←128
-iterations←28
+iterations←48
 centreX←¯0.6
 centreY←0
 zoom←1.4

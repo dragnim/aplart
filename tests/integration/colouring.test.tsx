@@ -12,7 +12,18 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockAplExecutionService } from '@/execution/MockAplExecutionService';
 import { fromNested, type NumericMatrix } from '@/matrix/matrixTypes';
+import { numberAssignedTo } from '@/editor/parameterBinding';
 import { mandelbrotField } from '@/presets/mandelbrot-field';
+
+/**
+ * The preset's own iteration ceiling, read from its code.
+ *
+ * Derived rather than written out, because these tests are about what a
+ * value *means* against the ceiling that produced it. Restating the number
+ * made them all fail when the default moved from 28 to 48, which told us
+ * nothing except that the number had moved.
+ */
+const CEILING = numberAssignedTo(mandelbrotField.code, 'iterations') ?? 0;
 import { modularBloom } from '@/presets/modular-bloom';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
 
@@ -47,7 +58,7 @@ beforeEach(() => {
 });
 
 /** Escape counts that look like a real slice: some escaped, some did not. */
-function escapeCounts(size = 8, ceiling = 28): NumericMatrix {
+function escapeCounts(size = 8, ceiling = CEILING): NumericMatrix {
   return fromNested(
     Array.from({ length: size }, (_unusedRow, row) =>
       Array.from({ length: size }, (_unusedColumn, column) =>
@@ -193,7 +204,7 @@ describe('what the inspector says', () => {
     const { user } = await openAndRun();
 
     // Row 3, column 3 is on the diagonal, which this matrix sets to the ceiling.
-    expect(await inspect(user, 3, 3)).toContain('reached the maximum of 28 iterations');
+    expect(await inspect(user, 3, 3)).toContain(`reached the maximum of ${String(CEILING)} iterations`);
 
     /*
      * Row 1, column 2 holds 2. Before the declared range existed the note fired
@@ -217,11 +228,11 @@ describe('what the inspector says', () => {
 
   it('follows the ceiling the result was produced under, not the editor', async () => {
     const { user } = await openAndRun();
-    expect(await inspect(user, 3, 3)).toContain('reached the maximum of 28 iterations');
+    expect(await inspect(user, 3, 3)).toContain(`reached the maximum of ${String(CEILING)} iterations`);
 
     /*
      * Raised in the editor and not run. The matrix on screen is still a
-     * 28-iteration result, so it still means what 28 iterations produced —
+     * CEILING-iteration result, so it still means what CEILING iterations produced —
      * `tests/integration/resultSemantics.test.tsx` covers that boundary in
      * full, including the failed-run case.
      */
@@ -230,13 +241,13 @@ describe('what the inspector says', () => {
       expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toContain('iterations←60'),
     );
 
-    expect(await inspect(user, 3, 3)).toContain('reached the maximum of 28 iterations');
+    expect(await inspect(user, 3, 3)).toContain(`reached the maximum of ${String(CEILING)} iterations`);
   });
 });
 
 describe('a result with no variation in it', () => {
   it('keeps saying so, under every mode', async () => {
-    const uniform = fromNested(Array.from({ length: 6 }, () => Array.from({ length: 6 }, () => 28)));
+    const uniform = fromNested(Array.from({ length: 6 }, () => Array.from({ length: 6 }, () => CEILING)));
     await openAndRun(uniform);
 
     for (const mode of ['smooth', 'bands', 'repeating', 'insideOutside', 'threshold']) {

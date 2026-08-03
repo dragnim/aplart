@@ -23,7 +23,18 @@ import {
 import { executionError } from '@/execution/errors';
 import { PROBE_MARKER, formatBandReply, formatProbeReply } from '@/execution/transport';
 import { fromNested, type NumericMatrix } from '@/matrix/matrixTypes';
+import { numberAssignedTo } from '@/editor/parameterBinding';
 import { mandelbrotField } from '@/presets/mandelbrot-field';
+
+/**
+ * The preset's own iteration ceiling, read from its code.
+ *
+ * Derived rather than written out, because these tests are about what a
+ * value *means* against the ceiling that produced it. Restating the number
+ * made them all fail when the default moved from 28 to 48, which told us
+ * nothing except that the number had moved.
+ */
+const CEILING = numberAssignedTo(mandelbrotField.code, 'iterations') ?? 0;
 import { WorkspacePage } from '@/workspace/WorkspacePage';
 import type * as CanvasRenderer from '@/renderer/CanvasRenderer';
 
@@ -212,7 +223,7 @@ async function paintedSince(since: number) {
   await waitFor(() => expect(drawCalls.length).toBeGreaterThan(since));
 }
 
-async function start(matrix = counts(28)) {
+async function start(matrix = counts(CEILING)) {
   const user = userEvent.setup();
   const service = new HeldService(matrix);
   render(<WorkspacePage presetId={mandelbrotField.id} sharedState={null} service={service} />);
@@ -350,13 +361,13 @@ describe('editing while the bands arrive', () => {
 
     await finish(service);
     // The artwork that arrived is the one that was asked for.
-    expect(lastPaint()?.escape?.range.max).toBe(28);
+    expect(lastPaint()?.escape?.range.max).toBe(CEILING);
   });
 
   it('recolours the bands already on screen using the semantics they were made with', async () => {
     const { service } = await start();
     await releaseBands(service, 3);
-    expect(lastPaint()?.escape?.range.max).toBe(28);
+    expect(lastPaint()?.escape?.range.max).toBe(CEILING);
 
     // The scenario in full: edit the ceiling, then change two presentation
     // settings while the rest of the artwork is still being fetched.
@@ -370,22 +381,22 @@ describe('editing while the bands arrive', () => {
 
     /*
      * Both are presentation, so both repaint what is already there — and both
-     * repaint it against 28, because that is what produced those bands. Reading
+     * repaint it against CEILING, because that is what produced those bands. Reading
      * the editor here would recolour a half-delivered artwork mid-delivery,
      * under a ceiling no part of it came from.
      */
     await waitFor(() => expect(lastPaint()?.palette?.colours).toBeDefined());
-    expect(lastPaint()?.escape?.range.max).toBe(28);
+    expect(lastPaint()?.escape?.range.max).toBe(CEILING);
 
     await finish(service);
 
-    // And the finished result is still the 28-iteration run.
-    expect(lastPaint()?.escape?.range.max).toBe(28);
+    // And the finished result is still the CEILING-iteration run.
+    expect(lastPaint()?.escape?.range.max).toBe(CEILING);
     expect(screen.getByLabelText(/^Row/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: '3' } });
     fireEvent.change(screen.getByLabelText(/^Column/), { target: { value: '3' } });
     fireEvent.click(screen.getByRole('button', { name: /^Inspect$/ }));
-    expect(announced()).toContain('reached the maximum of 28 iterations');
+    expect(announced()).toContain(`reached the maximum of ${String(CEILING)} iterations`);
   });
 });
 
@@ -412,7 +423,7 @@ describe('when a banded run does not finish', () => {
 
     // Whole again, and still the artwork that completed.
     expect(paintedCells()).toBe(complete);
-    expect(lastPaint()?.escape?.range.max).toBe(28);
+    expect(lastPaint()?.escape?.range.max).toBe(CEILING);
   });
 
   it('offers to retry the run that failed, not the code in the editor', async () => {
@@ -440,8 +451,8 @@ describe('when a banded run does not finish', () => {
     await waitFor(() => expect(service.pending).toBeGreaterThan(0));
     await finish(service);
 
-    // The retried run was the 28 one, whatever the editor says now.
-    expect(lastPaint()?.escape?.range.max).toBe(28);
+    // The retried run was the CEILING one, whatever the editor says now.
+    expect(lastPaint()?.escape?.range.max).toBe(CEILING);
     expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toContain('iterations←60');
   });
 });
@@ -505,7 +516,7 @@ describe('a delivery while the artwork is repeated', () => {
 
   it('shows a first delivery as one copy, never repeated', async () => {
     const user = userEvent.setup();
-    const service = new HeldService(counts(28));
+    const service = new HeldService(counts(CEILING));
     render(<WorkspacePage presetId={mandelbrotField.id} sharedState={null} service={service} />);
 
     // Repeat chosen before anything has been drawn at all.
@@ -528,7 +539,7 @@ describe('a delivery while the artwork is repeated', () => {
 describe('exporting while a run is in flight', () => {
   it('offers nothing to export before a first result exists', async () => {
     const user = userEvent.setup();
-    const service = new HeldService(counts(28));
+    const service = new HeldService(counts(CEILING));
     render(<WorkspacePage presetId={mandelbrotField.id} sharedState={null} service={service} />);
 
     await user.click(screen.getByRole('button', { name: /^Run/ }));

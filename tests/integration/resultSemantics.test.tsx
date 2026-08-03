@@ -1,8 +1,8 @@
 /**
  * What a matrix means, and where that meaning comes from.
  *
- * Escape counts do not interpret themselves. A cell holding 28 means "reached
- * the limit" against a ceiling of 28 and "escaped comfortably" against a
+ * Escape counts do not interpret themselves. A cell holding CEILING means "reached
+ * the limit" against a ceiling of CEILING and "escaped comfortably" against a
  * ceiling of 60, so the source that produced the numbers has to travel with
  * them. Editing the code decides what the *next* run will mean; it says nothing
  * about the result already on screen.
@@ -17,7 +17,18 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockAplExecutionService } from '@/execution/MockAplExecutionService';
 import { fromNested, type NumericMatrix } from '@/matrix/matrixTypes';
+import { numberAssignedTo } from '@/editor/parameterBinding';
 import { mandelbrotField } from '@/presets/mandelbrot-field';
+
+/**
+ * The preset's own iteration ceiling, read from its code.
+ *
+ * Derived rather than written out, because these tests are about what a
+ * value *means* against the ceiling that produced it. Restating the number
+ * made them all fail when the default moved from 28 to 48, which told us
+ * nothing except that the number had moved.
+ */
+const CEILING = numberAssignedTo(mandelbrotField.code, 'iterations') ?? 0;
 import { WorkspacePage } from '@/workspace/WorkspacePage';
 import type * as CanvasRenderer from '@/renderer/CanvasRenderer';
 
@@ -147,7 +158,7 @@ async function openAndRun(options: { readonly at60?: NumericMatrix | 'oversized'
       options.at60 === 'oversized' ? counts(60, 200) : options.at60,
     );
   }
-  service.register('default', counts(28));
+  service.register('default', counts(CEILING));
 
   render(<WorkspacePage presetId={mandelbrotField.id} sharedState={null} service={service} />);
   await runAndWait(user);
@@ -167,15 +178,15 @@ describe('a successful run at 28', () => {
   it('colours and describes the matrix against 28', async () => {
     const { user } = await openAndRun();
 
-    expect(paintedCeiling()).toBe(28);
-    expect(await inspect(user, 3, 3)).toContain('reached the maximum of 28 iterations');
+    expect(paintedCeiling()).toBe(CEILING);
+    expect(await inspect(user, 3, 3)).toContain(`reached the maximum of ${String(CEILING)} iterations`);
   });
 });
 
 describe('edited to 60 without running', () => {
   it('leaves the canvas coloured against 28', async () => {
     await openAndRun();
-    expect(paintedCeiling()).toBe(28);
+    expect(paintedCeiling()).toBe(CEILING);
 
     await editTo60();
 
@@ -184,10 +195,10 @@ describe('edited to 60 without running', () => {
      * them against 60 would change the artwork with no execution behind it —
      * the one thing this application must never do.
      */
-    expect(paintedCeiling()).toBe(28);
+    expect(paintedCeiling()).toBe(CEILING);
   });
 
-  it('still reads 28 as having reached the limit', async () => {
+  it('still reads CEILING as having reached the limit', async () => {
     const { user } = await openAndRun();
     await inspect(user, 3, 3);
 
@@ -195,7 +206,7 @@ describe('edited to 60 without running', () => {
 
     // The sentence describes a calculation that happened, not one that is
     // merely written down.
-    expect(announced()).toContain('reached the maximum of 28 iterations');
+    expect(announced()).toContain(`reached the maximum of ${String(CEILING)} iterations`);
     expect(announced()).not.toContain('Escaped before');
     expect(announced()).not.toContain('60');
   });
@@ -205,7 +216,7 @@ describe('edited to 60 without running', () => {
     const service = new MockAplExecutionService();
     service.register(
       'default',
-      fromNested(Array.from({ length: 6 }, () => Array.from({ length: 6 }, () => 28))),
+      fromNested(Array.from({ length: 6 }, () => Array.from({ length: 6 }, () => CEILING))),
     );
     render(<WorkspacePage presetId={mandelbrotField.id} sharedState={null} service={service} />);
     await runAndWait(user);
@@ -215,14 +226,14 @@ describe('edited to 60 without running', () => {
     await editTo60();
 
     /*
-     * Uniformly 28 is at the limit under the ceiling that produced it. Reading
+     * Uniformly CEILING is at the limit under the ceiling that produced it. Reading
      * it against 60 would decide the view had escaped and silently withdraw the
      * only message explaining why the artwork is one flat colour.
      */
     expect(announced()).toContain('reached the current iteration limit');
   });
 
-  it('interprets the matrix at 28 under every colouring mode', async () => {
+  it('interprets the matrix at CEILING under every colouring mode', async () => {
     const { user } = await openAndRun();
     await editTo60();
 
@@ -230,15 +241,15 @@ describe('edited to 60 without running', () => {
       fireEvent.change(screen.getByLabelText('Mode'), { target: { value: mode } });
       // Changing how the numbers are read must not change which numbers they
       // are being read against.
-      expect(paintedCeiling()).toBe(28);
+      expect(paintedCeiling()).toBe(CEILING);
     }
 
-    expect(await inspect(user, 3, 3)).toContain('reached the maximum of 28 iterations');
+    expect(await inspect(user, 3, 3)).toContain(`reached the maximum of ${String(CEILING)} iterations`);
   });
 });
 
 describe('a failed run at 60', () => {
-  it('leaves the 28 result and its meaning intact', async () => {
+  it('leaves the CEILING result and its meaning intact', async () => {
     const { user } = await openAndRun({ at60: 'oversized' });
     await editTo60();
     await runAndWait(user);
@@ -250,24 +261,24 @@ describe('a failed run at 60', () => {
     /*
      * The failure is the dangerous case: the code now says 60 and no result
      * ever came back at 60. Anything reading the editor would reinterpret a
-     * 28-iteration matrix permanently, with nothing on screen to explain it.
+     * CEILING-iteration matrix permanently, with nothing on screen to explain it.
      */
-    expect(paintedCeiling()).toBe(28);
-    expect(await inspect(user, 3, 3)).toContain('reached the maximum of 28 iterations');
+    expect(paintedCeiling()).toBe(CEILING);
+    expect(await inspect(user, 3, 3)).toContain(`reached the maximum of ${String(CEILING)} iterations`);
   });
 });
 
 describe('a successful run at 60', () => {
   it('moves the matrix and its meaning together', async () => {
     const { user } = await openAndRun({ at60: counts(60) });
-    expect(paintedCeiling()).toBe(28);
+    expect(paintedCeiling()).toBe(CEILING);
 
     await editTo60();
     await runAndWait(user);
 
     await waitFor(() => expect(paintedCeiling()).toBe(60));
 
-    // 28 escaped under this ceiling, and the diagonal now holds 60.
+    // CEILING escaped under this ceiling, and the diagonal now holds 60.
     expect(await inspect(user, 3, 3)).toContain('reached the maximum of 60 iterations');
     expect(await inspect(user, 1, 2)).toContain('Escaped before the iteration limit.');
   });
@@ -318,7 +329,9 @@ describe('resetting the artwork', () => {
     await user.click(screen.getByRole('button', { name: 'Reset' }));
     await user.click(await screen.findByRole('button', { name: 'Reset everything' }));
     await waitFor(() =>
-      expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toContain('iterations←28'),
+      expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toContain(
+        `iterations←${String(CEILING)}`,
+      ),
     );
 
     /*
