@@ -34,6 +34,18 @@
   max-height: calc(100dvh - 12rem);
   overflow-y: auto;
   overflow-x: hidden;
+  /*
+   * A containing block, so that the clipping above actually clips everything.
+   *
+   * `overflow` only clips a descendant whose containing block is inside the
+   * scroller. The controls carry `.visually-hidden` descriptions for screen
+   * readers, which are `position: absolute` — with no positioned ancestor they
+   * belonged to the initial containing block, escaped this scroller, and sat at
+   * their static positions two thousand pixels down the *document*. The page was
+   * then scrollable far past its own footer, into blank space, even though every
+   * box in the layout was the right size. One declaration removes it.
+   */
+  position: relative;
   padding-right: var(--space-2);
   /*
    * Grid and flex children default to min-width: auto, which refuses to

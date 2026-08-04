@@ -133,13 +133,23 @@ test.describe('Multibrot', () => {
     await expect(editor).toContainText('power←2');
     await expect(editor).toContainText('centreX←¯0.6');
     await runAndSettle(page);
+    await expect(page.locator('canvas').first()).toHaveAttribute('aria-label', /Ember palette/);
     const squared = await canvasDigest(page);
 
     await page.goto('./#/art/mandelbrot-field');
-    // Mandelbrot's own defaults are already this view; only the palette differs,
-    // so it is set to match before the pictures are compared.
-    await page.getByRole('radio', { name: 'Ember', exact: true }).click();
+    /*
+     * Mandelbrot's own defaults are already this view; only the palette differs, so
+     * it is set to match before the pictures are compared — and the change is
+     * confirmed rather than assumed. Clicking without checking made this test flaky
+     * the moment the page's layout shifted: a click that missed left Mandelbrot in
+     * Abyss, and two pictures in different palettes will never match.
+     */
+    const ember = page.getByRole('radio', { name: 'Ember', exact: true });
+    await ember.scrollIntoViewIfNeeded();
+    await ember.click();
+    await expect(ember).toHaveAttribute('aria-checked', 'true');
     await runAndSettle(page);
+    await expect(page.locator('canvas').first()).toHaveAttribute('aria-label', /Ember palette/);
     const mandelbrot = await canvasDigest(page);
 
     expect(squared).not.toBe('none');

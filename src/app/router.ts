@@ -87,8 +87,24 @@ function subscribe(onChange: () => void): () => void {
   return () => window.removeEventListener('hashchange', onChange);
 }
 
+/**
+ * The last hash that named a route.
+ *
+ * Every route in this application begins `#/`, so a bare fragment like `#main`
+ * is an in-page anchor rather than a destination. Without this it was parsed as
+ * a path, matched nothing, and replaced the page with "We could not find that" —
+ * so pressing "Skip to main content", the one anchor the site has, destroyed the
+ * gallery. Anchors now leave the route alone while the browser still does its own
+ * scrolling and focusing.
+ */
+let routeHash = '#/';
+
 function getSnapshot(): string {
-  return window.location.hash;
+  const hash = window.location.hash;
+  if (hash === '' || hash === '#' || hash.startsWith('#/')) {
+    routeHash = hash === '' || hash === '#' ? '#/' : hash;
+  }
+  return routeHash;
 }
 
 export function useRoute(): Route {
