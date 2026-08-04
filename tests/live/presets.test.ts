@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { setParameterValue } from '@/editor/parameterBinding';
-import { TryAplExecutionService } from '@/execution/TryAplExecutionService';
+import { TRYAPL_CAPABILITIES, TryAplExecutionService } from '@/execution/TryAplExecutionService';
 import { runArtwork } from '@/execution/runArtwork';
 import { presets } from '@/presets/presets';
 import { type ArtworkParameter } from '@/presets/schema';
@@ -52,12 +52,19 @@ describe.each(presets.map((preset) => [preset.id, preset] as const))('%s', (_id,
     /*
      * Not compared against anything the preset declares — there is nothing left
      * to declare. A result that printed came back whole in the first request; one
-     * that did not took that request plus its bands. Either is correct; what
-     * would not be is a small artwork paying for bands it did not need.
+     * that did not took that request plus its bands. Either is correct; what would
+     * not be is a small artwork paying for bands it did not need.
+     *
+     * Judged by rows, not by cells. This first read `cells < 90 × 90`, which is not
+     * the rule the service applies and is not the rule the code applies either:
+     * what decides whether a result prints is its printed shape — the number of
+     * rows against the line cap, and the width of a row against the length cap.
+     * Cellular Echo returns 81 × 121, which is 9,801 cells and prints perfectly
+     * well in one request, so the proxy failed the artwork for being wide.
      */
-    const cells = run.matrix.rows * run.matrix.columns;
+    const { maxOutputLines } = TRYAPL_CAPABILITIES;
     if (run.requestCount === 1) {
-      expect(cells).toBeLessThan(90 * 90);
+      expect(run.matrix.rows, `${String(run.matrix.rows)} rows in one request`).toBeLessThan(maxOutputLines);
     } else {
       expect(run.requestCount).toBeGreaterThan(1);
     }

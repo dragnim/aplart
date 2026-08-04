@@ -17,6 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { numberAssignedTo } from '@/editor/parameterBinding';
 import { TryAplExecutionService } from '@/execution/TryAplExecutionService';
 import { runArtwork } from '@/execution/runArtwork';
 import { mandelbrotField } from '@/presets/mandelbrot-field';
@@ -84,12 +85,24 @@ describe('escape is recorded, not re-tested', () => {
   });
 
   it('leaves the default view exactly as it was', async () => {
-    // The fault is unreachable through the controls, so the artwork anybody has
-    // actually seen must not have moved by a single cell.
+    /*
+     * The fault is unreachable through the controls, so the artwork anybody has
+     * actually seen must not have moved by a single cell.
+     *
+     * The ceiling is read from the program rather than written here. It was 28 when
+     * this test was first written and became 48 when the iteration default was
+     * raised deliberately, and because the live suite is excluded from CI the stale
+     * expectation went unnoticed until a release check ran it. Derived, it cannot
+     * rot again: what is being asserted is that the range is the one the code asks
+     * for, not that it is any particular number.
+     */
+    const ceiling = numberAssignedTo(mandelbrotField.code, 'iterations');
+    expect(ceiling).toBeGreaterThan(0);
+
     const run = await draw(mandelbrotField.code);
     const stats = { min: Math.min(...run.matrix.values), max: Math.max(...run.matrix.values) };
 
     expect(run.matrix.rows).toBe(128);
-    expect(stats).toEqual({ min: 1, max: 28 });
+    expect(stats).toEqual({ min: 1, max: ceiling });
   });
 });

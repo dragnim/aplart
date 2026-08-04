@@ -10,7 +10,7 @@ Live site: <https://dragnim.github.io/aplart/>
 Every picture is drawn from numbers returned by actually running the APL shown in the editor. Nothing
 is simulated in JavaScript.
 
-![The APL Art gallery, showing seven generative artworks](docs/screenshot-gallery.png)
+![The APL Art gallery: a grid of artwork cards with category and difficulty filters](docs/screenshot-gallery.png)
 
 Open a piece and the code is right there beside it. Move a slider and the matching number in the APL
 changes with it.
