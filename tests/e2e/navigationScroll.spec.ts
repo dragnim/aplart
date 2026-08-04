@@ -27,14 +27,28 @@ async function scrollY(page: Page): Promise<number> {
   return page.evaluate(() => Math.round(window.scrollY));
 }
 
-/** Scrolls the gallery well down and confirms it actually moved. */
+/**
+ * Scrolls the gallery well down, and makes sure it stayed there.
+ *
+ * Mobile Safari sometimes returns the offset to zero a moment after it is set,
+ * while the gallery's lazily loaded thumbnails settle. The precondition has to
+ * hold at the moment of the click that follows, or the assertion afterwards
+ * proves nothing at all — so it is re-applied until it sticks.
+ */
 async function scrollGalleryDown(page: Page): Promise<number> {
   await expect(page.getByRole('article').first()).toBeVisible({ timeout: 20_000 });
-  await page.evaluate(() => {
-    window.scrollTo(0, 1200);
-  });
-  await expect.poll(async () => scrollY(page)).toBeGreaterThan(200);
-  return scrollY(page);
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await page.evaluate(() => {
+      window.scrollTo(0, 1200);
+    });
+    await page.waitForTimeout(300);
+    if ((await scrollY(page)) > 200) break;
+  }
+
+  const settled = await scrollY(page);
+  expect(settled, 'the gallery would not stay scrolled').toBeGreaterThan(200);
+  return settled;
 }
 
 test.describe('opening a page starts at the top', () => {
@@ -99,6 +113,66 @@ test.describe('opening a page starts at the top', () => {
      * roughly where they were rather than to the top.
      */
     await expect.poll(async () => scrollY(page), { timeout: 5000 }).toBeGreaterThan(Math.round(from / 2));
+  });
+});
+
+test.describe('focus follows the route', () => {
+  test('lands in the main region when an artwork is opened', async ({ page }) => {
+    /*
+     * Measured before the change: focus fell to `<body>` here, so the next Tab
+     * started from the top of the document and assistive technology was told
+     * nothing but a new document title.
+     */
+    await stubTryApl(page);
+    await page.goto('./#/');
+    await expect(page.getByRole('article').first()).toBeVisible({ timeout: 20_000 });
+
+    await page.getByRole('link', { name: 'Open Mandelbrot Field' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Mandelbrot Field' })).toBeVisible();
+
+    await expect(page.locator('main')).toBeFocused();
+  });
+
+  test('does not leave focus on the navigation link that was used', async ({ page }) => {
+    // The header link stays in the page across the navigation, so focus used to
+    // remain on it — still pointing at a page the visitor had left.
+    await stubTryApl(page);
+    await page.goto('./#/art/mandelbrot-field');
+    await expect(page.getByRole('heading', { level: 1, name: 'Mandelbrot Field' })).toBeVisible({
+      timeout: 20_000,
+    });
+
+    await page.getByRole('link', { name: 'Help' }).first().click();
+    await expect(page.getByRole('heading', { level: 1, name: /Help/ })).toBeVisible();
+
+    await expect(page.locator('main')).toBeFocused();
+  });
+
+  test('does not move focus during ordinary interaction on one page', async ({ page }) => {
+    /*
+     * The other half of the requirement: the route has not changed, so nothing
+     * should be taken away from whatever the visitor is using. A control is focused
+     * and then changed; focus must stay exactly where it was.
+     */
+    await stubTryApl(page);
+    await page.goto('./#/art/mandelbrot-field');
+    await expect(page.getByRole('heading', { level: 1, name: 'Mandelbrot Field' })).toBeVisible({
+      timeout: 20_000,
+    });
+
+    // The narrow layout keeps the controls on their own tab; the wide one shows
+    // everything at once and has no tabs to click.
+    const controls = page.getByRole('tab', { name: 'Controls' }).first();
+    if (await controls.isVisible()) await controls.click();
+
+    const iterations = page.getByRole('slider', { name: 'Maximum iterations' });
+    await iterations.focus();
+    await iterations.fill('52');
+
+    // The control took the change, and kept the focus. What the change did to the
+    // source is asserted elsewhere; the editor is on another tab in this layout.
+    await expect(iterations).toHaveValue('52');
+    await expect(iterations).toBeFocused();
   });
 });
 

@@ -236,6 +236,174 @@ describe('TryAplExecutionService', () => {
       expect(vi.mocked(fetchImpl)).toHaveBeenCalled();
     });
 
+    /**
+     * A body delivered in chunks with no `Content-Length`.
+     *
+     * The interesting shape, because it is the one the old reader could not see:
+     * `response.text()` had downloaded everything before the size was consulted,
+     * and a chunked reply carries no header to reject first.
+     */
+    function streamOf(chunks: readonly Uint8Array[], init: ResponseInit = {}): typeof fetch {
+      return vi.fn(async () => {
+        let index = 0;
+        const body = new ReadableStream<Uint8Array>({
+          pull(sink) {
+            if (index >= chunks.length) {
+              sink.close();
+              return;
+            }
+            sink.enqueue(chunks[index] as Uint8Array);
+            index += 1;
+          },
+        });
+        return new Response(body, { status: 200, ...init });
+      }) as unknown as typeof fetch;
+    }
+
+    const bytesOf = (text: string) => new TextEncoder().encode(text);
+
+    it('stops reading a chunked oversized body that declares no length', async () => {
+      // Ten chunks of 500 bytes against a 1,000-byte limit: the reader must give
+      // up early rather than assemble five kilobytes and then object.
+      const chunk = bytesOf('x'.repeat(500));
+      const fetchImpl = streamOf(Array.from({ length: 10 }, () => chunk));
+
+      const error = await expectFailure(
+        service(fetchImpl, { maxResponseBytes: 1000 }).execute({
+          code: 'x',
+          timeoutMs: 5000,
+          freshWorkspace: true,
+        }),
+      );
+
+      expect(error.kind).toBe('tooLarge');
+      expect(error.detail).toContain('bytes');
+    });
+
+    it('does not trust a Content-Length that understates the body', async () => {
+      /*
+       * The header says twelve bytes and the stream delivers four thousand. Trusting
+       * the claim would have let the whole body through; the count taken from the
+       * stream is what refuses it.
+       */
+      const chunk = bytesOf('y'.repeat(1000));
+      const fetchImpl = streamOf(
+        Array.from({ length: 4 }, () => chunk),
+        {
+          headers: { 'Content-Type': 'application/json', 'Content-Length': '12' },
+        },
+      );
+
+      const error = await expectFailure(
+        service(fetchImpl, { maxResponseBytes: 1000 }).execute({
+          code: 'x',
+          timeoutMs: 5000,
+          freshWorkspace: true,
+        }),
+      );
+
+      expect(error.kind).toBe('tooLarge');
+    });
+
+    it('counts bytes rather than characters for a multibyte body', async () => {
+      /*
+       * Six hundred APL glyphs: 600 UTF-16 code units, 1,800 UTF-8 bytes. Against a
+       * 1,000-byte limit the character count says this is fine and the byte count
+       * says it is not — and bytes are what crossed the wire.
+       */
+      const glyphs = '⍳'.repeat(600);
+      const encoded = bytesOf(glyphs);
+      expect(glyphs.length).toBeLessThan(1000);
+      expect(encoded.byteLength).toBeGreaterThan(1000);
+
+      const fetchImpl = streamOf([encoded]);
+      const error = await expectFailure(
+        service(fetchImpl, { maxResponseBytes: 1000 }).execute({
+          code: 'x',
+          timeoutMs: 5000,
+          freshWorkspace: true,
+        }),
+      );
+
+      expect(error.kind).toBe('tooLarge');
+    });
+
+    it('accepts a valid response just inside the byte limit', async () => {
+      // The other side of the boundary, so the protection cannot be satisfied by
+      // refusing everything. Padding inside the JSON keeps it a real reply.
+      const payload = JSON.stringify(['state', 0, 'x'.repeat(400), ['1 2 3']]);
+      const size = bytesOf(payload).byteLength;
+
+      const fetchImpl = streamOf([bytesOf(payload)]);
+      const result = await service(fetchImpl, { maxResponseBytes: size }).execute({
+        code: 'x',
+        timeoutMs: 5000,
+        freshWorkspace: true,
+      });
+
+      expect(result.outputLines).toEqual(['1 2 3']);
+    });
+
+    it('rejoins a multibyte character split across two chunks', async () => {
+      // A streaming decode, not a per-chunk one: the glyph's three bytes arrive in
+      // two reads and must still come back as one character.
+      const payload = bytesOf(JSON.stringify(['state', 0, '', ['⍳3']]));
+      const cut = payload.byteLength - 6;
+      const fetchImpl = streamOf([payload.subarray(0, cut), payload.subarray(cut)]);
+
+      const result = await service(fetchImpl, { maxResponseBytes: 10_000 }).execute({
+        code: 'x',
+        timeoutMs: 5000,
+        freshWorkspace: true,
+      });
+
+      expect(result.outputLines).toEqual(['⍳3']);
+    });
+
+    it('reports an abort that lands while the body is being read', async () => {
+      /*
+       * Stop pressed mid-stream: the first chunk has arrived, the next never will,
+       * and the read must surface as a cancellation rather than as a size failure,
+       * an unhandled rejection, or a wait for the request timeout.
+       */
+      const controller = new AbortController();
+      const cancelled = () => new DOMException('Cancelled', 'AbortError');
+
+      const fetchImpl = vi.fn(async () => {
+        const body = new ReadableStream<Uint8Array>({
+          start(sink) {
+            sink.enqueue(bytesOf('["state",0,"",["1'));
+          },
+          pull() {
+            // Nothing further is produced; the abort ends it.
+            return new Promise<void>((_resolve, reject) => {
+              if (controller.signal.aborted) {
+                reject(cancelled());
+                return;
+              }
+              controller.signal.addEventListener('abort', () => reject(cancelled()), { once: true });
+            });
+          },
+        });
+        return new Response(body, { status: 200 });
+      }) as unknown as typeof fetch;
+
+      const pending = service(fetchImpl, { maxResponseBytes: 10_000 }).execute({
+        code: 'x',
+        timeoutMs: 5000,
+        freshWorkspace: true,
+        signal: controller.signal,
+      });
+
+      // After the first chunk has been taken, so the abort genuinely interrupts a
+      // read in progress rather than the request before it starts.
+      await Promise.resolve();
+      controller.abort(cancelled());
+
+      const error = await expectFailure(pending);
+      expect(error.kind).toBe('cancelled');
+    });
+
     it('refuses an oversized response', async () => {
       const fetchImpl = respondWith(['1 2 3'], {
         headers: { 'Content-Type': 'application/json', 'Content-Length': '9999999' },

@@ -5,7 +5,9 @@
 Create patterns, fractals and generative art with Dyalog APL. Choose a piece, change the code and see
 what happens.
 
-Live site: <https://dragnim.github.io/aplart/>
+Live site: <https://dragnim.github.io/aplart/>. What changed between versions is in
+[CHANGELOG.md](CHANGELOG.md), and the published versions are on the
+[releases page](https://github.com/dragnim/aplart/releases).
 
 Every picture is drawn from numbers returned by actually running the APL shown in the editor. Nothing
 is simulated in JavaScript.
@@ -32,7 +34,8 @@ changes with it.
 - [Accessibility](#accessibility)
 - [Deployment](#deployment)
 - [Testing](#testing)
-- [Roadmap](#roadmap)
+- [What is in it](#what-is-in-it)
+- [Deliberately not here](#deliberately-not-here)
 - [Licence](#licence)
 
 ---
@@ -110,17 +113,17 @@ a shared public service, and a pull request must not fail because that service i
 Copy `.env.example` to `.env.local` and edit as needed. Every value has a working default, so the file
 is optional.
 
-| Variable                       | Default                   | Purpose                                       |
-| ------------------------------ | ------------------------- | --------------------------------------------- |
-| `VITE_APL_EXEC_ENDPOINT`       | `https://tryapl.org/Exec` | Where APL is executed.                        |
-| `VITE_APL_REQUEST_TIMEOUT_MS`  | `8000`                    | Client-side timeout for a whole execution.    |
-| `VITE_MAX_MATRIX_ROWS`         | `256`                     | Hard ceiling on rendered rows.                |
-| `VITE_MAX_MATRIX_COLUMNS`      | `256`                     | Hard ceiling on rendered columns.             |
-| `VITE_MAX_MATRIX_CELLS`        | `65536`                   | Hard ceiling on total cells.                  |
-| `VITE_SINGLE_REQUEST_MAX_ROWS` | `90`                      | Rows obtainable from one TryAPL request.      |
-| `VITE_MAX_CODE_LENGTH`         | `10000`                   | Maximum submitted code length, in characters. |
-| `VITE_MAX_RESPONSE_BYTES`      | `2097152`                 | Reject raw responses larger than this.        |
-| `VITE_BASE`                    | `/aplart/`                | Deployment base path.                         |
+| Variable                        | Default                   | Purpose                                       |
+| ------------------------------- | ------------------------- | --------------------------------------------- |
+| `VITE_APL_EXEC_ENDPOINT`        | `https://tryapl.org/Exec` | Where APL is executed.                        |
+| `VITE_APL_EXECUTION_TIMEOUT_MS` | `8000`                    | Budget for one whole run, bands included.     |
+| `VITE_MAX_MATRIX_ROWS`          | `256`                     | Hard ceiling on rendered rows.                |
+| `VITE_MAX_MATRIX_COLUMNS`       | `256`                     | Hard ceiling on rendered columns.             |
+| `VITE_MAX_MATRIX_CELLS`         | `65536`                   | Hard ceiling on total cells.                  |
+| `VITE_SINGLE_REQUEST_MAX_ROWS`  | `90`                      | Rows obtainable from one TryAPL request.      |
+| `VITE_MAX_CODE_LENGTH`          | `10000`                   | Maximum submitted code length, in characters. |
+| `VITE_MAX_RESPONSE_BYTES`       | `2097152`                 | Reject raw responses larger than this.        |
+| `VITE_BASE`                     | `/aplart/`                | Deployment base path.                         |
 
 All of these are read in exactly one place, [`src/app/config.ts`](src/app/config.ts). Nothing else in
 the codebase touches `import.meta.env`. Values that are missing or malformed fall back to the default
@@ -364,10 +367,42 @@ actual screen reader, and the artwork itself is only ever described structurally
 value range and palette — because describing what a generative image _looks like_ is not something this
 application can honestly do.
 
+Route changes are handled deliberately rather than left to the browser. A same-document navigation moves
+focus into the `main` landmark, which puts the next `Tab` at the top of the new page and gives assistive
+technology something definite to announce; a document title change alone is announced inconsistently.
+Before this fix, opening a gallery card left focus on `<body>`, while navigation through a header link
+could leave focus on the link from the page the visitor had just left. `tests/e2e/navigationScroll.spec.ts`
+asserts both the new behaviour and its limit: focus is never taken away while interacting with one page.
+
+[`docs/assistive-technology-plan.md`](docs/assistive-technology-plan.md) is the manual pass that would
+turn "the ARIA contract is verified" into "the experience is verified" — NVDA with Firefox, VoiceOver
+with Safari, and a keyboard-only journey. It has not been run.
+
 ## Deployment
 
-Pushing to `main` triggers `.github/workflows/deploy-pages.yml`, which typechecks, lints, validates
-presets, tests, builds and deploys to GitHub Pages using the official actions.
+One workflow, `.github/workflows/ci.yml`, with four jobs in a chain:
+
+| Job       | Runs                                                                     | When                        |
+| --------- | ------------------------------------------------------------------------ | --------------------------- |
+| `verify`  | typecheck, lint, `format:check`, `validate:presets`, `npm test`, `build` | every push and pull request |
+| `e2e`     | Playwright in Chromium and WebKit, including the accessibility audit     | every push and pull request |
+| `package` | `configure-pages`, the build with `VITE_BASE`, artifact upload           | pushes to `main` only       |
+| `deploy`  | `deploy-pages` into the `github-pages` environment                       | after `package` succeeds    |
+
+`package` names both `verify` and `e2e` in its `needs`, so **nothing is published until every required
+check has passed** — and it publishes the commit those checks ran against. There used to be two
+workflows started by the same push: one verified, the other verified rather less (no formatting check,
+no Playwright) and deployed. A commit that broke an end-to-end journey could be live before CI had
+finished discovering it.
+
+A pull request runs `verify` and `e2e` and stops there; `package` is skipped by its own condition, so a
+fork's pull request cannot reach the deployment path or its permissions.
+
+Concurrency is deliberately asymmetric. Superseded pull-request runs are cancelled, and runs on `main`
+never are — cancelling one part-way through publishing is how a half-deployed site happens. Deployments
+queue rather than interrupting each other, and the deploy job re-checks that its commit is still the tip
+of `main` before publishing, so a run that waited behind a newer one abandons its own older site rather
+than overwriting a newer one.
 
 The base path is not hard-coded. `actions/configure-pages` reports the published base path and it is
 passed to the build as `VITE_BASE`, so renaming the repository or moving to a custom domain needs no
@@ -375,9 +410,6 @@ code change.
 
 Repository settings must have **Settings → Pages → Source** set to **GitHub Actions**. Note that Pages
 does not publish from a private repository on GitHub Free.
-
-`.github/workflows/ci.yml` runs the same checks plus the Playwright journeys on pull requests, without
-deploying.
 
 ## Testing
 
@@ -403,19 +435,58 @@ intercept.
 Only the first two run in required CI. The live suite calls a shared public service, and a pull request
 must not fail because that service is momentarily busy.
 
-## Roadmap
+## What is in it
 
-**Done:** execution engine with two-tier transport; CodeMirror 6 APL editor with symbol toolbar and APL
-syntax highlighting; seven presets; parameter binding with detached-control handling; eight palettes and
-the render options; PNG export; share links; local saving; responsive layouts; the accessibility work
-above; GitHub Pages deployment.
+Eleven artworks, each a real `.apl` file that the editor shows and the service runs:
 
-**Later:** animated matrices, coordinate and path rendering, SVG export, user-defined palettes,
-step-through of intermediate arrays, embeddable artworks.
+| Artwork           | Category | What it is                                                    |
+| ----------------- | -------- | ------------------------------------------------------------- |
+| Modular Bloom     | geometry | A multiplication table folded by a modulus.                   |
+| Checker Shift     | pattern  | Row plus column, folded by a repeat.                          |
+| Wave Interference | geometry | Straight waves crossing and reinforcing.                      |
+| Truchet Grid      | pattern  | A hashed tile choice per cell.                                |
+| Sierpiński Array  | fractal  | The triangle, from a bitwise test.                            |
+| Cellular Echo     | cellular | A one-dimensional automaton, one row per generation.          |
+| Mandelbrot Field  | fractal  | The set, counted in real arithmetic.                          |
+| Julia Set         | fractal  | The same iteration with `c` fixed and the grid seeding `z`.   |
+| Burning Ship      | fractal  | Mandelbrot with each component made positive before squaring. |
+| Tricorn           | fractal  | Mandelbrot with one sign reversed — the conjugate.            |
+| Multibrot         | fractal  | Mandelbrot with the square replaced by an integer power.      |
 
-Accounts, cloud projects and a public community gallery are deliberately out of scope, but the storage
-layer sits behind a `ProjectRepository` interface and the renderer behind a single matrix contract, so
-neither is closed off.
+The four fractals after Mandelbrot exist to be compared with it: each differs by one legible thing, and
+Multibrot at `power←2` returns Mandelbrot's matrix cell for cell.
+
+**Appearance, none of which re-runs the APL.** Nine named palettes, plus a custom palette editor with
+draggable stops that travel in a share link. Pixel and Smooth display. Five escape-colouring modes for
+the fractals. Invert, rotation and mirroring. Palette animation, which cycles the ramp and can be reset
+exactly to where it started.
+
+**Working with a piece.** Drag on a Mandelbrot-family artwork to zoom into a region, or use the pan and
+zoom buttons; either way the visible centre and span assignments are rewritten, so the code still
+explains the picture. Inspect any cell by pointer or by naming its row and column, and read its value
+against the artwork's declared range. Open a Julia set from an inspected Mandelbrot coordinate. Repeat or
+mirror-repeat the artwork into a composition, with optional seam guides. Focus mode gives the artwork the
+window with the controls in a drawer.
+
+**Keeping and sharing.** PNG export at several sizes, of one tile or of the whole composition, with an
+optional caption stating the real character count. Projects are saved in the browser. A share link
+carries the source, controls and appearance in the URL itself — nothing is uploaded — and is bounded at
+both ends: 64 KB compressed, 256 KB decompressed, refused before decoding rather than after.
+
+## Deliberately not here
+
+- **Fullscreen API.** Removed on purpose; Focus mode plus the browser's own F11 does the job without a
+  second, flakier full-screen state to keep in step.
+- **Column banding, and wide floating-point transport.** A matrix whose rows are too wide to print is
+  refused with an explanation rather than fetched a column-group at a time. Dyalog elides a long float
+  row with `···`, which the parser cannot read, so those are refused early too.
+- **More fractals.** Newton and the rest are out of scope for now; the family is meant to make one point,
+  not to be exhaustive.
+- **SVG export, coordinate and path rendering, step-through of intermediate arrays, embeddable
+  artworks.** Still worth doing, still not done.
+- **Accounts, cloud projects, a public community gallery.** Out of scope by design — though the storage
+  layer sits behind a `ProjectRepository` interface and the renderer behind a single matrix contract, so
+  neither is closed off.
 
 ## Licence
 

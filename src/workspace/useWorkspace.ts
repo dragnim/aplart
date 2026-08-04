@@ -123,7 +123,7 @@ export function useWorkspace({ preset, service, initialState }: UseWorkspaceOpti
               maxColumns: config.maxMatrixColumns,
               maxCells: config.maxMatrixCells,
             },
-            timeoutMs: config.requestTimeoutMs,
+            timeoutMs: config.executionTimeoutMs,
             signal: controller.signal,
           });
 

@@ -18,11 +18,69 @@ import { detectAplError, executionError } from './errors';
 import { buildBandExpression, estimateValueWidth, isDrawableType, planBands } from './transport';
 
 /**
- * A ceiling on requests for one artwork, so a pathological re-planning loop
- * cannot turn a single Run press into an unbounded stream of calls to a shared
- * public service.
+ * The most requests one artwork run may send, counting the first.
+ *
+ * A ceiling so that no single Run press can turn into an unbounded stream of
+ * calls to a shared public service. Stated as a maximum rather than as a
+ * threshold: the thirty-second request is allowed and the thirty-third is not.
+ *
+ * This used to be consulted only when a truncated band forced a re-plan,
+ * so a long run of *successful* narrow bands could sail past it — the limit
+ * guarded the unusual path and ignored the ordinary one.
  */
-const MAX_BAND_REQUESTS = 32;
+const MAX_REQUESTS_PER_RUN = 32;
+
+/**
+ * The time and the requests one run is allowed, in one place.
+ *
+ * Both are properties of the whole run rather than of any request in it, which
+ * is what went wrong before: each band was handed a fresh copy of the full
+ * timeout, so an eight-second budget could take four minutes across thirty-odd
+ * requests while every individual request stayed inside its limit.
+ *
+ * `claim` is called immediately before each request and answers with the time
+ * that request may take — never more than what is left of the run.
+ */
+interface RunBudget {
+  /** Reserves the next request, or throws if there is no time or allowance left. */
+  claim: () => number;
+  /** How many requests have been claimed so far. */
+  spent: () => number;
+  /** Milliseconds left of the run, floored at zero. */
+  remainingMs: () => number;
+}
+
+function createBudget(totalTimeoutMs: number, now: () => number = Date.now): RunBudget {
+  const deadline = now() + totalTimeoutMs;
+  let claimed = 0;
+
+  const remainingMs = () => Math.max(0, deadline - now());
+
+  return {
+    remainingMs,
+    spent: () => claimed,
+    claim: () => {
+      if (claimed >= MAX_REQUESTS_PER_RUN) {
+        throw executionError(
+          'tooLarge',
+          `a single run may send ${MAX_REQUESTS_PER_RUN} requests and this one wanted more`,
+          `This artwork needs more requests than APL Art will make for one run. Reduce its size and run again.`,
+        );
+      }
+
+      const remaining = remainingMs();
+      if (remaining <= 0) {
+        throw executionError(
+          'timeout',
+          `the ${totalTimeoutMs} ms budget for the whole run was spent after ${claimed} request(s)`,
+        );
+      }
+
+      claimed += 1;
+      return remaining;
+    },
+  };
+}
 
 /**
  * How much of a banded artwork has arrived so far.
@@ -56,6 +114,13 @@ export interface RunArtworkOptions {
    */
   readonly onProgress?: ((progress: RunProgress) => void) | undefined;
   readonly limits: MatrixLimits;
+  /**
+   * The budget for the *whole* run, bands included — not for each request.
+   *
+   * Each request is given whatever is left of it, so several bands cannot each
+   * spend the full amount. `AplExecutionRequest.timeoutMs` is the per-request
+   * figure derived from this one.
+   */
   readonly timeoutMs: number;
   readonly signal?: AbortSignal;
 }
@@ -76,8 +141,9 @@ export async function runArtwork(options: RunArtworkOptions): Promise<ArtworkRun
   }
 
   const startedAt = Date.now();
+  const budget = createBudget(options.timeoutMs);
 
-  const outcome = await runAdaptive(flattened.statements, options);
+  const outcome = await runAdaptive(flattened.statements, options, budget);
 
   const validation = validateMatrix(outcome.matrix, options.limits);
   if (!validation.ok) {
@@ -126,8 +192,13 @@ interface TransportOutcome {
 async function runAdaptive(
   statements: readonly string[],
   options: RunArtworkOptions,
+  runBudget: RunBudget,
 ): Promise<TransportOutcome> {
-  const first = await execute(buildAdaptiveExpression(statements, options.service.capabilities), options);
+  const first = await execute(
+    buildAdaptiveExpression(statements, options.service.capabilities),
+    options,
+    runBudget,
+  );
 
   const aplError = detectAplError(first.outputLines);
   if (aplError !== null) {
@@ -154,7 +225,7 @@ async function runAdaptive(
     return { matrix: parsed.matrix, requestCount: 1, warnings: first.warnings };
   }
 
-  return runBanded(statements, options, reply, first.warnings);
+  return runBanded(statements, options, runBudget, reply, first.warnings);
 }
 
 /**
@@ -168,6 +239,7 @@ async function runAdaptive(
 async function runBanded(
   statements: readonly string[],
   options: RunArtworkOptions,
+  runBudget: RunBudget,
   metadata: AdaptiveMetadata,
   firstWarnings: readonly string[],
 ): Promise<TransportOutcome> {
@@ -252,8 +324,6 @@ async function runBanded(
     ...firstWarnings,
     'This artwork was too large to return in one request, so the program was run several times and the pieces joined together. Code that uses randomness, or that changes state as it runs, may not agree between the pieces.',
   ];
-  // The first request is already spent; it measured the shape these bands use.
-  let requestCount = 1;
 
   const totalCells = rows * columns;
   const values = new Float64Array(totalCells);
@@ -295,8 +365,8 @@ async function runBanded(
     const band = await execute(
       buildBandExpression(statements, plan.offset, plan.count, plan.perLine),
       options,
+      runBudget,
     );
-    requestCount += 1;
 
     const bandError = detectAplError(band.outputLines);
     if (bandError !== null) {
@@ -323,7 +393,7 @@ async function runBanded(
     if (wasTruncated || received.length < plan.count) {
       const observed = widestToken(band.outputLines);
       const widened = Math.max(width + 1, observed + 1);
-      if (widened <= width || requestCount > MAX_BAND_REQUESTS) {
+      if (widened <= width) {
         throw executionError(
           'badResponse',
           `band at ${plan.offset} returned ${received.length} of ${plan.count} values and could not be narrowed further`,
@@ -346,7 +416,11 @@ async function runBanded(
     report();
   }
 
-  return { matrix: { rows, columns, values }, requestCount, warnings: dedupe(warnings) };
+  return {
+    matrix: { rows, columns, values },
+    requestCount: runBudget.spent(),
+    warnings: dedupe(warnings),
+  };
 }
 
 /** Re-plans the remaining bands from `filled`, keeping earlier offsets valid. */
@@ -357,10 +431,19 @@ function replan(totalCells: number, filled: number, width: number, options: RunA
   }));
 }
 
-async function execute(expression: string, options: RunArtworkOptions) {
+/**
+ * One request, against the run's budget.
+ *
+ * `claim` is what makes the two ceilings real: it refuses when the run has used
+ * its allowance of requests or its time, and otherwise hands back only the time
+ * that remains for this one.
+ */
+async function execute(expression: string, options: RunArtworkOptions, runBudget: RunBudget) {
+  const timeoutMs = runBudget.claim();
+
   return options.service.execute({
     code: expression,
-    timeoutMs: options.timeoutMs,
+    timeoutMs,
     freshWorkspace: true,
     ...(options.signal === undefined ? {} : { signal: options.signal }),
   });

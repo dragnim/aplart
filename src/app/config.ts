@@ -9,8 +9,16 @@
 export interface AppConfig {
   /** APL execution endpoint. See TryAplExecutionService for the wire format. */
   readonly aplExecEndpoint: string;
-  /** Client-side timeout applied to a whole execution, including all bands. */
-  readonly requestTimeoutMs: number;
+  /**
+   * Client-side budget for one whole artwork run, bands included.
+   *
+   * Named for the run rather than for a request because that is what it bounds.
+   * It was previously `requestTimeoutMs`, and the mismatch was not cosmetic:
+   * every band was given a fresh copy of the full amount, so a run could take
+   * thirty times this figure while each request stayed inside it. The runner now
+   * derives each request's timeout from what is left of this one.
+   */
+  readonly executionTimeoutMs: number;
   /** Hard ceiling on rows in a rendered matrix. */
   readonly maxMatrixRows: number;
   /** Hard ceiling on columns in a rendered matrix. */
@@ -34,7 +42,7 @@ export interface AppConfig {
 
 const DEFAULTS = {
   aplExecEndpoint: 'https://tryapl.org/Exec',
-  requestTimeoutMs: 8_000,
+  executionTimeoutMs: 8_000,
   maxMatrixRows: 256,
   maxMatrixColumns: 256,
   maxMatrixCells: 65_536,
@@ -87,7 +95,12 @@ function endpoint(raw: string | undefined, fallback: string): string {
 
 export const config: AppConfig = Object.freeze({
   aplExecEndpoint: endpoint(env.VITE_APL_EXEC_ENDPOINT, DEFAULTS.aplExecEndpoint),
-  requestTimeoutMs: positiveNumber(env.VITE_APL_REQUEST_TIMEOUT_MS, DEFAULTS.requestTimeoutMs),
+  // The newer name wins; the older one still works, so an existing .env keeps
+  // configuring the same thing it always did.
+  executionTimeoutMs: positiveNumber(
+    env.VITE_APL_EXECUTION_TIMEOUT_MS ?? env.VITE_APL_REQUEST_TIMEOUT_MS,
+    DEFAULTS.executionTimeoutMs,
+  ),
   maxMatrixRows: positiveNumber(env.VITE_MAX_MATRIX_ROWS, DEFAULTS.maxMatrixRows),
   maxMatrixColumns: positiveNumber(env.VITE_MAX_MATRIX_COLUMNS, DEFAULTS.maxMatrixColumns),
   maxMatrixCells: positiveNumber(env.VITE_MAX_MATRIX_CELLS, DEFAULTS.maxMatrixCells),

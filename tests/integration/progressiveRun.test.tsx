@@ -60,8 +60,19 @@ const CAPABILITIES: ExecutionCapabilities = {
   preservesState: false,
 };
 
-/** 2,304 cells against those limits: a dozen bands, not one. */
-const SIZE = 48;
+/**
+ * 576 cells against those limits: nine requests — a first, then eight bands.
+ *
+ * It was 48, which is 2,304 cells and, at six values to a line and twelve lines to
+ * a reply, thirty-three requests. That is one past the ceiling a single run is
+ * allowed, and it went unnoticed while the ceiling was only checked when a band
+ * came back truncated. Now that every request is counted, a fixture asking for
+ * thirty-three is asking for a refusal. Twenty-four still delivers in several
+ * visible pieces, which is all these tests need; every assertion below is written
+ * against `SIZE` rather than a literal, so the smaller artwork changes nothing
+ * about what they mean.
+ */
+const SIZE = 24;
 
 interface Painted {
   readonly matrix: { readonly rows: number; readonly columns: number; readonly values: Float64Array };

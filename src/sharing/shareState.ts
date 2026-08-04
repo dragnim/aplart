@@ -58,5 +58,32 @@ export interface SharedRenderOptions {
  */
 export const SHARE_URL_WARNING_LENGTH = 2000;
 
-/** Ceiling on decoded share payloads, so a hostile link cannot exhaust memory. */
+/**
+ * Ceiling on the *decompressed* payload, so a hostile link cannot exhaust memory.
+ *
+ * Enforced as the inflater produces output rather than after it finishes, because
+ * deflate compresses repetition enormously: a few kilobytes of zeroes expands to
+ * megabytes, and a check that runs afterwards has already paid for the expansion.
+ */
 export const MAX_DECODED_SHARE_BYTES = 256 * 1024;
+
+/**
+ * Ceiling on the *compressed* payload, which is what a link actually carries.
+ *
+ * Separate from the decoded limit because the two answer different questions —
+ * how much a stranger may send, and how much it may become. They used to be one
+ * constant, which meant a 256 KB link was accepted for decoding
+ * even though no honest one comes close: the longest artwork here compresses to
+ * about a kilobyte, and the interface already warns past 2,000 URL characters.
+ */
+export const MAX_COMPRESSED_SHARE_BYTES = 64 * 1024;
+
+/**
+ * The longest Base64 input worth decoding, derived from the byte ceiling.
+ *
+ * Base64 spends four characters on every three bytes, so this is that ratio plus
+ * the few characters padding can add. Checked *before* `atob`, which is the point:
+ * decoding first and measuring after means a megabyte of text has already become
+ * a megabyte of bytes.
+ */
+export const MAX_ENCODED_SHARE_CHARS = Math.ceil(MAX_COMPRESSED_SHARE_BYTES / 3) * 4 + 4;

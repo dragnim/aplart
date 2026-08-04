@@ -4,6 +4,21 @@ import styles from './ErrorBoundary.module.css';
 interface Props {
   /** Named in the fallback copy, e.g. "the gallery". */
   readonly area: string;
+  /**
+   * Changes when the visitor has navigated somewhere meaningfully different.
+   *
+   * A caught error is about the page that threw it, so it must not outlive that
+   * page. "Back to the gallery" in the fallback below is an ordinary link: it
+   * changes the route, React renders the gallery — and the boundary, still
+   * holding an error from the artwork, went on showing the fallback instead. The
+   * visitor was stuck on an error page for a page they had already left, with
+   * only "Try again" to escape it.
+   *
+   * Resetting on this rather than remounting on a `key` is deliberate: the
+   * children are already being replaced by the route change, and a key here would
+   * additionally throw away state that has nothing to do with the failure.
+   */
+  readonly resetKey?: string | number;
   readonly children: ReactNode;
 }
 
@@ -26,6 +41,14 @@ export class ErrorBoundary extends Component<Props, State> {
   override componentDidCatch(error: Error, info: ErrorInfo): void {
     if (import.meta.env.DEV) {
       console.error(`[${this.props.area}] render failed`, error, info.componentStack);
+    }
+  }
+
+  override componentDidUpdate(previous: Props): void {
+    // Only when something was actually caught, so an ordinary navigation costs
+    // nothing, and only on a change — not on every render.
+    if (this.state.error !== null && previous.resetKey !== this.props.resetKey) {
+      this.setState({ error: null });
     }
   }
 

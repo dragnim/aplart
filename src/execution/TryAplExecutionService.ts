@@ -145,34 +145,89 @@ export class TryAplExecutionService implements AplExecutionService {
   }
 
   /**
-   * Reads the body while enforcing the size limit.
+   * Reads the body incrementally, counting bytes, and stops at the limit.
    *
-   * `Content-Length` is checked first so an oversized response can be rejected
-   * without downloading it, but it is only advisory — a chunked response has
-   * none — so the decoded text is checked as well.
+   * Three things were wrong with reading it in one go. `response.text()` had
+   * already downloaded and decoded everything before the size was looked at, so
+   * the limit described what would be *reported* rather than what would be
+   * received. The check then compared `text.length`, which counts UTF-16 code
+   * units and not bytes — a reply full of APL glyphs is two or three bytes per
+   * character, so a body well past the limit could measure comfortably inside it.
+   * And `Content-Length` was treated as the early defence when it is only a claim:
+   * a chunked response has none, and a hostile one can understate it.
+   *
+   * So the header is an early rejection when it is honest about being too big, and
+   * the byte count taken from the stream is the protection that actually holds.
    */
   private async readBounded(response: Response): Promise<string> {
     const declared = response.headers.get('content-length');
     if (declared !== null) {
       const size = Number(declared);
       if (Number.isFinite(size) && size > this.maxResponseBytes) {
-        throw executionError(
-          'tooLarge',
-          `the service returned ${size.toLocaleString('en-GB')} bytes; the limit is ${this.maxResponseBytes.toLocaleString('en-GB')}`,
-        );
+        throw this.tooLarge(size, 'bytes, as the service declared');
       }
     }
 
-    const text = await response.text();
-
-    if (text.length > this.maxResponseBytes) {
-      throw executionError(
-        'tooLarge',
-        `the service returned ${text.length.toLocaleString('en-GB')} characters; the limit is ${this.maxResponseBytes.toLocaleString('en-GB')}`,
-      );
+    const body = response.body;
+    if (body === null || typeof body.getReader !== 'function') {
+      /*
+       * No stream to read: an environment without `ReadableStream` bodies, or a
+       * response constructed without one. The body has already arrived by the time
+       * this is discovered, so nothing here can prevent the download — what it can
+       * still do is refuse to hand a caller more than the limit, and measure it in
+       * bytes rather than characters.
+       */
+      const text = await response.text();
+      const bytes = new TextEncoder().encode(text).byteLength;
+      if (bytes > this.maxResponseBytes) throw this.tooLarge(bytes, 'bytes');
+      return text;
     }
 
-    return text;
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let received = 0;
+    let text = '';
+
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value === undefined) continue;
+
+        received += value.byteLength;
+        if (received > this.maxResponseBytes) {
+          // Stop the transfer rather than draining the rest of it politely.
+          await reader.cancel().catch(() => undefined);
+          throw this.tooLarge(received, 'bytes');
+        }
+
+        // Streaming decode, so a multi-byte character split across two chunks is
+        // rejoined rather than becoming a replacement character.
+        text += decoder.decode(value, { stream: true });
+      }
+
+      // Flushes any incomplete sequence left at the end.
+      text += decoder.decode();
+      return text;
+    } finally {
+      /*
+       * Released so an aborted or oversized read does not hold the body open. It
+       * throws if the reader is already closed or cancelled, which is exactly the
+       * case here often enough to be unremarkable.
+       */
+      try {
+        reader.releaseLock();
+      } catch {
+        // Already released by cancel() or by the stream ending.
+      }
+    }
+  }
+
+  private tooLarge(size: number, unit: string): AplExecutionError {
+    return executionError(
+      'tooLarge',
+      `the service returned ${size.toLocaleString('en-GB')} ${unit}; the limit is ${this.maxResponseBytes.toLocaleString('en-GB')}`,
+    );
   }
 
   /** Maps whatever went wrong onto the failure taxonomy. */

@@ -16,7 +16,9 @@ import { DEFAULT_PALETTE_ID, canonicalPaletteId, paletteExists } from '@/rendere
 import { fromBase64Url } from './encodeShareState';
 import { migrateShareState } from './migrations';
 import {
+  MAX_COMPRESSED_SHARE_BYTES,
   MAX_DECODED_SHARE_BYTES,
+  MAX_ENCODED_SHARE_CHARS,
   SHARE_SCHEMA_VERSION,
   type SharedArtworkState,
   type SharedTilingState,
@@ -26,19 +28,40 @@ export type DecodeResult =
   { readonly ok: true; readonly state: SharedArtworkState } | { readonly ok: false; readonly reason: string };
 
 export function decodeShareState(encoded: string): DecodeResult {
-  if (encoded.trim() === '') return { ok: false, reason: 'the link carried no artwork' };
+  const trimmed = encoded.trim();
+  if (trimmed === '') return { ok: false, reason: 'the link carried no artwork' };
+
+  /*
+   * Refused on its length alone, before `atob` and before any buffer exists.
+   *
+   * This used to decode first and measure after, which meant a megabyte of text
+   * in the address bar became a megabyte of bytes before anything objected. The
+   * ceiling is derived from the compressed-byte limit rather than written twice,
+   * so the two cannot drift apart.
+   */
+  if (trimmed.length > MAX_ENCODED_SHARE_CHARS) {
+    return { ok: false, reason: 'the link is too large to open safely' };
+  }
 
   let json: string;
   try {
-    const bytes = fromBase64Url(encoded);
-
-    // Checked before inflating and again after: a small compressed payload can
-    // expand enormously, and refusing early is cheaper than finding out later.
-    if (bytes.length > MAX_DECODED_SHARE_BYTES) {
+    const bytes = fromBase64Url(trimmed);
+    if (bytes.length > MAX_COMPRESSED_SHARE_BYTES) {
       return { ok: false, reason: 'the link is too large to open safely' };
     }
 
-    const inflated = inflateSync(bytes);
+    /*
+     * Output-bounded inflation: one byte more than the ceiling is allocated, and
+     * nothing beyond it ever is.
+     *
+     * A compressed payload the size limit happily allows can still expand without
+     * bound — deflate turns four megabytes of zeroes into four kilobytes — so
+     * inflating first and measuring afterwards pays for the bomb before noticing
+     * it. Given somewhere to write, fflate fills the space and stops, and a result
+     * that reached the final byte is the signal that more was coming.
+     */
+    const room = new Uint8Array(MAX_DECODED_SHARE_BYTES + 1);
+    const inflated = inflateSync(bytes, { out: room });
     if (inflated.length > MAX_DECODED_SHARE_BYTES) {
       return { ok: false, reason: 'the link is too large to open safely' };
     }

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect } from 'react';
+import { Suspense, lazy, useEffect, useRef } from 'react';
 import { ErrorBoundary } from '@/components/ErrorBoundary/ErrorBoundary';
 import { SiteFooter } from '@/components/SiteFooter/SiteFooter';
 import { SiteHeader } from '@/components/SiteHeader/SiteHeader';
@@ -124,6 +124,34 @@ export function App() {
     };
   }, [routeKey]);
 
+  /*
+   * Focus follows the route, so a page change is something you can hear.
+   *
+   * Measured before changing anything: following a gallery card left focus on
+   * `<body>`, and using the header navigation left it on the link that had just
+   * been activated — which is still in the header, so Back left it there too,
+   * pointing at a page the visitor was no longer on. A keyboard user lost their
+   * place, and a screen-reader user was told nothing beyond a document title,
+   * which browsers announce inconsistently for a same-document navigation.
+   *
+   * Moving focus to the main landmark is the smallest reliable answer: it puts the
+   * next Tab at the top of the new page's content and gives assistive technology
+   * something definite to announce. `preventScroll` because where the page starts
+   * is already decided above, and only after the first render, so a fresh load
+   * still offers the skip link as its first stop. `routeKey` changes on navigation
+   * and on nothing else, so ordinary interaction never moves focus.
+   */
+  const mainRef = useRef<HTMLElement>(null);
+  const navigated = useRef(false);
+
+  useEffect(() => {
+    if (!navigated.current) {
+      navigated.current = true;
+      return;
+    }
+    mainRef.current?.focus({ preventScroll: true });
+  }, [routeKey]);
+
   useEffect(() => {
     const state: unknown = window.history.state;
     const revisited =
@@ -146,8 +174,8 @@ export function App() {
 
       <SiteHeader current={headerSelection(route)} />
 
-      <main id="main" className={styles.main} tabIndex={-1}>
-        <ErrorBoundary area={route.name === 'artwork' ? 'this artwork' : 'this page'}>
+      <main id="main" ref={mainRef} className={styles.main} tabIndex={-1}>
+        <ErrorBoundary area={route.name === 'artwork' ? 'this artwork' : 'this page'} resetKey={routeKey}>
           <RouteView route={route} />
         </ErrorBoundary>
       </main>
