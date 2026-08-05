@@ -9,6 +9,12 @@
   background: var(--surface);
 }
 
+/*
+ * The wordmark is the whole of the brand here now. The rounded square that used
+ * to sit beside it, holding a ⍴, dated from the text wordmark; two marks in one
+ * header said less than one, and the pixel logo carries the identity on its own.
+ * `gap` stays because the link still centres its contents.
+ */
 .brand {
   display: inline-flex;
   align-items: center;
@@ -16,28 +22,6 @@
   min-height: var(--tap-target);
   text-decoration: none;
   color: var(--text);
-}
-
-.mark {
-  display: grid;
-  place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: var(--radius-md);
-  /*
-   * The same neutral as "apl", so the wordmark's "art" is the only colour in the
-   * header and stays the thing that follows the artwork.
-   *
-   * Themed with the palette this square became the loudest element up here — a
-   * 2rem block of solid accent beside a wordmark drawn in the same hue, which
-   * read as an app icon demanding attention rather than as support for the
-   * signature. Compared both ways before choosing; the quiet one won.
-   */
-  background: var(--logo-neutral);
-  color: var(--surface);
-  font-family: var(--font-apl);
-  font-size: 1.25rem;
-  line-height: 1;
 }
 
 /*

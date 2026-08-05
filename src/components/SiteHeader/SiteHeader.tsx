@@ -10,16 +10,18 @@ export function SiteHeader({ current }: Props) {
   return (
     <header className={styles.header}>
       {/*
-        The link carries the name and both things inside it are decorative, so
-        "APL Art" is announced once. Naming the wordmark instead would work
-        equally well for a screen reader but would add a second image to the page,
-        which is a thing tests and assistive technology both have to disambiguate
-        from the artwork itself.
+        The wordmark alone. There used to be a rounded square holding a ⍴ beside
+        it, from when the wordmark was plain text and the header needed something
+        of its own; the pixel logo says the same thing better, and two marks
+        competing said less than one.
+
+        The link carries the name and the logo inside it is decorative, so "APL
+        Art" is announced once. Naming the wordmark instead would work equally well
+        for a screen reader but would add a second image to the page, which is a
+        thing tests and assistive technology both have to disambiguate from the
+        artwork itself.
       */}
       <a className={styles.brand} href="#/" aria-label="APL Art">
-        <span className={styles.mark} aria-hidden="true">
-          ⍴
-        </span>
         <AplArtLogo className={styles.wordmark} decorative />
       </a>
 

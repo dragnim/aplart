@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+The rounded square holding a `⍴` has gone from the header. It dated from when the
+wordmark was plain text and the header needed a mark of its own; the pixel logo
+says the same thing, and one mark reads better than two.
+
 ## v1.1.0 — 2026-08-05
 
 ### Palette-responsive branding

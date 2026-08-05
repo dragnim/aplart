@@ -30,16 +30,28 @@ ${selector} {`) + 1;
   return css.slice(start, end);
 }
 
-describe('the header mark', () => {
+describe('the header', () => {
   const css = read('components', 'SiteHeader', 'SiteHeader.module.css');
+  const markup = read('components', 'SiteHeader', 'SiteHeader.tsx');
 
-  it('uses the wordmark neutral, not the palette and not the fixed orange', () => {
-    const mark = block(css, '.mark');
+  it('carries the wordmark and nothing else in the brand link', () => {
+    /*
+     * The rounded square holding a ⍴ is gone: it dated from the text wordmark, and
+     * two marks in one header said less than one. Asserted so it cannot drift back
+     * in beside the logo it was replaced by.
+     */
+    expect(css).not.toContain('.mark');
+    expect(markup).not.toContain('styles.mark');
+    /*
+     * No assertion on the glyph itself: the comment above the link explains what
+     * used to be there and mentions it, which is worth keeping. What the link
+     * actually renders is asserted against the DOM in
+     * `tests/integration/interfaceTheme.test.tsx` — no spans, no text.
+     */
 
-    // The same neutral as "apl", so "art" is the only colour in the header.
-    expect(mark).toContain('background: var(--logo-neutral)');
-    expect(mark).not.toContain('--accent-orange');
-    expect(mark).not.toContain('--ui-accent-solid');
+    // The wordmark is still there, still decorative, still inside the named link.
+    expect(markup).toContain('<AplArtLogo className={styles.wordmark} decorative />');
+    expect(markup).toContain('aria-label="APL Art"');
   });
 
   it('still marks the current page with the derived border', () => {

@@ -421,8 +421,13 @@ describe('the header wordmark', () => {
     expect(svg?.getAttribute('viewBox')).toBe('0 0 312 113');
     expect(link.querySelector('img')).toBeNull();
 
-    // The old text is gone; the decorative glyph beside it stays.
-    expect(link.textContent?.trim()).toBe('⍴');
+    /*
+     * And it is the only thing in the link. The old text has gone, and so has the
+     * rounded square that held a ⍴ beside it: that dated from the text wordmark,
+     * and two marks in one header said less than one.
+     */
+    expect(link.textContent?.trim()).toBe('');
+    expect(link.querySelectorAll('span')).toHaveLength(0);
   });
 
   it('keeps the destination and the accessible name', () => {
@@ -432,9 +437,9 @@ describe('the header wordmark', () => {
     expect(link).toHaveAttribute('href', '#/');
 
     /*
-     * Named once. The link carries the name; the wordmark and the glyph beside it
-     * are both hidden, so nothing inside is announced a second time and the only
-     * image role on an artwork page remains the artwork.
+     * Named once. The link carries the name and the wordmark inside it is hidden,
+     * so nothing inside is announced a second time and the only image role on an
+     * artwork page remains the artwork.
      */
     expect(link.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
     expect(within(link).queryAllByRole('img')).toHaveLength(0);

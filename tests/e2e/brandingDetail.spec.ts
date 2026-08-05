@@ -39,7 +39,8 @@ const css = (locator: Locator, property: string) =>
 const before = (locator: Locator, property: string) =>
   locator.evaluate((node, name) => getComputedStyle(node, '::before').getPropertyValue(name), property);
 
-const mark = (page: Page) => page.locator('header a > span[aria-hidden="true"]');
+/** The wordmark's neutral half, which is what must not follow the artwork. */
+const aplHalf = (page: Page) => page.getByRole('link', { name: 'APL Art' }).locator('svg path').first();
 const title = (page: Page) => page.locator('h1[class*="title"]');
 
 /**
@@ -69,24 +70,27 @@ async function open(page: Page, id: string, heading: string) {
   await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
 }
 
-test.describe('the header mark', () => {
+test.describe('the header brand', () => {
   test.use({ viewport: WIDE });
 
-  test('is the wordmark neutral, whatever the artwork is', async ({ page }) => {
-    await page.goto('./#/');
-    const neutral = await token(page, '--logo-neutral');
-    await expect(mark(page)).toHaveCSS('background-color', neutral);
-
-    // Two artworks with unrelated palettes; the square does not move.
-    for (const [id, heading] of [
-      ['julia-set', 'Julia Set'],
-      ['sierpinski-array', 'Sierpiński Array'],
+  test('is the wordmark alone, on every route', async ({ page }) => {
+    /*
+     * The rounded square holding a ⍴ has gone. It dated from the text wordmark and
+     * the pixel logo says the same thing, so the link now holds one mark rather
+     * than two competing ones.
+     */
+    for (const [route, heading] of [
+      ['./#/', /Tiny programs/],
+      ['./#/art/julia-set', /Julia Set/],
+      ['./#/art/sierpinski-array', /Sierpiński Array/],
     ] as const) {
-      await page.goto(`./#/art/${id}`);
+      await page.goto(route);
       await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
 
-      await expect(mark(page)).toHaveCSS('background-color', neutral);
-      expect(await css(mark(page), 'background-color')).not.toBe(await token(page, '--ui-accent-solid'));
+      const brand = page.getByRole('link', { name: 'APL Art' });
+      expect(await brand.locator('svg').count(), route).toBe(1);
+      expect(await brand.locator('span').count(), route).toBe(0);
+      expect((await brand.innerText()).trim(), route).toBe('');
     }
   });
 
@@ -96,11 +100,11 @@ test.describe('the header mark', () => {
     const paths = page.getByRole('link', { name: 'APL Art' }).locator('svg path');
     const apl = await paths.nth(0).evaluate((node) => getComputedStyle(node).fill);
     const art = await paths.nth(1).evaluate((node) => getComputedStyle(node).fill);
-    const square = await css(mark(page), 'background-color');
 
-    // The neutral half and the square agree; only "art" differs.
-    expect(square).toBe(apl);
+    // "apl" holds the neutral; only "art" follows the artwork.
+    expect(apl).toBe(await token(page, '--logo-neutral'));
     expect(art).not.toBe(apl);
+    expect(art).toBe(await token(page, '--ui-accent-text'));
   });
 });
 
@@ -417,7 +421,7 @@ test.describe('the coherence journey', () => {
       .locator('svg path')
       .nth(1)
       .evaluate((node) => getComputedStyle(node).fill);
-    const neutralMark = await css(mark(page), 'background-color');
+    const neutralApl = await css(aplHalf(page), 'fill');
 
     // 2 and 3. One theme family across the logo, the primary control and the title.
     await page.goto('./#/art/julia-set');
@@ -439,7 +443,7 @@ test.describe('the coherence journey', () => {
     expect(teal.art).toBe(await token(page, '--ui-accent-text'));
     expect(teal.run).toBe(await token(page, '--ui-accent-solid'));
     expect(teal.marker).toBe(teal.run);
-    expect(await css(mark(page), 'background-color')).toBe(neutralMark);
+    expect(await css(aplHalf(page), 'fill')).toBe(neutralApl);
 
     // 4 and 5. A different palette moves all three together.
     await page.getByRole('radio', { name: /Heat/ }).click();
@@ -465,7 +469,7 @@ test.describe('the coherence journey', () => {
     expect(heat.run).toBe(await token(page, '--ui-accent-solid'));
     expect(heat.marker).toBe(heat.run);
     expect(heat.source).not.toBe(teal.source);
-    expect(await css(mark(page), 'background-color')).toBe(neutralMark);
+    expect(await css(aplHalf(page), 'fill')).toBe(neutralApl);
 
     // 6. And a general link is untouched by any of it.
     expect(await css(page.locator('footer a').first(), 'color')).toBe(
@@ -499,7 +503,7 @@ test.describe('the coherence journey', () => {
         { timeout: 5_000 },
       )
       .toBe(defaultArt);
-    expect(await css(mark(page), 'background-color')).toBe(neutralMark);
+    expect(await css(aplHalf(page), 'fill')).toBe(neutralApl);
     expect(await page.locator('[data-accent]').getAttribute('data-accent')).toBe('default');
   });
 });
