@@ -8,6 +8,8 @@
  * dropped from the gallery instead of taking the whole page down with it.
  */
 
+import { validateInstantPlay, type InstantPlayConfig } from './instantPlay';
+
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced';
 
 /**
@@ -169,6 +171,14 @@ export interface ArtworkPreset {
   readonly thumbnailPath: string;
   readonly fixturePath: string;
   readonly featured?: boolean;
+  /**
+   * Set by the preset that opens when somebody chooses to start creating.
+   *
+   * Declares which existing parameters become creative controls, what they are
+   * called in words, and the combinations worth opening with. It relabels and
+   * narrows; it never redefines a parameter or holds a value of its own.
+   */
+  readonly instantPlay?: InstantPlayConfig;
   readonly tags: readonly string[];
   /** Preset-specific prompts for the collapsible "Try changing this" panel. */
   readonly tryChangingThis?: readonly string[];
@@ -206,6 +216,8 @@ export function validatePreset(preset: ArtworkPreset): PresetValidationIssue[] {
 
     validateParameter(preset, parameter, fail);
   }
+
+  validateInstantPlay(preset, fail);
 
   return issues;
 }

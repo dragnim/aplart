@@ -41,9 +41,15 @@ function centreWeighted(random: () => number): number {
   return (random() + random()) / 2;
 }
 
-function snapToStep(value: number, parameter: ArtworkParameter): number {
-  const min = parameter.min ?? 0;
-  const step = parameter.step ?? (parameter.type === 'integer' ? 1 : 0.01);
+/**
+ * Puts a value on the step grid and inside the bounds.
+ *
+ * The grid is measured from `min`, so a narrowed range keeps landing on values
+ * the control can actually reach. Exported because Instant Play needs the same
+ * arithmetic against a Play range rather than the parameter's full one, and two
+ * copies of it would be two chances to round differently.
+ */
+export function snapWithin(value: number, min: number, max: number, step: number): number {
   const snapped = min + Math.round((value - min) / step) * step;
 
   // Floating point steps such as 0.01 accumulate error; round to the number of
@@ -51,7 +57,14 @@ function snapToStep(value: number, parameter: ArtworkParameter): number {
   const decimals = (String(step).split('.')[1] ?? '').length;
   const rounded = Number(snapped.toFixed(decimals));
 
-  return Math.min(parameter.max ?? rounded, Math.max(min, rounded));
+  return Math.min(max, Math.max(min, rounded));
+}
+
+function snapToStep(value: number, parameter: ArtworkParameter): number {
+  const min = parameter.min ?? 0;
+  const step = parameter.step ?? (parameter.type === 'integer' ? 1 : 0.01);
+
+  return snapWithin(value, min, parameter.max ?? value, step);
 }
 
 export function randomValueFor(parameter: ArtworkParameter, random: () => number): ParameterValue {

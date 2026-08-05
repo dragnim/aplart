@@ -50,6 +50,51 @@ inside a named link, and every state it colours also carries a non-colour
 indicator — but the plan should be run before claiming the interface is accessible
 rather than structurally correct.
 
+## Instant Play needs two things the workspace does not have yet
+
+Both were found while building the Instant Play configuration and generator, and
+both were deliberately left for the stages that need them — adding either during a
+data-and-generator stage would have meant untested production code sitting unused.
+They are recorded here as interfaces so the later stages inherit a decision rather
+than a discovery.
+
+### Undo belongs to the workspace, not to Play
+
+Play offers an Undo, but `workspaceState.ts` has no history: its actions
+(`codeChanged`, `cellInspected`, `renderOptionsChanged`, the run lifecycle,
+`restored`) each replace state outright. A Play-only undo stack would be a second
+history that disagrees with the editor's own, so the reducer is where this goes.
+
+Sketch of the required shape:
+
+- `readonly past: readonly WorkspaceSnapshot[]` on the existing state, where a
+  snapshot holds the code and a short label for what produced it ("Randomise",
+  "Complexity").
+- A new `undone` action that pops the most recent snapshot, and a `canUndo`
+  derivation for the button's disabled state.
+- Pushes happen on **discrete commits** only — a variation applied, a control
+  released — never per keystroke, or typing floods the stack.
+- `restored` must not push: rebuilding from a shared link is not something the
+  visitor did, so there is nothing there to undo back past.
+- Bound the stack (twenty is ample) so a long session cannot grow without limit.
+
+### The editor cannot be asked to show a line
+
+`AplEditorHandle` exposes `insertAtCursor`, `focus`, `undo` and `redo`. Peek's whole
+claim is "this control changes that line", which means scrolling the line into view,
+so it needs one more method:
+
+```ts
+revealLine(line: number, options?: { readonly select?: boolean }): void;
+```
+
+`line` is zero-based, matching `AssignmentLocation.line`, and `select` highlights
+the assigned value rather than the whole line. No new parsing is required for
+either: `findAssignment` already returns the line index and the `prefix` whose
+length is the value's start column. `tests/unit/instantPlay.test.ts` already asserts
+that every Play control resolves to a real assignment, so the line Peek will be
+handed is known to exist.
+
 ## Near-black palettes: hover is numerically, not visually, distinct
 
 A palette whose source is near-black (`#0a0118`, say) produces a near-black fill.
