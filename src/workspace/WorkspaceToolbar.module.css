@@ -32,9 +32,33 @@
   background: var(--surface-sunken);
 }
 
+/*
+ * The one place the workspace states its connection to the artwork, and it does
+ * it with a single square rather than by colouring the words.
+ *
+ * A pixel block because that is what the wordmark is made of; the same motif at
+ * a smaller size, once. Colouring the title itself was legible but put a third
+ * strong colour beside the logo and the Run button, and the point of this stage
+ * is that the logo stays the signature. The section headings below deliberately
+ * get nothing: markers there would decorate the furniture rather than say
+ * anything about the artwork.
+ *
+ * No space between the block and the first word — margin instead — so a long
+ * title can never leave the marker stranded on a line of its own.
+ */
 .title {
   font-size: var(--text-2xl);
   letter-spacing: -0.02em;
+}
+
+.title::before {
+  content: '';
+  display: inline-block;
+  width: 0.42em;
+  height: 0.42em;
+  margin-right: 0.42em;
+  vertical-align: 0.06em;
+  background: var(--ui-accent-solid);
 }
 
 .meta {

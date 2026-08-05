@@ -16,6 +16,10 @@ const NARROW = { width: 390, height: 780 };
 
 /** A custom property, resolved to the rgb() form computed style reports. */
 async function token(page: Page, name: string): Promise<string> {
+  // The shell may not have rendered yet on a slow first paint, and reading a
+  // property off nothing throws rather than failing an assertion.
+  await page.locator('[data-accent]').first().waitFor();
+
   return page.evaluate((property) => {
     const shell = document.querySelector('[data-accent]') as Element;
     const hex = getComputedStyle(shell).getPropertyValue(property).trim();

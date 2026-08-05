@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+### Palette-responsive branding
+
+APL Art's pixel logo and interface now respond to the palette used by the current
+artwork. `APL` stays neutral while `Art`, active controls and selected workspace
+details take colours derived from that artwork's palette.
+
+Nothing is used as it comes out of the palette. Each colour is adjusted until it
+meets the contrast its job requires — separately for light panels and for the
+near-black editor, since no one colour can serve both — so a pale palette produces
+darker text rather than unreadable text, and a monochrome palette produces a
+monochrome interface rather than an invented hue. Error, warning and success
+colours are unchanged, and so are links on Help and About: the same link should not
+change colour with the page it is read on.
+
+Custom palettes and shared artworks are followed. A palette that is momentarily
+unusable — mid-edit in a colour field — leaves the interface where it was rather
+than flashing. The gallery and information pages keep APL Art's own accent, and an
+animating artwork does not repaint the interface frame by frame: the theme follows
+the palette definition, never the rendered pixels.
+
+Two smaller details come with it. The wordmark is now the real pixel artwork rather
+than text, and a small block of the artwork's colour sits beside the artwork title
+and beside each of the three headings in the controls column.
+
 ## v1.0.1 — hardening
 
 No change to what APL Art looks like or how it behaves when everything goes right.

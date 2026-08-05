@@ -8,7 +8,12 @@
   margin-bottom: var(--space-4);
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border);
-  border-left: 4px solid var(--accent-orange);
+  /*
+   * Neutral, not palette-coloured: this same notice says "could not be opened"
+   * when a link is broken, and a cheerful accent bar on a failure would be the
+   * wrong emphasis. The words carry the meaning; the bar only marks the block.
+   */
+  border-left: 4px solid var(--border-strong);
   border-radius: var(--radius-md);
   background: var(--surface);
   font-size: var(--text-sm);
@@ -85,9 +90,34 @@
   min-width: 0;
 }
 
+/*
+ * The three headings that structure the controls column — Code controls,
+ * Appearance, Inspect — and the only headings that carry the motif.
+ *
+ * Quieter than the artwork title's block in both size and colour: the border
+ * token rather than the solid, and two thirds the size. That ordering is the
+ * point. The wordmark is the signature, the title's block is its echo, and these
+ * are wayfinding — a mark for where a section begins, especially on a phone,
+ * where this column is long and everything else in it is a label.
+ *
+ * Not on the group legends beneath them, nor on the primitive reference, nor on
+ * the Focus-mode drawer: repeating it at every level would turn a hierarchy into
+ * a texture. Bound to the first word by a margin, as the title's is, so it cannot
+ * be left on a line of its own.
+ */
 .sectionHeading {
   font-size: var(--text-lg);
   margin-bottom: var(--space-1);
+}
+
+.sectionHeading::before {
+  content: '';
+  display: inline-block;
+  width: 0.3em;
+  height: 0.3em;
+  margin-right: 0.45em;
+  vertical-align: 0.1em;
+  background: var(--ui-accent-border);
 }
 
 .sectionNote {

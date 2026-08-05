@@ -24,8 +24,17 @@
   width: 2rem;
   height: 2rem;
   border-radius: var(--radius-md);
-  background: var(--accent-orange);
-  color: #fff;
+  /*
+   * The same neutral as "apl", so the wordmark's "art" is the only colour in the
+   * header and stays the thing that follows the artwork.
+   *
+   * Themed with the palette this square became the loudest element up here — a
+   * 2rem block of solid accent beside a wordmark drawn in the same hue, which
+   * read as an app icon demanding attention rather than as support for the
+   * signature. Compared both ways before choosing; the quiet one won.
+   */
+  background: var(--logo-neutral);
+  color: var(--surface);
   font-family: var(--font-apl);
   font-size: 1.25rem;
   line-height: 1;

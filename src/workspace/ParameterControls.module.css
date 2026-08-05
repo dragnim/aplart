@@ -110,8 +110,13 @@
   background: var(--surface-sunken);
 }
 
+/*
+ * Two states told apart by their left border: this one claims the tiling is
+ * seamless, and takes the palette. The other keeps the neutral border above, so a
+ * palette can never make the cautious claim look like the confident one.
+ */
 .edgeNote[data-compatible='true'] {
-  border-left-color: var(--accent-orange);
+  border-left-color: var(--ui-accent-border);
 }
 
 .edgeTitle {

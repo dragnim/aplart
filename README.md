@@ -358,6 +358,11 @@ Three things, none of which rely on remembering to look:
 - **Contrast, arithmetically**, in `tests/unit/contrast.test.ts`. Ratios are computed from the WCAG
   formula and the colours are read out of `tokens.css`, so changing a token either keeps the contrast
   or fails the build. This covers the editor's syntax colours too, including the active-line tint.
+- **Every colour an artwork palette can produce**, in `tests/unit/interfaceAccent.test.ts`. The derived
+  accents are not fixed values that can be checked once, so each role is asserted against the surfaces it
+  actually appears on — for the nine built-in palettes and for pale, dark, fluorescent, monochrome,
+  single-colour and invalid ones. Selected and active states additionally keep a non-colour indicator, so
+  a forced-colour mode or a monochrome palette loses nothing.
 - **Behaviour that axe cannot see**, in the journeys: completing the whole flow by keyboard alone, the
   canvas description, the announced status region, and reduced motion actually taking effect.
 
@@ -460,6 +465,24 @@ Multibrot at `power←2` returns Mandelbrot's matrix cell for cell.
 draggable stops that travel in a share link. Pixel and Smooth display. Five escape-colouring modes for
 the fractals. Invert, rotation and mirroring. Palette animation, which cycles the ramp and can be reset
 exactly to where it started.
+
+**The interface follows the artwork.** Open a piece and APL Art takes its accent from that piece's
+palette. `APL` in the pixel logo stays neutral; `Art` becomes a colour derived from the palette, and so
+do the Run button, selected palettes, sliders, checked boxes, the current tab, a small block beside the
+artwork's title and one beside each of the three headings in the controls column. Everything else stays
+neutral — the interface is meant to belong to the artwork, not to be repainted by it.
+
+No palette colour is used as an interface colour directly. Each is adjusted in OKLCH until it meets the
+contrast that role needs, keeping its hue, and separately for light and dark surfaces, because nothing
+reaches 4.5:1 against both a white panel and the near-black editor. A pale yellow becomes a darker gold
+for text; a monochrome palette gives a monochrome interface rather than an invented hue. Error, warning
+and success colours never change, and neither do links on Help and About — the same link should not
+change colour with the page it is read on. Custom palettes and shared artworks are followed too, an
+unusable palette leaves the colours where they were, the gallery and information pages keep APL Art's own
+accent, and an animating artwork does not repaint the interface frame by frame: the theme follows the
+palette _definition_, never the pixels. The wordmark's artwork lives at
+`src/assets/branding/aplart_logo.svg`; how the colours are derived is in
+[`docs/interface-accent.md`](docs/interface-accent.md).
 
 **Working with a piece.** Drag on a Mandelbrot-family artwork to zoom into a region, or use the pan and
 zoom buttons; either way the visible centre and span assignments are rewritten, so the code still
