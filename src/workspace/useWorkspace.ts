@@ -30,9 +30,27 @@ export interface UseWorkspaceOptions {
   readonly initialState?: WorkspaceState;
 }
 
+/** What a committed change was, for the history it creates. */
+export interface CodeCommit {
+  /** Names the action, for Undo's accessible label. */
+  readonly label: string;
+  /**
+   * The gesture this change belongs to, if any.
+   *
+   * Steps sharing one identity become one undo entry. Supplied here rather than
+   * decided in the reducer because only the interface knows when a gesture ends.
+   */
+  readonly coalesce?: string | undefined;
+  readonly seed?: number | undefined;
+}
+
 export interface Workspace {
   readonly state: WorkspaceState;
   readonly setCode: (code: string) => void;
+  /** As `setCode`, but recorded so that Undo can take it back. */
+  readonly commitCode: (code: string, commit: CodeCommit) => void;
+  /** Steps back to the source, seed and artwork before the last commit. */
+  readonly undo: () => void;
   readonly setRenderOptions: (options: Partial<RenderOptions>) => void;
   readonly run: () => void;
   /**
@@ -191,6 +209,26 @@ export function useWorkspace({ preset, service, initialState }: UseWorkspaceOpti
     dispatch({ type: 'codeChanged', code });
   }, []);
 
+  const commitCode = useCallback((code: string, commit: CodeCommit) => {
+    dispatch({ type: 'codeCommitted', code, ...commit });
+  }, []);
+
+  /*
+   * Stepping back, with any run in flight disowned first.
+   *
+   * The token is advanced before the state changes, so a request already on its
+   * way is stale by the time it answers and its result is discarded by the same
+   * guard that protects against a superseded run. Without that, undoing during a
+   * run would put the old source on screen and then have the new artwork land on
+   * top of it — a picture and a program that do not agree.
+   */
+  const undo = useCallback(() => {
+    runToken.current += 1;
+    abortController.current?.abort();
+    executionService.cancel();
+    dispatch({ type: 'undone' });
+  }, [executionService]);
+
   const inspectCell = useCallback((cell: SourceCell | null) => {
     dispatch({ type: 'cellInspected', cell });
   }, []);
@@ -203,5 +241,5 @@ export function useWorkspace({ preset, service, initialState }: UseWorkspaceOpti
     dispatch({ type: 'restored', state: restored });
   }, []);
 
-  return { state, setCode, setRenderOptions, run, runCode, stop, restore, inspectCell };
+  return { state, setCode, commitCode, undo, setRenderOptions, run, runCode, stop, restore, inspectCell };
 }

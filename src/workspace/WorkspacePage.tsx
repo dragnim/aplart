@@ -45,6 +45,9 @@ import { PrimitivePanel } from './PrimitivePanel';
 import { TryChangingThis } from './TryChangingThis';
 import { randomiseParameters } from './randomise';
 import { readPlaySeed, startCreating } from './startCreating';
+import { generateInstantPlayVariation, randomSeed } from './instantPlayVariation';
+import { playLabelFor } from '@/presets/instantPlay';
+import { PlayControls } from './PlayControls';
 import { readSavedProjectImmediate, useLocalProject } from './useLocalProject';
 import { FocusToolbar } from './FocusToolbar';
 import { type SourceCell, type SourceRect } from '@/renderer/displayMapping';
@@ -89,6 +92,15 @@ type MobileTab = 'artwork' | 'code' | 'controls';
 
 /** How many views back the Back button can reach. */
 const VIEW_HISTORY_LIMIT = 40;
+
+/**
+ * What Play's Save image writes.
+ *
+ * One size rather than a menu, because this surface answers "save what I made"
+ * and not "at which resolution". A thousand pixels is large enough to post and
+ * small enough to send; the full choice is still in the toolbar's Export menu.
+ */
+const PLAY_EXPORT_SIZE = 1024;
 
 export function WorkspacePage({ presetId, sharedState, handoff = null, play = null, service }: Props) {
   const preset = getPreset(presetId);
@@ -199,6 +211,9 @@ function Workspace({
       return {
         ...initialWorkspaceState(preset),
         code: started.code,
+        // The seed the session began from, so sharing it passes on the number
+        // that produced it and Undo has something consistent to restore.
+        seed: started.seed,
         // Edited, because it is: the curated values differ from the preset's own.
         modified: started.code !== preset.code,
       };
@@ -224,7 +239,7 @@ function Workspace({
     ...(service === undefined ? {} : { service }),
     ...(initialState === undefined ? {} : { initialState }),
   });
-  const { state, setCode, setRenderOptions, run, runCode, stop, inspectCell } = workspace;
+  const { state, setCode, commitCode, undo, setRenderOptions, run, runCode, stop, inspectCell } = workspace;
 
   /*
    * A handoff runs itself, exactly once.
@@ -267,14 +282,24 @@ function Workspace({
   const wide = useMediaQuery(WIDE_LAYOUT_QUERY);
   const [confirmingReset, setConfirmingReset] = useState(false);
   /*
-   * Carried into the share link so a randomised piece can be reproduced.
+   * Which curated recipe the artwork on screen stands on.
    *
-   * A Start creating session begins with the seed from its own link, so sharing
-   * what you were given passes on the same number that produced it. Read once, as
-   * an initial value: pressing Randomise afterwards replaces it, and nothing
-   * about the link should be able to put the old one back.
+   * Only so that the next Randomise can offer a different one. A ref, not state:
+   * nothing renders it, and it belongs to the sequence of presses rather than to
+   * the artwork — after an Undo it still names the recipe just taken back, which
+   * is the one least worth offering again.
    */
-  const [seed, setSeed] = useState<number | undefined>(started?.seed);
+  const playRecipe = useRef<string | undefined>(started?.recipeId);
+
+  /*
+   * Whether this is a Play session, and what it offers.
+   *
+   * Both conditions, because either alone would be wrong: a seed in the link that
+   * named no valid variation must not produce a Play surface with nothing behind
+   * it, and a preset with Instant Play opened from its card is not a session — the
+   * card is the ordinary way in and stays exactly that.
+   */
+  const playConfig = started === null ? undefined : preset.instantPlay;
 
   /*
    * Focus mode is session state and nothing more.
@@ -461,7 +486,16 @@ function Workspace({
 
   const edgeClaim = useMemo(() => edgeClaimFor(preset, state.result?.source ?? null), [preset, state.result]);
 
-  const actions = useArtworkActions({ preset, state, seed, animation, animationPhase, escape });
+  // The seed comes from the workspace state now, so a share link and an Undo
+  // cannot disagree about which number produced the artwork on screen.
+  const actions = useArtworkActions({
+    preset,
+    state,
+    seed: state.seed,
+    animation,
+    animationPhase,
+    escape,
+  });
 
   useLocalProject(preset, state);
 
@@ -835,11 +869,65 @@ function Workspace({
   const handleRandomise = useCallback(() => {
     analytics.track({ name: 'randomise_used', presetId: preset.id });
     const { values, seed } = randomiseParameters(preset.parameters);
-    setSeed(seed);
     // One code change for all of them, so undo treats it as a single action
-    // and only one run follows.
-    setCode(setParameterValues(state.code, values));
-  }, [preset.id, preset.parameters, state.code, setCode]);
+    // and only one run follows. The seed travels with it, so the artwork stays
+    // reproducible and stepping back restores the seed that made this one.
+    commitCode(setParameterValues(state.code, values), { label: 'Randomise', seed });
+  }, [preset.id, preset.parameters, state.code, commitCode]);
+
+  /*
+   * Randomise, as the Play surface offers it.
+   *
+   * The same generator the gallery's link uses, given a fresh seed and the recipe
+   * already on screen so that it moves somewhere else. One commit for all three
+   * values, then one run of exactly the source that was written — so the whole
+   * thing is a single step back, and the artwork that appears is the artwork the
+   * code describes.
+   */
+  const handlePlayRandomise = useCallback(() => {
+    analytics.track({ name: 'randomise_used', presetId: preset.id });
+
+    const variation = generateInstantPlayVariation(preset, randomSeed(), playRecipe.current);
+    if (variation === null) return;
+    playRecipe.current = variation.recipeId;
+
+    const next = setParameterValues(state.code, variation.values);
+    commitCode(next, { label: 'Randomise', seed: variation.seed });
+    runCode(next);
+  }, [preset, state.code, commitCode, runCode]);
+
+  /**
+   * A step of a Play gesture: the value is written, the artwork waits.
+   *
+   * Running on every step of a drag would send the public service forty requests
+   * to draw thirty-nine pictures nobody looked at, so the run happens when the
+   * gesture ends. The gesture's identity makes all of its steps one undo entry.
+   */
+  const handlePlayAdjust = useCallback(
+    (parameter: ArtworkParameter, value: number, gesture: string) => {
+      const updated = setParameterValue(state.code, parameter.variable, value);
+      if (!updated.ok) return;
+      commitCode(updated.code, { label: playLabelFor(preset, parameter), coalesce: gesture });
+    },
+    [preset, state.code, commitCode],
+  );
+
+  /*
+   * The gesture ended, so draw what it left behind.
+   *
+   * Guarded on the source having actually changed: a slider pressed and released
+   * without moving, or a control merely focused and left, must not ask the public
+   * service for the picture already on screen. The code is passed explicitly
+   * rather than read through `run`, whose ref is written by an effect — this fires
+   * in the same breath as the last adjustment, which is too soon to rely on that.
+   */
+  const handlePlayAdjustEnd = useCallback(() => {
+    const drawn = state.result !== null && state.result.source === state.code;
+    const arriving = state.progress !== null && state.progress.source === state.code;
+    if (drawn || arriving) return;
+
+    runCode(state.code);
+  }, [state.result, state.progress, state.code, runCode]);
 
   const editorPanel = (
     <div className={styles.editorPanel}>
@@ -1096,6 +1184,76 @@ function Workspace({
   );
 
   /*
+   * The Play surface, when this workspace was opened as a session.
+   *
+   * One element, rendered beside the artwork and moved by CSS — under it
+   * ordinarily, floating over it in Focus mode — so there is one copy of it in the
+   * tree and no layout has its own version.
+   *
+   * Absent entirely otherwise. An artwork opened from its card is the workspace it
+   * always was, which is also why no existing behaviour can be affected by
+   * anything in here.
+   */
+  const playPanel =
+    playConfig === undefined ? null : (
+      <div className={styles.playArea}>
+        <PlayControls
+          preset={preset}
+          config={playConfig}
+          code={state.code}
+          onAdjust={handlePlayAdjust}
+          onAdjustEnd={handlePlayAdjustEnd}
+          onRandomise={handlePlayRandomise}
+          onUndo={undo}
+          undoLabel={state.past.at(-1)?.label ?? null}
+          onSaveImage={() => actions.exportAt(PLAY_EXPORT_SIZE)}
+          onShare={actions.share}
+          canSave={state.result !== null}
+          busy={state.status === 'running'}
+        />
+      </div>
+    );
+
+  /*
+   * The editor and every technical control, which is also the Focus-mode drawer.
+   *
+   * In a session it is behind a disclosure: still here, still one press away, but
+   * no longer the first thing on the page. Closed by default and never unmounted —
+   * a `details` hides its contents without removing them, so the editor keeps its
+   * own undo history whether it has been opened or not.
+   */
+  const secondaryColumn = (
+    <div
+      className={styles.leftColumn}
+      id="focus-drawer"
+      ref={drawerRef}
+      data-drawer={focus ? (drawerOpen ? 'open' : 'closed') : undefined}
+      // Closed drawer in Focus mode: inert removes its controls from the tab
+      // order, so nothing hidden stays reachable behind the overlay.
+      inert={focus && !drawerOpen}
+    >
+      <div className={styles.drawerHeader}>
+        <h2 className={styles.drawerTitle}>Controls</h2>
+        <button type="button" className={styles.secondary} onClick={closeDrawer}>
+          Close
+        </button>
+      </div>
+      {playConfig === undefined ? (
+        <>
+          {editorPanel}
+          {controlsPanel}
+        </>
+      ) : (
+        <details className={styles.fullWorkspace}>
+          <summary className={styles.fullWorkspaceSummary}>Code and full controls</summary>
+          {editorPanel}
+          {controlsPanel}
+        </details>
+      )}
+    </div>
+  );
+
+  /*
    * Focus mode is a change of layout, not a second workspace.
    *
    * The same elements are rendered either way and CSS moves them, so entering
@@ -1168,36 +1326,37 @@ function Workspace({
         display: none also keeps the hidden chrome out of the tab order.
       */}
       {wide ? (
-        <div className={styles.columns}>
+        <div className={styles.columns} data-play={playConfig === undefined ? undefined : 'true'}>
           {/*
-            In Focus mode this becomes an overlay drawer rather than a grid
-            column: positioned over the artwork, so opening it never shrinks
-            the piece.
+            In a session the artwork and its three controls come first, in the
+            document as well as on screen, and the technical workspace follows.
+            Ordinarily the editor leads, as it always has.
+
+            The order is decided once, when the workspace is built: a session and
+            an ordinary opening are separate addresses, so nothing here changes
+            under a mounted component and no element is ever moved between
+            positions — which would remount the editor and lose its undo history.
           */}
-          <div
-            className={styles.leftColumn}
-            id="focus-drawer"
-            ref={drawerRef}
-            data-drawer={focus ? (drawerOpen ? 'open' : 'closed') : undefined}
-            // Closed drawer in Focus mode: inert removes its controls from the
-            // tab order, so nothing hidden stays reachable behind the overlay.
-            inert={focus && !drawerOpen}
-          >
-            <div className={styles.drawerHeader}>
-              <h2 className={styles.drawerTitle}>Controls</h2>
-              <button type="button" className={styles.secondary} onClick={closeDrawer}>
-                Close
-              </button>
-            </div>
-            {editorPanel}
-            {controlsPanel}
-          </div>
-          {artworkPanel}
+          {playConfig === undefined ? (
+            <>
+              {secondaryColumn}
+              {artworkPanel}
+            </>
+          ) : (
+            <>
+              {artworkPanel}
+              {playPanel}
+              {secondaryColumn}
+            </>
+          )}
         </div>
       ) : (
-        <div className={styles.stacked}>
+        <div className={styles.stacked} data-play={playConfig === undefined ? undefined : 'true'}>
           {/* The artwork sits behind the sheet in Focus mode, always visible. */}
-          <div className={styles.focusBackdrop}>{focus ? artworkPanel : null}</div>
+          <div className={styles.focusBackdrop}>
+            {focus ? artworkPanel : null}
+            {focus ? playPanel : null}
+          </div>
 
           <button
             type="button"
@@ -1256,6 +1415,13 @@ function Workspace({
             >
               {/* Never both: in Focus mode the artwork lives in the backdrop. */}
               {shownTab === 'artwork' && !focus ? artworkPanel : null}
+              {/*
+                With the artwork, not in a tab of its own. On a phone the Play
+                controls are the workspace — putting them one tab away from the
+                picture they change would make a session feel like the long route
+                in, and the two are what somebody arrived to use together.
+              */}
+              {shownTab === 'artwork' && !focus ? playPanel : null}
               {shownTab === 'code' ? editorPanel : null}
               {shownTab === 'controls' ? controlsPanel : null}
             </div>

@@ -74,6 +74,19 @@ export function playRange(parameter: ArtworkParameter, control: InstantPlayContr
   return control.range ?? { min: parameter.min ?? 0, max: parameter.max ?? 1 };
 }
 
+/**
+ * What Play calls a parameter, or what the preset calls it if Play offers no
+ * control for it.
+ *
+ * Used where an action has to be named after the thing it changed — an Undo that
+ * says "Complexity" rather than "multiplier", which is the whole point of the
+ * relabelling.
+ */
+export function playLabelFor(preset: ArtworkPreset, parameter: ArtworkParameter): string {
+  const control = preset.instantPlay?.controls.find((candidate) => candidate.parameterId === parameter.id);
+  return control?.label ?? parameter.label;
+}
+
 /** The step a Play control moves in, which is the parameter's own. */
 export function playStep(parameter: ArtworkParameter): number {
   return parameter.step ?? (parameter.type === 'integer' ? 1 : 0.01);

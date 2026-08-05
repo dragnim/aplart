@@ -1,0 +1,152 @@
+/*
+ * The Play panel: three controls and four actions, under the artwork.
+ *
+ * Deliberately quiet. The artwork above it is the thing being looked at, so this
+ * is a card that sits with it rather than a second focus of attention — surface
+ * ground, one filled button, and no motif of its own.
+ */
+
+.panel {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.heading {
+  font-size: var(--text-lg);
+  margin: 0;
+}
+
+/*
+ * Side by side while there is room, stacked when there is not.
+ *
+ * A minimum of 12rem is what a slider needs before its endpoint labels start
+ * colliding with each other; below that the three controls are better one above
+ * the other than three cramped rows.
+ */
+.controls {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+}
+
+.control {
+  display: grid;
+  gap: var(--space-1);
+  align-content: start;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.label {
+  font-weight: 650;
+}
+
+.value {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.description {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.slider {
+  width: 100%;
+  /* A comfortable target on a phone, where this is the main way in. */
+  min-height: var(--tap-target);
+  accent-color: var(--ui-accent-solid);
+}
+
+.ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.detached {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.primary,
+.action {
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 600;
+  transition:
+    background var(--motion-fast) var(--ease),
+    transform var(--motion-fast) var(--ease);
+}
+
+/*
+ * Randomise is the filled one, because it is the action this surface exists for
+ * — the quickest way to see the artwork become something else. It takes the
+ * palette-derived fill, so it belongs to the artwork beside it.
+ */
+.primary {
+  background: var(--ui-accent-solid);
+  border-color: var(--ui-accent-solid);
+  color: var(--ui-accent-on-solid);
+}
+
+.primary:hover {
+  background: var(--ui-accent-solid-hover);
+  border-color: var(--ui-accent-solid-hover);
+}
+
+.primary:active {
+  background: var(--ui-accent-solid-active);
+  border-color: var(--ui-accent-solid-active);
+  transform: translateY(1px);
+}
+
+.action:hover:not(:disabled) {
+  background: var(--surface-sunken);
+}
+
+.action:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/*
+ * Where the panel sits is the workspace's business, not this component's: below
+ * the artwork ordinarily, floating over it in Focus mode. Both live in
+ * WorkspacePage.module.css, which is the file that knows about layout.
+ */

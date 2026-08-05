@@ -133,6 +133,91 @@
   max-height: calc(100dvh - 12rem);
 }
 
+/* ── A Play session ───────────────────────────────────────────────────────
+ *
+ * Present only when the workspace was opened as a session, so nothing below
+ * this can change how an artwork opened from its card behaves.
+ *
+ * The artwork is the dominant element and the three controls sit with it. The
+ * technical workspace keeps its column but gives most of it up: enough width to
+ * read a line of APL when it is opened, and a summary when it is not.
+ */
+/*
+ * The artwork takes the height, the controls take a column beside it, and the way
+ * into everything else spans the foot of both.
+ *
+ * Beside rather than beneath, because the artwork is square: stacking the controls
+ * under it either pushed them off the screen or shrank the picture to make room,
+ * and neither is "the artwork is the point". This way the piece is as large as the
+ * window allows and its three controls are all visible without scrolling.
+ */
+.columns[data-play='true'] {
+  grid-template-columns: minmax(0, 1fr) minmax(17rem, 22rem);
+}
+
+.playArea {
+  min-width: 0;
+}
+
+/*
+ * A little shorter than the ordinary workspace allows, so the whole square is
+ * above the fold. The ordinary layout can afford to run past it — the column
+ * beside it scrolls anyway — but a session should open with the artwork whole.
+ */
+.columns[data-play='true'] .artworkPanel {
+  max-height: calc(100dvh - 14rem);
+}
+
+.columns[data-play='true'] .leftColumn {
+  /* Below both, and free to be as tall as its contents once it is opened. */
+  grid-column: 1 / -1;
+  max-height: none;
+  overflow: visible;
+}
+
+/*
+ * The route into everything else. A quiet summary rather than a button: it is a
+ * disclosure, and the words say what is behind it.
+ */
+.fullWorkspaceSummary {
+  min-height: var(--tap-target);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--ui-accent-text);
+}
+
+.fullWorkspace[open] .fullWorkspaceSummary {
+  margin-bottom: var(--space-4);
+}
+
+.fullWorkspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/*
+ * In Focus mode the artwork fills the window, so the panel floats over the foot
+ * of it: the reason to be in Focus mode with a session is a large picture and
+ * three sliders. It sits below the drawer's z-index, so opening the drawer still
+ * wins.
+ */
+.page[data-focus='true'] .playArea {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-4);
+  transform: translateX(-50%);
+  z-index: 20;
+  width: min(46rem, calc(100% - 2 * var(--space-5)));
+  max-height: 60%;
+  overflow-y: auto;
+}
+
 /* Narrow layout. */
 .stacked {
   display: grid;
@@ -181,6 +266,11 @@
 .stacked .leftColumn {
   max-height: none;
   overflow: visible;
+}
+
+/* Stacked under the artwork rather than beside it, in the same tab. */
+.stacked .playArea {
+  margin-top: var(--space-4);
 }
 
 .parameterActions {

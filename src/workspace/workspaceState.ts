@@ -84,8 +84,63 @@ export interface RunInFlight {
   readonly bandsDone: number;
 }
 
+/**
+ * A picture you can be put back to.
+ *
+ * Everything that describes the artwork on screen and nothing that describes how
+ * you were looking at it: the source, the seed that reproduces it, the result and
+ * the sentences about the run that produced it. Appearance is deliberately absent
+ * — recolouring is not a change to the artwork, and an undo that also put the
+ * palette back would take away something nobody asked to lose.
+ *
+ * The result is held by reference, not copied. It is already immutable and
+ * already in memory, so a bounded history costs the matrices it keeps alive
+ * rather than a duplicate of each.
+ */
+export interface WorkspaceSnapshot {
+  readonly code: string;
+  readonly seed: number | undefined;
+  readonly result: ArtworkResult | null;
+  readonly warnings: readonly string[];
+  readonly lastRunAt: number | null;
+  readonly lastDurationMs: number | null;
+  readonly lastRequestCount: number | null;
+  /** What was about to happen, so Undo can name what it will take back. */
+  readonly label: string;
+  /**
+   * The gesture this snapshot belongs to, if it was taken during one.
+   *
+   * A slider dragged across twenty values is one thing somebody did, so the
+   * first step takes a snapshot and the rest recognise their own gesture and add
+   * none. The caller supplies the identity because only the caller knows when a
+   * gesture ends — a pointer released, a key let go.
+   */
+  readonly coalesce: string | undefined;
+}
+
+/**
+ * How many steps back Undo can reach.
+ *
+ * Bounded because a session has no natural end: an afternoon of pressing
+ * Randomise should not keep every artwork it produced alive. Twenty is far more
+ * than anybody steps back and small enough that the matrices it holds are
+ * measured in kilobytes.
+ */
+export const HISTORY_LIMIT = 20;
+
 export interface WorkspaceState {
   readonly code: string;
+  /**
+   * The seed that reproduces this artwork, when one produced it.
+   *
+   * Here rather than beside the interface state because it is part of what makes
+   * the picture: it travels in the share link, and Undo has to put back the seed
+   * that goes with the source it restores, or a shared link would name a number
+   * that describes something else.
+   */
+  readonly seed: number | undefined;
+  /** Committed changes, oldest first. Empty when there is nothing to undo. */
+  readonly past: readonly WorkspaceSnapshot[];
   readonly renderOptions: RenderOptions;
   readonly status: RunStatus;
   /** The last artwork that ran successfully. Survives later failures. */
@@ -110,7 +165,35 @@ export interface WorkspaceState {
 }
 
 export type WorkspaceAction =
+  /**
+   * The source changed by some route the history does not describe.
+   *
+   * Typing, a technical control, a Reset, an inserted symbol, a view rewritten by
+   * a drag. Records nothing and invalidates what was recorded, which is the pair
+   * that makes Undo safe to offer.
+   */
   | { readonly type: 'codeChanged'; readonly code: string }
+  /**
+   * A change somebody deliberately made, which Undo can therefore take back.
+   *
+   * Separate from `codeChanged` rather than a flag on it, and that separation is
+   * what the safety rests on: the default is to record nothing and to invalidate,
+   * so a route that has not been taught to commit cannot silently become
+   * undoable. Typing must not fill a history either — the editor has its own undo,
+   * and a keystroke is not a decision. What arrives here is a control released or
+   * a Randomise completed.
+   */
+  | {
+      readonly type: 'codeCommitted';
+      readonly code: string;
+      /** Names the action, for Undo's accessible label. */
+      readonly label: string;
+      /** Identity of the gesture in progress, if this is part of one. */
+      readonly coalesce?: string | undefined;
+      /** The seed that produced this code, when one did. */
+      readonly seed?: number | undefined;
+    }
+  | { readonly type: 'undone' }
   | { readonly type: 'cellInspected'; readonly cell: SourceCell | null }
   | { readonly type: 'renderOptionsChanged'; readonly options: Partial<RenderOptions> }
   | { readonly type: 'runStarted' }
@@ -132,6 +215,8 @@ export type WorkspaceAction =
 export function initialWorkspaceState(preset: ArtworkPreset): WorkspaceState {
   return {
     code: preset.code,
+    seed: undefined,
+    past: [],
     renderOptions: defaultRenderOptions(preset.defaultPaletteId),
     status: 'ready',
     result: null,
@@ -153,7 +238,18 @@ export function workspaceReducer(
 ): WorkspaceState {
   switch (action.type) {
     case 'codeChanged': {
+      /*
+       * Identical text is not a change, and this is load-bearing rather than an
+       * optimisation.
+       *
+       * The editor echoes: pushing a new value into it makes its document change,
+       * which its update listener reports straight back here. Every committed
+       * change therefore arrives a second time as a `codeChanged` carrying exactly
+       * the text just committed — and that echo must not be mistaken for somebody
+       * editing, or the history below would be discarded the instant it was made.
+       */
       if (action.code === state.code) return state;
+
       return {
         ...state,
         code: action.code,
@@ -161,6 +257,97 @@ export function workspaceReducer(
         // Running is not interrupted by typing; the run in flight is either
         // superseded or completes and is discarded by the caller.
         status: state.status === 'running' ? 'running' : 'edited',
+        /*
+         * The history goes, because this change is not in it.
+         *
+         * A snapshot describes the source as it was before a recorded change, so a
+         * step back is only honest while every change since has been recorded.
+         * This action is the one that has not been: typing, a technical control, a
+         * Reset, a symbol inserted, a view rewritten by a drag. Undoing past one of
+         * those would quietly throw it away, so Undo stops offering rather than
+         * offering something untrue — and the next committed change starts a fresh
+         * sequence from wherever the source now stands.
+         */
+        past: state.past.length === 0 ? state.past : [],
+      };
+    }
+
+    case 'codeCommitted': {
+      const seed = action.seed ?? state.seed;
+      // Nothing changed, so there is nothing to undo back to. Setting a slider to
+      // the value it already holds should not consume a step of the history.
+      if (action.code === state.code && seed === state.seed) return state;
+
+      const current = state.past.at(-1);
+      const sameGesture = action.coalesce !== undefined && current?.coalesce === action.coalesce;
+
+      const snapshot: WorkspaceSnapshot = {
+        code: state.code,
+        seed: state.seed,
+        result: state.result,
+        warnings: state.warnings,
+        lastRunAt: state.lastRunAt,
+        lastDurationMs: state.lastDurationMs,
+        lastRequestCount: state.lastRequestCount,
+        label: action.label,
+        ...(action.coalesce === undefined ? { coalesce: undefined } : { coalesce: action.coalesce }),
+      };
+
+      return {
+        ...state,
+        code: action.code,
+        seed,
+        modified: action.code !== preset.code,
+        status: state.status === 'running' ? 'running' : 'edited',
+        /*
+         * The state *before* the change, so a step back lands where you were.
+         * Within one gesture the first snapshot is already that state, and the
+         * newest entries are the ones kept when the limit is reached.
+         */
+        past: sameGesture ? state.past : [...state.past, snapshot].slice(-HISTORY_LIMIT),
+      };
+    }
+
+    case 'undone': {
+      /*
+       * A step back reaches the source as it was before the last committed change,
+       * and it can only ever reach that far.
+       *
+       * Nothing untracked can have happened in between: any source change that is
+       * not a commit empties the history above, so a step back never discards work
+       * it has no record of. Which is why this can restore the source outright
+       * rather than trying to reconcile it with anything.
+       */
+      const previous = state.past.at(-1);
+      if (previous === undefined) return state;
+
+      return {
+        ...state,
+        code: previous.code,
+        seed: previous.seed,
+        result: previous.result,
+        warnings: previous.warnings,
+        lastRunAt: previous.lastRunAt,
+        lastDurationMs: previous.lastDurationMs,
+        lastRequestCount: previous.lastRequestCount,
+        modified: previous.code !== preset.code,
+        past: state.past.slice(0, -1),
+        /*
+         * The source and the picture were restored together, so they agree — and
+         * that agreement is what the status says. A failure and a half-delivered
+         * run both belonged to the change being taken back, so both go with it.
+         */
+        status: previous.result === null ? 'ready' : 'success',
+        error: null,
+        progress: null,
+        // A cell chosen in the artwork being left is only kept if the artwork
+        // being restored has it, exactly as a completed run decides.
+        inspected:
+          state.inspected !== null &&
+          previous.result !== null &&
+          withinMatrix(previous.result.matrix, state.inspected.row, state.inspected.column)
+            ? state.inspected
+            : null,
       };
     }
 
@@ -245,6 +432,14 @@ export function workspaceReducer(
       return { ...state, status: 'cancelled', progress: null };
 
     case 'restored':
+      /*
+       * Replaced wholesale, and deliberately without a snapshot.
+       *
+       * Rebuilding from a shared link or from saved work is not something the
+       * visitor did in this session, so there is nothing behind it to step back
+       * to — and the incoming state brings its own history, which for every
+       * caller is an empty one.
+       */
       return action.state;
   }
 }

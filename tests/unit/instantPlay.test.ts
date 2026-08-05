@@ -16,6 +16,7 @@ import { presets } from '@/presets/presets';
 import {
   MAX_INSTANT_PLAY_CONTROLS,
   parameterForControl,
+  playLabelFor,
   playRange,
   playStep,
   validateInstantPlay,
@@ -303,6 +304,25 @@ describe('the validator refuses', () => {
 
   it('drift finer than the step, which would round away to nothing', () => {
     expect(issues(withRecipe(0, { drift: { size: 0.5 } }))).toContain('below its step of 1');
+  });
+});
+
+describe('playLabelFor', () => {
+  const parameterNamed = (id: string) =>
+    modularBloom.parameters.find((parameter) => parameter.id === id) as ArtworkParameter;
+
+  it('gives a Play control’s creative label', () => {
+    // What an Undo says it will take back: "Complexity", not "multiplier".
+    expect(playLabelFor(modularBloom, parameterNamed('multiplier'))).toBe('Complexity');
+    expect(playLabelFor(modularBloom, parameterNamed('modulus'))).toBe('Scale');
+    expect(playLabelFor(modularBloom, parameterNamed('size'))).toBe('Detail');
+  });
+
+  it('falls back to the parameter’s own label where Play offers no control', () => {
+    const preset = presetWith({ ...base, controls: [firstControl] });
+
+    expect(playLabelFor(preset, parameterNamed('size'))).toBe('Size');
+    expect(playLabelFor(presetWith(), parameterNamed('modulus'))).toBe('Modulus');
   });
 });
 

@@ -50,33 +50,11 @@ inside a named link, and every state it colours also carries a non-colour
 indicator — but the plan should be run before claiming the interface is accessible
 rather than structurally correct.
 
-## Instant Play needs two things the workspace does not have yet
+## Instant Play needs one more thing the workspace does not have
 
-Both were found while building the Instant Play configuration and generator, and
-both were deliberately left for the stages that need them — adding either during a
-data-and-generator stage would have meant untested production code sitting unused.
-They are recorded here as interfaces so the later stages inherit a decision rather
-than a discovery.
-
-### Undo belongs to the workspace, not to Play
-
-Play offers an Undo, but `workspaceState.ts` has no history: its actions
-(`codeChanged`, `cellInspected`, `renderOptionsChanged`, the run lifecycle,
-`restored`) each replace state outright. A Play-only undo stack would be a second
-history that disagrees with the editor's own, so the reducer is where this goes.
-
-Sketch of the required shape:
-
-- `readonly past: readonly WorkspaceSnapshot[]` on the existing state, where a
-  snapshot holds the code and a short label for what produced it ("Randomise",
-  "Complexity").
-- A new `undone` action that pops the most recent snapshot, and a `canUndo`
-  derivation for the button's disabled state.
-- Pushes happen on **discrete commits** only — a variation applied, a control
-  released — never per keystroke, or typing floods the stack.
-- `restored` must not push: rebuilding from a shared link is not something the
-  visitor did, so there is nothing there to undo back past.
-- Bound the stack (twenty is ample) so a long session cannot grow without limit.
+Two were recorded here during the configuration stage. The workspace-level undo
+was built in Stage 4 — `WorkspaceSnapshot`, `past`, `codeCommitted` and `undone` in
+`workspaceState.ts`, exactly as sketched — and this is what is left.
 
 ### The editor cannot be asked to show a line
 

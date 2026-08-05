@@ -238,7 +238,14 @@ describe('arriving from Start creating', () => {
       },
     });
 
-    await user.click(screen.getByRole('button', { name: 'Share' }));
+    /*
+     * The toolbar's Share, which is the first in document order — a session also
+     * offers one of its own, beside the artwork. Both call the same action; this
+     * is the one that existed before sessions did, so it is the one this test
+     * keeps asking about.
+     */
+    const [toolbarShare] = screen.getAllByRole('button', { name: 'Share' });
+    await user.click(toolbarShare as HTMLElement);
     await waitFor(() => expect(copied).not.toBe(''));
 
     const encoded = new URL(copied).hash.split('?s=')[1] ?? '';

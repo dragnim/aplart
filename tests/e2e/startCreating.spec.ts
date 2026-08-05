@@ -23,24 +23,41 @@ function runStatus(page: Page) {
 }
 
 /**
+ * Opens the full technical workspace, wherever this layout keeps it.
+ *
+ * Three arrangements to cope with: a session hides it behind a disclosure, a
+ * narrow screen keeps it in tabs, and an ordinary wide workspace has it open
+ * already. Any of them is one press away, which is the point being relied on
+ * here rather than asserted — `playWorkspace.spec.ts` is where it is asserted.
+ */
+async function fullWorkspaceOn(page: Page, tab: 'Code' | 'Controls' = 'Code'): Promise<void> {
+  const disclosure = page.getByText('Code and full controls');
+  if ((await disclosure.count()) > 0) {
+    if (!(await page.locator('.cm-content').isVisible())) await disclosure.click();
+    return;
+  }
+
+  const tabs = page.getByRole('tab', { name: tab });
+  if ((await tabs.count()) > 0) await tabs.click();
+}
+
+/**
  * The program on screen, whichever layout is showing it.
  *
  * Read after the artwork rather than before: the narrow layout puts the two in
- * different tabs, so asking for the code first would unmount the canvas.
+ * different tabs, so asking for the code first would hide the canvas.
  */
 async function sourceOn(page: Page): Promise<string> {
-  await page.locator('.cm-content, [role="tab"]').first().waitFor();
-  const tab = page.getByRole('tab', { name: 'Code' });
-  if ((await tab.count()) > 0) await tab.click();
+  await page.locator('.cm-content, [role="tab"]').first().waitFor({ state: 'attached' });
+  await fullWorkspaceOn(page);
 
-  await page.waitForSelector('.cm-content');
+  await page.waitForSelector('.cm-content', { state: 'visible' });
   return page.locator('.cm-content').innerText();
 }
 
-/** Reveals the controls panel, which the narrow layout keeps in a tab. */
+/** Reveals the controls panel, wherever this layout keeps it. */
 async function controlsOn(page: Page): Promise<void> {
-  const tab = page.getByRole('tab', { name: 'Controls' });
-  if ((await tab.count()) > 0) await tab.click();
+  await fullWorkspaceOn(page, 'Controls');
 }
 
 /**
