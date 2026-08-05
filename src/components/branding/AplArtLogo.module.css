@@ -1,0 +1,48 @@
+/*
+ * The wordmark's two halves.
+ *
+ * Both fills come from custom properties with the source colour as their
+ * fallback, so this renders exactly like `aplart_logo.svg` before the
+ * palette-derived tokens exist and keeps doing so anywhere they are unset — a
+ * missing token must never leave a letter unpainted.
+ */
+
+.logo {
+  /*
+   * Sized by the type around it rather than by a fixed width: one component then
+   * serves the header, a Focus-mode bar and anything larger, and the viewBox
+   * keeps the proportions.
+   */
+  display: block;
+  height: 1em;
+  width: auto;
+  max-width: 100%;
+
+  /*
+   * Every edge in this wordmark is axis-aligned, so snapping to the pixel grid
+   * costs nothing and buys two things: the hard edges a pixel face is drawn for,
+   * and rasterisation that does not depend on how the geometry is divided
+   * between elements. See the component for what that second one fixes.
+   */
+  shape-rendering: crispEdges;
+}
+
+.apl {
+  fill: var(--logo-neutral, #4a4a4a);
+}
+
+.art {
+  fill: var(--ui-accent-text, var(--logo-neutral, #4a4a4a));
+  transition: fill var(--motion-base) var(--ease);
+}
+
+/*
+ * `--motion-base` already collapses to 0ms under this preference, so this is
+ * belt and braces — and it states the intent locally, where somebody changing
+ * the fill above will see it.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .art {
+    transition: none;
+  }
+}

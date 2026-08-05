@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { AA_LARGE, contrastRatio } from '../../scripts/lib/contrast';
+import { AA_LARGE, contrastRatio } from '@/theme/contrast';
 import { fromNested } from '@/matrix/matrixTypes';
 import { matrixStats } from '@/matrix/matrixStats';
 import { COLOURING_MODES, DEFAULT_COLOURING, createEscapeMapper } from '@/renderer/escapeColouring';

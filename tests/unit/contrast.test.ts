@@ -11,7 +11,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { AA_BODY, AA_LARGE, contrastRatio, over, parseHex } from '../../scripts/lib/contrast';
+import { AA_BODY, AA_LARGE, contrastRatio, over, parseHex } from '@/theme/contrast';
 import { palettes } from '@/renderer/palettes';
 
 const TOKENS = readFileSync(join(import.meta.dirname, '..', '..', 'src', 'styles', 'tokens.css'), 'utf8');
