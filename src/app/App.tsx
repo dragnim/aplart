@@ -41,8 +41,8 @@ function titleFor(route: Route): string {
  * What counts as a different page for scrolling.
  *
  * The artwork's identity is part of it, so moving from one piece to another starts
- * at the top; the shared-state and handoff payloads are not, because they arrive
- * with the same navigation and would otherwise scroll twice.
+ * at the top; the shared-state, handoff and play-seed payloads are not, because
+ * they arrive with the same navigation and would otherwise scroll twice.
  */
 function keyFor(route: Route): string {
   return route.name === 'artwork' ? `artwork:${route.presetId}` : route.name;
@@ -202,7 +202,12 @@ function RouteView({ route }: { readonly route: Route }) {
     case 'artwork':
       return (
         <Suspense fallback={<p className={styles.loading}>Loading the workspace…</p>}>
-          <WorkspacePage presetId={route.presetId} sharedState={route.sharedState} handoff={route.handoff} />
+          <WorkspacePage
+            presetId={route.presetId}
+            sharedState={route.sharedState}
+            handoff={route.handoff}
+            play={route.play}
+          />
         </Suspense>
       );
     case 'about':

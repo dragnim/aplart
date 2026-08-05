@@ -44,6 +44,7 @@ import { furthestCorner } from './readingPlacement';
 import { PrimitivePanel } from './PrimitivePanel';
 import { TryChangingThis } from './TryChangingThis';
 import { randomiseParameters } from './randomise';
+import { readPlaySeed, startCreating } from './startCreating';
 import { readSavedProjectImmediate, useLocalProject } from './useLocalProject';
 import { FocusToolbar } from './FocusToolbar';
 import { type SourceCell, type SourceRect } from '@/renderer/displayMapping';
@@ -78,6 +79,8 @@ interface Props {
   readonly sharedState: string | null;
   /** A session-only handoff token, as written by "Open as Julia set". */
   readonly handoff?: string | null;
+  /** The seed a "Start creating" session began from, as written by the gallery. */
+  readonly play?: string | null;
   /** Injected by end-to-end tests so runs are deterministic. */
   readonly service?: AplExecutionService;
 }
@@ -87,7 +90,7 @@ type MobileTab = 'artwork' | 'code' | 'controls';
 /** How many views back the Back button can reach. */
 const VIEW_HISTORY_LIMIT = 40;
 
-export function WorkspacePage({ presetId, sharedState, handoff = null, service }: Props) {
+export function WorkspacePage({ presetId, sharedState, handoff = null, play = null, service }: Props) {
   const preset = getPreset(presetId);
 
   if (preset === undefined) {
@@ -97,11 +100,14 @@ export function WorkspacePage({ presetId, sharedState, handoff = null, service }
   return (
     // Keyed on the link as well as the preset, so opening a different shared
     // creation rebuilds the workspace from it rather than keeping the old one.
+    // The play seed is part of that: two Start creating sessions are two
+    // artworks, however few characters apart their links are.
     <Workspace
-      key={`${preset.id}:${sharedState ?? ''}:${handoff ?? ''}`}
+      key={`${preset.id}:${sharedState ?? ''}:${handoff ?? ''}:${play ?? ''}`}
       preset={preset}
       sharedState={sharedState}
       handoff={handoff}
+      play={play}
       service={service}
     />
   );
@@ -111,11 +117,13 @@ function Workspace({
   preset,
   sharedState,
   handoff,
+  play,
   service,
 }: {
   readonly preset: ArtworkPreset;
   readonly sharedState: string | null;
   readonly handoff: string | null;
+  readonly play: string | null;
   readonly service?: AplExecutionService | undefined;
 }) {
   /*
@@ -137,6 +145,20 @@ function Workspace({
    * and the artwork simply opens on its own defaults.
    */
   const handedOff = useMemo(() => readHandoff(handoff, preset.id), [handoff, preset.id]);
+
+  /*
+   * A Start creating session, decided from the seed in the link and nothing else.
+   *
+   * Deliberately not `randomSeed()` called here: a variation chosen inside the
+   * workspace would be a different artwork on every render, on every reload and
+   * on Back, and none of them would be the one the link describes. The seed is
+   * chosen once, in the gallery, by the press that asked for it.
+   */
+  const playSeed = useMemo(() => readPlaySeed(play), [play]);
+  const started = useMemo(
+    () => (playSeed === null ? null : startCreating(preset, playSeed)),
+    [preset, playSeed],
+  );
 
   const initialState = useMemo(() => {
     if (handedOff !== null) {
@@ -167,6 +189,21 @@ function Workspace({
       };
     }
 
+    /*
+     * A Start creating session, which beats saved work for the same reason a
+     * shared link does: pressing it is a request for a new artwork, not for
+     * whatever this browser was last doing. Saved work is not lost — it is still
+     * there on the artwork's own address, without the seed.
+     */
+    if (started !== null) {
+      return {
+        ...initialWorkspaceState(preset),
+        code: started.code,
+        // Edited, because it is: the curated values differ from the preset's own.
+        modified: started.code !== preset.code,
+      };
+    }
+
     // No shared link, so pick up where this browser left off. A link always
     // wins over saved work: someone following one wants to see what they were
     // sent, not what they were last doing.
@@ -180,7 +217,7 @@ function Workspace({
       renderOptions: saved.renderOptions,
       modified: code !== preset.code,
     };
-  }, [handedOff, shared, preset]);
+  }, [handedOff, shared, started, preset]);
 
   const workspace = useWorkspace({
     preset,
@@ -207,13 +244,37 @@ function Workspace({
     run();
   }, [handedOff, run]);
 
+  /*
+   * A Start creating session draws itself, exactly once, and for the same reason
+   * a handoff does: the press was the request. Arriving at code and a blank frame
+   * would make "Start creating" the slowest way into the application rather than
+   * the quickest.
+   *
+   * Once per workspace, not once per render — the component is keyed on the seed,
+   * so a different session is a different workspace with its own ref, and this one
+   * cannot fire again however the code is edited afterwards.
+   */
+  const startedRun = useRef(false);
+  useEffect(() => {
+    if (started === null || startedRun.current) return;
+    startedRun.current = true;
+    run();
+  }, [started, run]);
+
   const editorHandle = useRef<AplEditorHandle>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [tab, setTab] = useState<MobileTab>('artwork');
   const wide = useMediaQuery(WIDE_LAYOUT_QUERY);
   const [confirmingReset, setConfirmingReset] = useState(false);
-  // Carried into the share link so a randomised piece can be reproduced.
-  const [seed, setSeed] = useState<number | undefined>(undefined);
+  /*
+   * Carried into the share link so a randomised piece can be reproduced.
+   *
+   * A Start creating session begins with the seed from its own link, so sharing
+   * what you were given passes on the same number that produced it. Read once, as
+   * an initial value: pressing Randomise afterwards replaces it, and nothing
+   * about the link should be able to put the old one back.
+   */
+  const [seed, setSeed] = useState<number | undefined>(started?.seed);
 
   /*
    * Focus mode is session state and nothing more.

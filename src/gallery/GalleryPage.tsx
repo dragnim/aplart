@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
-import { presets } from '@/presets/presets';
+import { hrefForPlay } from '@/app/router';
+import { presets, starterPreset } from '@/presets/presets';
+import { randomSeed } from '@/workspace/instantPlayVariation';
 import { ArtworkCard } from './ArtworkCard';
 import { GalleryFilters } from './GalleryFilters';
 import { FILTERS, matchesFilter, type FilterId } from './filterModel';
@@ -7,6 +9,19 @@ import styles from './GalleryPage.module.css';
 
 export function GalleryPage() {
   const [filter, setFilter] = useState<FilterId>('all');
+
+  /*
+   * The seed "Start creating" would begin from: chosen once per visit to the
+   * gallery, never on a render.
+   *
+   * A lazy initial state rather than a memo, because React guarantees this runs
+   * exactly once for the life of the component while it may discard and recompute
+   * a memo. Filtering the grid, resizing the window and re-rendering for any other
+   * reason therefore leave the link alone — and coming back to the gallery is a
+   * fresh visit, which offers a fresh artwork.
+   */
+  const [playSeed] = useState(randomSeed);
+  const starter = starterPreset();
 
   const counts = useMemo(() => {
     const result = {} as Record<FilterId, number>;
@@ -30,9 +45,29 @@ export function GalleryPage() {
           Create patterns, fractals and generative art with Dyalog APL. Choose a piece, change the code and
           see what happens.
         </p>
+
+        {/*
+          Two ways in, and they are not equals.
+
+          Start creating is the dominant one because it is the shorter path to
+          having made something: it opens an artwork already varied into somewhere
+          worth looking, and draws it. Browsing is the considered route, kept as an
+          ordinary link to the grid below — a jump within this page, not a
+          navigation, so Back still means "the page before this one".
+        */}
+        <div className={styles.heroActions}>
+          {starter !== undefined && (
+            <a className={styles.start} href={hrefForPlay(starter.id, playSeed)}>
+              Start creating
+            </a>
+          )}
+          <a className={styles.browse} href="#gallery">
+            Browse the gallery
+          </a>
+        </div>
       </section>
 
-      <section aria-labelledby="gallery-heading">
+      <section id="gallery" className={styles.artworks} aria-labelledby="gallery-heading">
         <h2 id="gallery-heading" className="visually-hidden">
           Artworks
         </h2>

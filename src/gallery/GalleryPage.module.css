@@ -27,6 +27,99 @@
   max-width: 52ch;
 }
 
+/*
+ * The two ways in.
+ *
+ * Wrapping rather than shrinking: on a narrow phone the second action drops to
+ * its own line at full readability instead of both being squeezed under the tap
+ * target. `align-items: center` keeps their optical baselines together while they
+ * are different sizes.
+ */
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.start,
+.browse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap-target);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-weight: 650;
+  text-decoration: none;
+  transition:
+    background var(--motion-fast) var(--ease),
+    transform var(--motion-fast) var(--ease);
+}
+
+/*
+ * The dominant action, and the only filled control on this page.
+ *
+ * The same palette-derived fill the workspace gives Run, for the same reason: it
+ * is the one thing on the page that starts something. Its foreground is
+ * `--ui-accent-on-solid`, which is whichever interface text colour reaches 4.5:1
+ * against that fill, so this file never has to name a colour to sit on it.
+ */
+.start {
+  /*
+   * Taller as well as filled and larger. Height is the one dimension that does
+   * not depend on how long the two labels happen to be, so it is what keeps the
+   * hierarchy visible in any language and at any text size.
+   */
+  min-height: calc(var(--tap-target) + var(--space-2));
+  padding: 0 var(--space-6);
+  font-size: var(--text-lg);
+  background: var(--ui-accent-solid);
+  border-color: var(--ui-accent-solid);
+  color: var(--ui-accent-on-solid);
+}
+
+.start:hover {
+  background: var(--ui-accent-solid-hover);
+  border-color: var(--ui-accent-solid-hover);
+}
+
+/* Pressed is a colour *and* a movement, so it reads without either alone. */
+.start:active {
+  background: var(--ui-accent-solid-active);
+  border-color: var(--ui-accent-solid-active);
+  transform: translateY(1px);
+}
+
+.browse {
+  padding: 0 var(--space-5);
+  font-size: var(--text-base);
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.browse:hover {
+  background: var(--surface-sunken);
+}
+
+.browse:active {
+  transform: translateY(1px);
+}
+
+/*
+ * Where "Browse the gallery" lands.
+ *
+ * A jump to an element rather than a scripted scroll, so it works from the
+ * keyboard and from a pasted `#gallery` alike. The margin keeps the filter row
+ * clear of the very top of the viewport, which reads as "the list starts here"
+ * rather than "something is cut off above".
+ */
+.artworks {
+  scroll-margin-top: var(--space-5);
+}
+
 .grid {
   display: grid;
   gap: var(--space-5);

@@ -238,12 +238,23 @@ test.describe('keyboard and screen reader use', () => {
     await page.keyboard.press('Tab');
     await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
 
-    // Reach the first Open link without using the mouse.
-    for (let press = 0; press < 12; press += 1) {
+    /*
+     * Reach the first Open link without using the mouse.
+     *
+     * The bound is generous rather than exact, and deliberately so: the number of
+     * stops before the grid is a design decision — the header links, the hero
+     * actions, the filter chips — and pinning it here would make every change to
+     * the top of the page fail as though the keyboard journey had broken. What
+     * matters is that the grid is reachable by Tab alone, so the loop asserts it
+     * arrived rather than pressing Enter on whatever happened to be focused.
+     */
+    let focused = '';
+    for (let press = 0; press < 30 && !focused.startsWith('Open'); press += 1) {
       await page.keyboard.press('Tab');
-      const focused = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? '');
-      if (focused.startsWith('Open')) break;
+      focused = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? '');
     }
+    expect(focused, 'no Open link was reached by Tab alone').toMatch(/^Open/);
+
     await page.keyboard.press('Enter');
 
     await expect(page.getByRole('heading', { level: 1, name: 'Modular Bloom' })).toBeVisible();

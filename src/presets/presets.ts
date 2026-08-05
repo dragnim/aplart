@@ -77,3 +77,15 @@ export function getPreset(id: string): ArtworkPreset | undefined {
 export function featuredPreset(): ArtworkPreset | undefined {
   return valid.find((preset) => preset.featured === true) ?? valid[0];
 }
+
+/**
+ * The artwork "Start creating" opens, or undefined if there is none.
+ *
+ * Found by asking which preset declares Instant Play rather than by naming one
+ * here, so the gallery cannot advertise an artwork that has no curated
+ * variations to offer — including in the case that matters most: a preset
+ * dropped by validation above.
+ */
+export function starterPreset(): ArtworkPreset | undefined {
+  return valid.find((preset) => preset.instantPlay !== undefined);
+}

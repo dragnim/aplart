@@ -27,6 +27,16 @@ export type Route =
        * than running something the recipient did not ask for.
        */
       readonly handoff: string | null;
+      /**
+       * The seed a "Start creating" session began from, as written by the
+       * gallery's own action.
+       *
+       * A number rather than a payload, and in the URL rather than in storage:
+       * the variation is a pure function of the preset and the seed, so the seed
+       * is the whole state. That is what makes reloading, copying the link and
+       * pressing Back all show the same artwork instead of a fresh one.
+       */
+      readonly play: string | null;
     }
   | { readonly name: 'about' }
   | { readonly name: 'help' }
@@ -56,6 +66,7 @@ export function parseRoute(hash: string): Route {
       presetId: safeDecode(second),
       sharedState: query.get('s'),
       handoff: query.get('h'),
+      play: query.get('play'),
     };
   }
 
@@ -75,6 +86,17 @@ function safeDecode(value: string): string {
 export function hrefForArtwork(presetId: string, sharedState?: string): string {
   const base = `#/art/${encodeURIComponent(presetId)}`;
   return sharedState === undefined ? base : `${base}?s=${encodeURIComponent(sharedState)}`;
+}
+
+/**
+ * Where "Start creating" leads: an artwork, and the seed to vary it by.
+ *
+ * An ordinary link, so it can be middle-clicked, opened in a new tab and read
+ * aloud like any other. The seed is written in full rather than shortened —
+ * a link somebody may keep should not need decoding to be understood.
+ */
+export function hrefForPlay(presetId: string, seed: number): string {
+  return `#/art/${encodeURIComponent(presetId)}?play=${encodeURIComponent(String(seed))}`;
 }
 
 /** Where "Open as Julia set" navigates to. The token is meaningless outside this tab. */

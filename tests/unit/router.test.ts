@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hrefForArtwork, parseRoute } from '@/app/router';
+import { hrefForArtwork, hrefForPlay, parseRoute } from '@/app/router';
 
 describe('parseRoute', () => {
   it('treats an empty hash as the gallery', () => {
@@ -23,6 +23,7 @@ describe('parseRoute', () => {
       presetId: 'modular-bloom',
       sharedState: null,
       handoff: null,
+      play: null,
     });
   });
 
@@ -32,25 +33,38 @@ describe('parseRoute', () => {
       presetId: 'modular-bloom',
       sharedState: 'AbC-_123',
       handoff: null,
+      play: null,
     });
   });
 
-  it('ignores query parameters other than the shared state', () => {
+  it('ignores query parameters other than the ones it knows', () => {
     const route = parseRoute('#/art/checker-shift?utm_source=elsewhere');
     expect(route).toEqual({
       name: 'artwork',
       presetId: 'checker-shift',
       sharedState: null,
       handoff: null,
+      play: null,
     });
 
-    // A handoff token is read, and is not a shared link: the two are separate
+    // A handoff token is read, and is not a shared link: the three are separate
     // fields because they mean different things and must not substitute.
     expect(parseRoute('#/art/julia-set?h=abc123')).toEqual({
       name: 'artwork',
       presetId: 'julia-set',
       sharedState: null,
       handoff: 'abc123',
+      play: null,
+    });
+  });
+
+  it('reads the play seed a Start creating session was opened with', () => {
+    expect(parseRoute('#/art/modular-bloom?play=1234567')).toEqual({
+      name: 'artwork',
+      presetId: 'modular-bloom',
+      sharedState: null,
+      handoff: null,
+      play: '1234567',
     });
   });
 
@@ -81,5 +95,23 @@ describe('hrefForArtwork', () => {
   it('round-trips an id that needs escaping', () => {
     const href = hrefForArtwork('odd id');
     expect(parseRoute(href)).toMatchObject({ presetId: 'odd id' });
+  });
+});
+
+describe('hrefForPlay', () => {
+  it('writes the seed in full, so the link says what it will open', () => {
+    expect(hrefForPlay('modular-bloom', 3_141_592_653)).toBe('#/art/modular-bloom?play=3141592653');
+  });
+
+  it('round-trips through parseRoute', () => {
+    const route = parseRoute(hrefForPlay('modular-bloom', 7));
+
+    expect(route).toMatchObject({ name: 'artwork', presetId: 'modular-bloom', play: '7' });
+  });
+
+  it('is not a shared link, and does not become one', () => {
+    // Distinct fields for distinct meanings: a play seed says "vary this artwork
+    // for me", a shared link says "somebody sent you theirs".
+    expect(parseRoute(hrefForPlay('modular-bloom', 7))).toMatchObject({ sharedState: null });
   });
 });
