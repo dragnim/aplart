@@ -41,6 +41,26 @@ const before = (locator: Locator, property: string) =>
 
 const mark = (page: Page) => page.locator('header a > span[aria-hidden="true"]');
 const title = (page: Page) => page.locator('h1[class*="title"]');
+
+/**
+ * Hides the title's marker, and hands back the means to put it back.
+ *
+ * Removing it matters: `open()` navigates by hash, which is a same-document
+ * navigation, so an injected stylesheet survives into the next iteration of a
+ * loop. A test that compares "with" against "without" and forgets to clean up
+ * measures "without" against "without" the second time round, and passes.
+ */
+async function suppressMarker(page: Page, declaration = 'display: none') {
+  return page.addStyleTag({
+    content: `h1[class*="title"]::before { ${declaration} !important; }`,
+  });
+}
+
+const restore = async (style: Awaited<ReturnType<typeof suppressMarker>>) => {
+  await style.evaluate((node: Element) => {
+    node.remove();
+  });
+};
 const runStatus = (page: Page) => page.locator('[role="status"][data-status]');
 
 async function open(page: Page, id: string, heading: string) {
@@ -120,40 +140,124 @@ test.describe('the artwork title', () => {
     expect(await before(title(page), 'background-color')).toBe(settled);
   });
 
-  test('never costs a line of its own, however the title wraps', async ({ page }) => {
-    await page.setViewportSize(NARROW);
-    await open(page, 'sierpinski-array', 'Sierpiński Array');
-
-    const heightOf = async () => {
-      const box = await title(page).boundingBox();
-      return (box as { height: number }).height;
-    };
-
-    const withBlock = await heightOf();
-
+  test('never costs the heading a line, at either width', async ({ page }) => {
     /*
-     * The same heading with the block suppressed. If the block had pushed the
-     * title onto an extra line, removing it would make the heading shorter — so
-     * equal heights is the property worth asserting, and it holds whatever the
-     * text does.
+     * The longest title in the gallery, at both widths, compared against itself
+     * with the block suppressed. If the block had pushed the heading onto an extra
+     * line, removing it would make the heading shorter.
      *
-     * Not "one line": how many lines a long title takes depends on the font the
-     * platform supplies. An earlier version of this test asserted one line, passed
-     * on Windows and failed in CI, where a wider fallback face wraps "Sierpiński
-     * Array" in a 390px header — which is fine, and not what this test is about.
+     * Not "one line": how many lines a title takes depends on the font the
+     * platform supplies, and an earlier version of this test asserted one line,
+     * passed on Windows and failed in CI. What must hold everywhere is that the
+     * decoration is not what causes a wrap — on a phone by standing aside, and
+     * on a desktop by there being room.
      */
-    await page.addStyleTag({ content: 'h1[class*="title"]::before { display: none !important; }' });
-    const withoutBlock = await heightOf();
+    for (const viewport of [WIDE, NARROW]) {
+      await page.setViewportSize(viewport);
+      await open(page, 'sierpinski-array', 'Sierpiński Array');
 
-    expect(withBlock).toBeCloseTo(withoutBlock, 0);
-    expect(withBlock).toBeGreaterThan(0);
+      const heightOf = async () => {
+        const box = await title(page).boundingBox();
+        return (box as { height: number }).height;
+      };
+
+      const withBlock = await heightOf();
+      const suppressed = await suppressMarker(page);
+      const withoutBlock = await heightOf();
+      await restore(suppressed);
+
+      expect(withBlock, `at ${viewport.width}px`).toBeCloseTo(withoutBlock, 0);
+      expect(withBlock).toBeGreaterThan(0);
+    }
   });
 
-  test('still paints its block at mobile width', async ({ page }) => {
-    await page.setViewportSize(NARROW);
+  test('stays visible, clear of the words, and inside the screen at both widths', async ({ page }) => {
+    const accent = async () => token(page, '--ui-accent-solid');
+
+    for (const viewport of [WIDE, NARROW]) {
+      await page.setViewportSize(viewport);
+      await open(page, 'sierpinski-array', 'Sierpiński Array');
+      const where = `at ${viewport.width}px`;
+
+      // Visible, and the palette's colour, whichever width.
+      expect(await before(title(page), 'background-color'), where).toBe(await accent());
+      expect(await before(title(page), 'display'), where).not.toBe('none');
+      expect(Number.parseFloat(await before(title(page), 'width')), where).toBeGreaterThan(4);
+
+      /*
+       * Painted, not merely declared. Computed style says nothing about where an
+       * absolutely positioned marker ends up: the first version of the hanging
+       * form measured perfectly and painted against a distant ancestor, because the
+       * heading was not its containing block. Comparing the toolbar with and
+       * without the marker catches that — if it were painted somewhere else, or not
+       * at all, the two images would match.
+       */
+      const toolbar = page.locator('[class*="toolbar"]').first();
+      const painted = await toolbar.screenshot();
+      const hidden = await suppressMarker(page, 'visibility: hidden');
+      const blank = await toolbar.screenshot();
+      await restore(hidden);
+      expect(painted.equals(blank), `${where}: the marker must be painted in the toolbar`).toBe(false);
+
+      /*
+       * Where the block is relative to the first word. In the flow it precedes the
+       * text, so the text must start beyond it; out of flow it hangs to the left,
+       * so its right edge must stop before the text begins. Either way they must
+       * not share space, and the block must not leave the screen.
+       */
+      const geometry = await page.evaluate(() => {
+        const heading = document.querySelector('h1[class*="title"]') as HTMLElement;
+        const style = getComputedStyle(heading, '::before');
+        const box = heading.getBoundingClientRect();
+
+        const range = document.createRange();
+        range.selectNodeContents(heading);
+        const textLeft = range.getClientRects()[0]?.left ?? box.left;
+
+        const width = Number.parseFloat(style.width);
+        const offset = style.position === 'absolute' ? Number.parseFloat(style.left) : 0;
+
+        return {
+          position: style.position,
+          blockLeft: box.left + offset,
+          blockRight: box.left + offset + width,
+          textLeft,
+          titleRight: box.right,
+          viewportWidth: window.innerWidth,
+        };
+      });
+
+      /*
+       * The mechanism, not just its effect: on a phone the marker must be out of
+       * flow, because that is what makes it unable to break a line whatever the
+       * font. Locally, Windows metrics fit the title either way, so without this
+       * assertion a regression to the in-flow version would only be caught by
+       * whichever platform happens to have a wider face.
+       */
+      expect(geometry.position, where).toBe(viewport.width <= 480 ? 'absolute' : 'static');
+
+      if (geometry.position === 'absolute') {
+        // Hanging: clear of the words to its right, and still on screen.
+        expect(geometry.blockRight, where).toBeLessThanOrEqual(geometry.textLeft + 0.5);
+        expect(geometry.blockLeft, where).toBeGreaterThanOrEqual(0);
+      } else {
+        // In the flow: the words start past it, as they always have.
+        expect(geometry.textLeft - geometry.blockLeft, where).toBeGreaterThanOrEqual(4);
+      }
+
+      // And the heading itself stays inside the screen.
+      expect(geometry.titleRight, where).toBeLessThanOrEqual(geometry.viewportWidth + 0.5);
+    }
+  });
+
+  test('leaves the desktop layout as it was, in the flow before the words', async ({ page }) => {
     await open(page, 'sierpinski-array', 'Sierpiński Array');
 
-    expect(await before(title(page), 'background-color')).toBe(await token(page, '--ui-accent-solid'));
+    // Unchanged on a wide screen: an inline block with its own margin, so the
+    // title text sits indented past it exactly as it did before the phone fix.
+    expect(await before(title(page), 'position')).toBe('static');
+    expect(await before(title(page), 'display')).toBe('inline-block');
+    expect(Number.parseFloat(await before(title(page), 'margin-right'))).toBeGreaterThan(4);
   });
 });
 
