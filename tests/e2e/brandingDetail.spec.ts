@@ -120,15 +120,39 @@ test.describe('the artwork title', () => {
     expect(await before(title(page), 'background-color')).toBe(settled);
   });
 
-  test('stays on one line with its block, at mobile width', async ({ page }) => {
+  test('never costs a line of its own, however the title wraps', async ({ page }) => {
     await page.setViewportSize(NARROW);
     await open(page, 'sierpinski-array', 'Sierpiński Array');
 
-    const box = await title(page).boundingBox();
-    const lineHeight = Number.parseFloat(await css(title(page), 'line-height'));
+    const heightOf = async () => {
+      const box = await title(page).boundingBox();
+      return (box as { height: number }).height;
+    };
 
-    // One line: the block cannot have been pushed onto a line of its own.
-    expect((box as { height: number }).height).toBeLessThan(lineHeight * 1.6);
+    const withBlock = await heightOf();
+
+    /*
+     * The same heading with the block suppressed. If the block had pushed the
+     * title onto an extra line, removing it would make the heading shorter — so
+     * equal heights is the property worth asserting, and it holds whatever the
+     * text does.
+     *
+     * Not "one line": how many lines a long title takes depends on the font the
+     * platform supplies. An earlier version of this test asserted one line, passed
+     * on Windows and failed in CI, where a wider fallback face wraps "Sierpiński
+     * Array" in a 390px header — which is fine, and not what this test is about.
+     */
+    await page.addStyleTag({ content: 'h1[class*="title"]::before { display: none !important; }' });
+    const withoutBlock = await heightOf();
+
+    expect(withBlock).toBeCloseTo(withoutBlock, 0);
+    expect(withBlock).toBeGreaterThan(0);
+  });
+
+  test('still paints its block at mobile width', async ({ page }) => {
+    await page.setViewportSize(NARROW);
+    await open(page, 'sierpinski-array', 'Sierpiński Array');
+
     expect(await before(title(page), 'background-color')).toBe(await token(page, '--ui-accent-solid'));
   });
 });
