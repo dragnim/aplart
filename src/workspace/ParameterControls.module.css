@@ -51,7 +51,13 @@
   width: 100%;
   /* Comfortable to hit on a touch screen without a bulky visual. */
   min-height: var(--tap-target);
-  accent-color: var(--accent-orange);
+  /*
+   * The one property that themes a native range input in every browser this
+   * targets: the thumb and the filled part of the track both follow it, and the
+   * remaining track stays the browser's neutral. Nothing about the hit area, the
+   * step behaviour or the events changes.
+   */
+  accent-color: var(--ui-accent-solid);
   cursor: pointer;
 }
 
@@ -74,7 +80,8 @@
 .toggle input {
   width: 1.15rem;
   height: 1.15rem;
-  accent-color: var(--accent-orange);
+  /* Checked follows the palette; the tick itself is what says "checked". */
+  accent-color: var(--ui-accent-solid);
 }
 
 .restore {

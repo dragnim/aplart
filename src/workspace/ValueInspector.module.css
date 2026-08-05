@@ -132,9 +132,15 @@
   margin-top: var(--space-2);
   min-height: var(--tap-target);
   padding: 0 var(--space-3);
-  border: 1px solid var(--accent-orange);
+  /*
+   * On the artwork, which is dark, so this takes the dark variants. The fill
+   * stays translucent rather than becoming the opaque soft tint: this panel
+   * overlays the picture, and a solid block would hide more of it than the
+   * control needs to.
+   */
+  border: 1px solid var(--ui-accent-border-on-dark);
   border-radius: var(--radius-sm);
-  background: rgb(255 106 19 / 16%);
+  background: color-mix(in srgb, var(--ui-accent-border-on-dark) 18%, transparent);
   color: var(--text-on-dark);
   cursor: pointer;
   font-size: var(--text-xs);

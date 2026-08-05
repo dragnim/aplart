@@ -45,6 +45,8 @@ export function AnimationControls({ settings, onChange, onReset, reducedMotion }
         <button
           type="button"
           className={styles.primary}
+          /* Lets the stylesheet mark playback without reading any colour. */
+          data-running={settings.running ? 'true' : undefined}
           onClick={() => onChange({ ...settings, running: !settings.running })}
         >
           {settings.running ? 'Pause' : 'Animate palette'}

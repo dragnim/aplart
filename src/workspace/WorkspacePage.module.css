@@ -127,8 +127,14 @@
   font-size: var(--text-sm);
 }
 
+/*
+ * Selected stays a raised white card with a heavier label — the cues that work
+ * without colour — and takes the accent only in its text. A filled accent block
+ * across a third of the width would be the loudest thing on a phone screen.
+ */
 .tab[data-selected='true'] {
   background: var(--surface);
+  color: var(--ui-accent-text);
   font-weight: 650;
   box-shadow: var(--shadow-sm);
 }

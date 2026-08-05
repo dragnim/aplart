@@ -1,3 +1,4 @@
+import { AplArtLogo } from '@/components/branding/AplArtLogo';
 import styles from './SiteHeader.module.css';
 
 interface Props {
@@ -8,12 +9,18 @@ interface Props {
 export function SiteHeader({ current }: Props) {
   return (
     <header className={styles.header}>
-      {/* The visible wordmark is the accessible name; the glyph is decorative. */}
-      <a className={styles.brand} href="#/">
+      {/*
+        The link carries the name and both things inside it are decorative, so
+        "APL Art" is announced once. Naming the wordmark instead would work
+        equally well for a screen reader but would add a second image to the page,
+        which is a thing tests and assistive technology both have to disambiguate
+        from the artwork itself.
+      */}
+      <a className={styles.brand} href="#/" aria-label="APL Art">
         <span className={styles.mark} aria-hidden="true">
           ⍴
         </span>
-        <span className={styles.wordmark}>APL Art</span>
+        <AplArtLogo className={styles.wordmark} decorative />
       </a>
 
       <nav className={styles.nav} aria-label="Main">

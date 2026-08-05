@@ -27,6 +27,8 @@ import { hrefForHandoff } from '@/app/router';
 import { type ArtworkParameter, type ArtworkPreset } from '@/presets/schema';
 import { ArtworkCanvas } from '@/renderer/ArtworkCanvas';
 import { DEFAULT_ANIMATION, type AnimationSettings } from '@/renderer/paletteAnimation';
+import { accentPaletteFor, paletteSignature } from '@/theme/accentSource';
+import { usePublishAccentPalette } from '@/theme/accentContext';
 import { escapeSettingsFor } from './escapeSettings';
 import { edgeClaimFor } from './edgeClaim';
 import { buildArtworkImage } from '@/renderer/CanvasRenderer';
@@ -405,6 +407,34 @@ function Workspace({
   useEffect(() => {
     analytics.track({ name: 'preset_opened', presetId: preset.id });
   }, [preset.id]);
+
+  /*
+   * Tells the shell which colours the interface should follow.
+   *
+   * The palette state stays here; what leaves is a copy of the colours, so the
+   * header can match the artwork without a second source of truth. Signature
+   * rather than the palette object in the dependencies, so changing the
+   * resolution or inverting the image — anything that leaves the colours alone —
+   * publishes nothing and repaints nothing.
+   *
+   * An unusable custom palette resolves to null and is not published at all: the
+   * shell keeps the last valid theme, which is what stops the interface flashing
+   * through the default orange between two keystrokes in a colour field.
+   */
+  const publishAccentPalette = usePublishAccentPalette();
+  const accentSignature = paletteSignature(accentPaletteFor(state.renderOptions));
+
+  useEffect(() => {
+    if (accentSignature === '') return;
+    publishAccentPalette({ presetId: preset.id, colours: accentSignature.split(',') });
+  }, [accentSignature, preset.id, publishAccentPalette]);
+
+  useEffect(
+    // Leaving the artwork returns the interface to its own colours. Separate from
+    // the effect above so it runs on unmount and on nothing else.
+    () => () => publishAccentPalette(null),
+    [publishAccentPalette],
+  );
 
   // Shared code is never run on arrival; the visitor is told what they have
   // been given and presses Run themselves.

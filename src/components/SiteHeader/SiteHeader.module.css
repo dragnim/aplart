@@ -31,10 +31,18 @@
   line-height: 1;
 }
 
+/*
+ * The wordmark is now the pixel logo, which takes its height from the type size
+ * around it — so this is a size rather than a scale. No transform and nothing
+ * fractional, which is what keeps the pixel edges hard.
+ *
+ * 1.5rem matches the presence of the 1.125rem text it replaces: the letterforms
+ * fill the middle two thirds of the view box, so the visible glyphs land at about
+ * the old cap height. Well inside the 44px tap target `.brand` already reserves,
+ * so the header keeps the height it had.
+ */
 .wordmark {
-  font-size: var(--text-lg);
-  font-weight: 650;
-  letter-spacing: -0.01em;
+  font-size: 1.5rem;
 }
 
 .nav {
@@ -65,5 +73,5 @@
   color: var(--text);
   font-weight: 600;
   /* Not colour alone: the current page also carries an underline. */
-  box-shadow: inset 0 -2px 0 var(--accent-orange);
+  box-shadow: inset 0 -2px 0 var(--ui-accent-border);
 }

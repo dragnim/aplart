@@ -34,7 +34,7 @@ const ART_PATH =
   'M179.25 93.75V75H160.5V37.5H179.25V75H198V37.5H179.25V18.75H216.75V93.75H179.25ZM245.25 93.75H226.5V18.75H264V37.5H245.25V93.75ZM292.5 75H273.75V0H292.5V18.75H311.25V37.5H292.5V75ZM292.5 93.75V75H311.25V93.75H292.5Z';
 
 export interface AplArtLogoProps {
-  readonly className?: string;
+  readonly className?: string | undefined;
   /**
    * Hide it from assistive technology, for when adjacent text already says
    * "APL Art" and announcing it twice would be noise rather than information.

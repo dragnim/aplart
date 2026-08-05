@@ -13,6 +13,41 @@
   --accent-orange: #ff6a13;
   --accent-orange-strong: #c24500; /* 4.6:1 on --surface, safe for text */
 
+  /*
+   * Interface accent, the default set.
+   *
+   * These are what APL Art looks like when no artwork palette is active: the
+   * gallery, Help, About, and the moment before a workspace has loaded. While an
+   * artwork is open the application shell overrides all fourteen at once with
+   * colours derived from that artwork's palette — see
+   * `src/theme/interfaceAccent.ts`, which computes exactly these values from
+   * `--accent-orange`, and `tests/unit/interfaceAccent.test.ts`, which asserts
+   * that it still does.
+   *
+   * Declared here as well as applied there so the first paint is already correct,
+   * before any JavaScript runs, and so a stylesheet can use them without knowing
+   * whether an artwork is open.
+   *
+   * Light and dark variants are not a convenience: no single colour reaches
+   * 4.5:1 against both #ffffff and #232323, and this interface has both. Use the
+   * `-on-dark` variant on the editor, the symbol toolbar, the canvas frame and
+   * the Focus-mode page; the plain one everywhere else.
+   */
+  --ui-accent-source: #ff6a13;
+  --ui-accent-solid: #bc4900;
+  --ui-accent-solid-hover: #a54000;
+  --ui-accent-solid-active: #8f3600;
+  --ui-accent-on-solid: #f2f0ee;
+  --ui-accent-text: #aa5026;
+  --ui-accent-text-on-dark: #e18259;
+  --ui-accent-border: #d8652d;
+  --ui-accent-border-on-dark: #ee7943;
+  --ui-accent-soft: #fff0ea;
+  --ui-accent-soft-on-dark: #462313;
+  --ui-accent-focus: #e15e14;
+  --logo-neutral: #4a4a4a;
+  --logo-neutral-on-dark: #8a8a8a;
+
   /* Light surfaces */
   --background: #f4f3f1;
   --surface: #ffffff;

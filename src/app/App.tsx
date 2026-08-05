@@ -6,6 +6,7 @@ import { GalleryPage } from '@/gallery/GalleryPage';
 import { AboutPage } from '@/pages/AboutPage';
 import { HelpPage } from '@/pages/HelpPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import { InterfaceAccentBoundary } from '@/theme/InterfaceAccentBoundary';
 import { useRoute, type Route } from './router';
 import styles from './App.module.css';
 
@@ -167,7 +168,16 @@ export function App() {
   }, [routeKey]);
 
   return (
-    <div className={styles.shell}>
+    /*
+     * The shell carries the interface accent, because it is above the route and
+     * outlives every navigation: the header can take its colour from the artwork
+     * below it, and no route change can leave a stale palette behind. See
+     * InterfaceAccentBoundary for why this is the right element.
+     */
+    <InterfaceAccentBoundary
+      className={styles.shell}
+      presetId={route.name === 'artwork' ? route.presetId : null}
+    >
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
@@ -181,7 +191,7 @@ export function App() {
       </main>
 
       <SiteFooter />
-    </div>
+    </InterfaceAccentBoundary>
   );
 }
 

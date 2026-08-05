@@ -65,7 +65,8 @@
   height: 2.5rem;
   border-radius: 50%;
   border: 3px solid rgb(255 255 255 / 25%);
-  border-top-color: var(--accent-orange);
+  /* Spinning over the artwork's own dark frame, so the dark variant. */
+  border-top-color: var(--ui-accent-border-on-dark);
   animation: spin 900ms linear infinite;
 }
 

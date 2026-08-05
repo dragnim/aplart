@@ -47,8 +47,8 @@
 
 /* Selection is shown by a ring and a bold label, not by colour alone. */
 .mode[data-selected='true'] {
-  border-color: var(--accent-orange);
-  box-shadow: inset 0 0 0 1px var(--accent-orange);
+  border-color: var(--ui-accent-border);
+  box-shadow: inset 0 0 0 1px var(--ui-accent-border);
   font-weight: 700;
 }
 

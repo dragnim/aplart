@@ -41,6 +41,7 @@
 .slider {
   width: 100%;
   min-height: var(--tap-target);
+  accent-color: var(--ui-accent-solid);
 }
 
 .note {

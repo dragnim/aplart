@@ -31,18 +31,15 @@
   fill: var(--logo-neutral, #4a4a4a);
 }
 
+/*
+ * The half that follows the artwork.
+ *
+ * Only this fill transitions — the neutral half holds still, and nothing larger
+ * moves at all. `--motion-base` is already 0ms under `prefers-reduced-motion`,
+ * so the preference needs no separate rule here; a second media query would only
+ * be another place for the duration to disagree with itself.
+ */
 .art {
   fill: var(--ui-accent-text, var(--logo-neutral, #4a4a4a));
   transition: fill var(--motion-base) var(--ease);
-}
-
-/*
- * `--motion-base` already collapses to 0ms under this preference, so this is
- * belt and braces — and it states the intent locally, where somebody changing
- * the fill above will see it.
- */
-@media (prefers-reduced-motion: reduce) {
-  .art {
-    transition: none;
-  }
 }

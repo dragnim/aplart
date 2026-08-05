@@ -40,10 +40,16 @@
   border-color: var(--border-strong);
 }
 
-/* Selection is shown by a ring and a bold label, not by colour alone. */
+/*
+ * Selection is shown by a ring, a soft tint and a bold label, not by colour
+ * alone. The tint is the palette's own, at the intensity the derivation reserves
+ * for backgrounds; the swatches inside are untouched, because they are the
+ * palette rather than a decoration of it.
+ */
 .palette[data-selected='true'] {
-  border-color: var(--accent-orange);
-  box-shadow: inset 0 0 0 1px var(--accent-orange);
+  border-color: var(--ui-accent-border);
+  box-shadow: inset 0 0 0 1px var(--ui-accent-border);
+  background: var(--ui-accent-soft);
 }
 
 .palette[data-selected='true'] .paletteName {
@@ -80,9 +86,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* No tint on the small segmented controls: a ring and a bold label is clearer
+   than a filled block at this size. */
 .rotation[data-selected='true'] {
-  border-color: var(--accent-orange);
-  box-shadow: inset 0 0 0 1px var(--accent-orange);
+  border-color: var(--ui-accent-border);
+  box-shadow: inset 0 0 0 1px var(--ui-accent-border);
   font-weight: 700;
 }
 
@@ -103,8 +111,8 @@
 }
 
 .displayMode[data-selected='true'] {
-  border-color: var(--accent-orange);
-  box-shadow: inset 0 0 0 1px var(--accent-orange);
+  border-color: var(--ui-accent-border);
+  box-shadow: inset 0 0 0 1px var(--ui-accent-border);
   font-weight: 700;
 }
 
@@ -133,7 +141,7 @@
   margin-top: 0.72rem;
   width: 1.1rem;
   height: 1.1rem;
-  accent-color: var(--accent-orange);
+  accent-color: var(--ui-accent-solid);
   flex: none;
 }
 

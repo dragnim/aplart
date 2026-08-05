@@ -34,7 +34,29 @@
   font-weight: 600;
 }
 
-.primary:hover,
+/*
+ * Playing, so this button is Pause and carries the accent — the state, not the
+ * control. Stopped, it says "Animate palette" and is as neutral as its
+ * neighbours. The label is what states which it is; nothing here pulses, glows
+ * or changes with the frame.
+ */
+.primary[data-running='true'] {
+  border-color: var(--ui-accent-solid);
+  background: var(--ui-accent-solid);
+  color: var(--ui-accent-on-solid);
+}
+
+.primary[data-running='true']:hover {
+  background: var(--ui-accent-solid-hover);
+  border-color: var(--ui-accent-solid-hover);
+}
+
+.primary[data-running='true']:active {
+  background: var(--ui-accent-solid-active);
+  border-color: var(--ui-accent-solid-active);
+}
+
+.primary:not([data-running='true']):hover,
 .action:hover:not(:disabled) {
   background: var(--surface-sunken);
 }
@@ -71,4 +93,5 @@
 .slider {
   width: 100%;
   min-height: var(--tap-target);
+  accent-color: var(--ui-accent-solid);
 }

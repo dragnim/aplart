@@ -97,6 +97,16 @@
   background: rgb(255 255 255 / 16%);
 }
 
+/*
+ * The drawer is open, which this button both says through `aria-expanded` and
+ * shows through the accent. Dark variants: these sit on the artwork itself, at
+ * the top of a Focus-mode page, whatever the light drawer below them uses.
+ */
+.action[aria-expanded='true'] {
+  border-color: var(--ui-accent-border-on-dark);
+  color: var(--ui-accent-text-on-dark);
+}
+
 .exit {
   border-color: rgb(255 255 255 / 45%);
   font-weight: 600;

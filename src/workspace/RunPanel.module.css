@@ -24,18 +24,31 @@
     transform var(--motion-fast) var(--ease);
 }
 
+/*
+ * Run is the one filled control in the workspace, and the only place the
+ * palette-derived fill is used.
+ *
+ * The foreground is not chosen here. `--ui-accent-on-solid` is whichever of the
+ * interface's two text colours reaches 4.5:1 against the fill, decided when the
+ * fill is derived — which is why this no longer names a near-black of its own. A
+ * neutral or monochrome palette produces a grey fill rather than no fill, so the
+ * button stays recognisably the primary action whatever the artwork looks like.
+ */
 .run {
-  background: var(--accent-orange);
-  border-color: var(--accent-orange);
-  /* Near-black on orange: 8.6:1, comfortably above AA. White would be 2.9:1. */
-  color: #1a0d02;
+  background: var(--ui-accent-solid);
+  border-color: var(--ui-accent-solid);
+  color: var(--ui-accent-on-solid);
 }
 
 .run:hover {
-  background: #ff7d31;
+  background: var(--ui-accent-solid-hover);
+  border-color: var(--ui-accent-solid-hover);
 }
 
+/* Pressed is a colour *and* a movement, so it reads without either alone. */
 .run:active {
+  background: var(--ui-accent-solid-active);
+  border-color: var(--ui-accent-solid-active);
   transform: translateY(1px);
 }
 
