@@ -167,9 +167,9 @@ describe('when a session is what opened the workspace', () => {
   it('offers the Play range, which is narrower than the parameter’s', () => {
     openPlay();
 
-    // Complexity is 1–12 of a parameter that goes to 16; Detail 32–72 of 8–88.
+    // Complexity is 1–11 of a parameter that goes to 16; Detail 32–72 of 8–88.
     expect(slider('Complexity')).toHaveAttribute('min', '1');
-    expect(slider('Complexity')).toHaveAttribute('max', '12');
+    expect(slider('Complexity')).toHaveAttribute('max', '11');
     expect(slider('Scale')).toHaveAttribute('min', '5');
     expect(slider('Scale')).toHaveAttribute('max', '24');
     expect(slider('Detail')).toHaveAttribute('min', '32');

@@ -27,11 +27,6 @@ export interface InstantPlayVariation {
   readonly values: ReadonlyMap<string, ParameterValue>;
 }
 
-/** A fresh seed, when the caller has no reason to prefer a particular one. */
-export function randomSeed(): number {
-  return Math.floor(Math.random() * 0xffff_ffff);
-}
-
 function chooseRecipe(
   recipes: readonly InstantPlayRecipe[],
   random: () => number,

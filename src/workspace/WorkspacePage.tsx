@@ -3,6 +3,12 @@
  *
  * Two columns on a wide screen — code and controls on the left, artwork on the
  * right — and stacked tabs on a narrow one, with the artwork first.
+ *
+ * A workspace opened as a session is the same workspace rearranged, not a second
+ * one: the artwork leads, three creative controls sit beside it, and everything
+ * technical moves behind one disclosure. Every element is the same element, so
+ * the code, the artwork and the history are necessarily shared between the two
+ * arrangements.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -45,7 +51,8 @@ import { PrimitivePanel } from './PrimitivePanel';
 import { TryChangingThis } from './TryChangingThis';
 import { randomiseParameters } from './randomise';
 import { readPlaySeed, startCreating } from './startCreating';
-import { generateInstantPlayVariation, randomSeed } from './instantPlayVariation';
+import { generateInstantPlayVariation } from './instantPlayVariation';
+import { randomSeed } from './randomise';
 import { playLabelFor } from '@/presets/instantPlay';
 import { PlayControls } from './PlayControls';
 import { revealTargetFor, type RevealTarget } from './peek';
@@ -173,6 +180,16 @@ function Workspace({
     [preset, playSeed],
   );
 
+  /**
+   * Whether the seed is what actually opened this workspace.
+   *
+   * A link can carry a shared creation and a seed at once. The creation wins —
+   * somebody was sent it — and then this is not a session at all: no Play
+   * surface, and nothing draws itself, because a shared artwork waits to be run.
+   * Everything about Play keys off this rather than off the seed having parsed.
+   */
+  const session = handedOff === null && shared === null ? started : null;
+
   const initialState = useMemo(() => {
     if (handedOff !== null) {
       const code = juliaSourceFor(handedOff);
@@ -208,15 +225,15 @@ function Workspace({
      * whatever this browser was last doing. Saved work is not lost — it is still
      * there on the artwork's own address, without the seed.
      */
-    if (started !== null) {
+    if (session !== null) {
       return {
         ...initialWorkspaceState(preset),
-        code: started.code,
+        code: session.code,
         // The seed the session began from, so sharing it passes on the number
         // that produced it and Undo has something consistent to restore.
-        seed: started.seed,
+        seed: session.seed,
         // Edited, because it is: the curated values differ from the preset's own.
-        modified: started.code !== preset.code,
+        modified: session.code !== preset.code,
       };
     }
 
@@ -233,7 +250,7 @@ function Workspace({
       renderOptions: saved.renderOptions,
       modified: code !== preset.code,
     };
-  }, [handedOff, shared, started, preset]);
+  }, [handedOff, shared, session, preset]);
 
   const workspace = useWorkspace({
     preset,
@@ -241,6 +258,32 @@ function Workspace({
     ...(initialState === undefined ? {} : { initialState }),
   });
   const { state, setCode, commitCode, undo, setRenderOptions, run, runCode, stop, inspectCell } = workspace;
+
+  /**
+   * The last source Play asked the service for.
+   *
+   * The workspace state cannot answer this: a request that has been sent appears
+   * in `progress` only once a band comes back, and in `result` only when it is
+   * finished, so between the two there is a window in which the same source can be
+   * asked for twice. A ref rather than state because nothing renders it and it must
+   * be readable in the same breath it is written.
+   */
+  const playSubmitted = useRef<string | null>(null);
+
+  /**
+   * Draws a source on Play's behalf, and remembers that it was asked for.
+   *
+   * The code is passed explicitly rather than read through `run`, whose ref is
+   * written by an effect — these fire in the same breath as the change they follow,
+   * which is too soon to rely on that.
+   */
+  const drawPlay = useCallback(
+    (code: string) => {
+      playSubmitted.current = code;
+      runCode(code);
+    },
+    [runCode],
+  );
 
   /*
    * A handoff runs itself, exactly once.
@@ -272,10 +315,12 @@ function Workspace({
    */
   const startedRun = useRef(false);
   useEffect(() => {
-    if (started === null || startedRun.current) return;
+    if (session === null || startedRun.current) return;
     startedRun.current = true;
-    run();
-  }, [started, run]);
+    // Through the same door the controls use, so what a session has already asked
+    // for is one fact rather than two.
+    drawPlay(session.code);
+  }, [session, drawPlay]);
 
   const editorHandle = useRef<AplEditorHandle>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -290,7 +335,7 @@ function Workspace({
    * the artwork — after an Undo it still names the recipe just taken back, which
    * is the one least worth offering again.
    */
-  const playRecipe = useRef<string | undefined>(started?.recipeId);
+  const playRecipe = useRef<string | undefined>(session?.recipeId);
 
   /*
    * Whether this is a Play session, and what it offers.
@@ -300,7 +345,7 @@ function Workspace({
    * it, and a preset with Instant Play opened from its card is not a session — the
    * card is the ordinary way in and stays exactly that.
    */
-  const playConfig = started === null ? undefined : preset.instantPlay;
+  const playConfig = session === null ? undefined : preset.instantPlay;
 
   /*
    * The technical workspace's disclosure, held rather than controlled.
@@ -923,8 +968,8 @@ function Workspace({
 
     const next = setParameterValues(state.code, variation.values);
     commitCode(next, { label: 'Randomise', seed: variation.seed });
-    runCode(next);
-  }, [preset, state.code, commitCode, runCode]);
+    drawPlay(next);
+  }, [preset, state.code, commitCode, drawPlay]);
 
   /**
    * A step of a Play gesture: the value is written, the artwork waits.
@@ -942,15 +987,6 @@ function Workspace({
     [preset, state.code, commitCode],
   );
 
-  /*
-   * The gesture ended, so draw what it left behind.
-   *
-   * Guarded on the source having actually changed: a slider pressed and released
-   * without moving, or a control merely focused and left, must not ask the public
-   * service for the picture already on screen. The code is passed explicitly
-   * rather than read through `run`, whose ref is written by an effect — this fires
-   * in the same breath as the last adjustment, which is too soon to rely on that.
-   */
   /**
    * "Edit the APL": show me the line this control writes.
    *
@@ -1001,12 +1037,22 @@ function Workspace({
   }, [revealRequest]);
 
   const handlePlayAdjustEnd = useCallback(() => {
-    const drawn = state.result !== null && state.result.source === state.code;
+    /*
+     * Three ways this source may already be on its way or already here, and each
+     * has to be checked: it has been asked for, it is arriving, or it is drawn.
+     *
+     * The first is the one that is easy to miss. Leaving a control ends its
+     * gesture, so moving from one slider to the next ends the first — and if that
+     * first change was still in flight, neither the result nor the delivery
+     * mentioned it yet, and the public service was sent the same request twice.
+     */
+    const asked = playSubmitted.current === state.code;
     const arriving = state.progress !== null && state.progress.source === state.code;
-    if (drawn || arriving) return;
+    const drawn = state.result !== null && state.result.source === state.code;
+    if (asked || arriving || drawn) return;
 
-    runCode(state.code);
-  }, [state.result, state.progress, state.code, runCode]);
+    drawPlay(state.code);
+  }, [state.result, state.progress, state.code, drawPlay]);
 
   const editorPanel = (
     <div className={styles.editorPanel}>

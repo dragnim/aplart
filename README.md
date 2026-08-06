@@ -301,6 +301,21 @@ to work around CORS with browser flags or public CORS-anywhere services.
 
 4. **Register it** in `src/presets/presets.ts`.
 
+   A preset may also declare an optional `instantPlay` block, which is what the gallery's **Start
+   creating** action opens. It names up to four existing parameters as creative controls — a label, a
+   sentence, an optional narrowed range and optional words for the two ends — and a set of curated
+   recipes, each a combination somebody has looked at, with an optional `drift` saying how far each
+   value may wander from it. Nothing in it redefines a parameter: the variable, step, limits and
+   binding to the source stay authoritative, and the block only relabels and narrows.
+
+   Two things are worth knowing before curating one. Look at the combinations rather than the
+   parameters — Modular Bloom's drift once moved a modulus onto a multiple of its multiplier, which is
+   arithmetically two shades and visually a blank artwork, and only a batch of live renders showed it.
+   And the same rule the validator applies applies to judgement: `validate:presets` checks that every
+   control names a numeric parameter, that Play ranges sit inside the parameter's and on its step grid,
+   that recipes set every control to a value inside its Play range, and that drift is positive and not
+   finer than the step — but it cannot know what the artwork looks like.
+
 5. **Validate and generate assets:**
 
    ```bash
@@ -460,6 +475,19 @@ Eleven artworks, each a real `.apl` file that the editor shows and the service r
 
 The four fractals after Mandelbrot exist to be compared with it: each differs by one legible thing, and
 Multibrot at `power←2` returns Mandelbrot's matrix cell for cell.
+
+**Starting without reading anything.** The gallery's **Start creating** action opens Modular Bloom on
+one of eight curated variations and draws it, so the first thing on screen is an artwork. Three controls
+in the artwork's own words — Complexity, Scale and Detail — sit beside it, with Randomise, Undo, Save
+image and Share. The seed is in the link, so reloading, sharing the address and pressing Back all show
+the same piece; coming back to the gallery offers a new one.
+
+Nothing there is a second model of the artwork. Each control reads its value out of the visible APL and
+writes changes back into it, and can show the assignment it changes and open the editor at that line.
+Undo is workspace state rather than a stack of its own: it restores the source, the seed and the picture
+together, treats a whole slider drag as one step, and stops offering — rather than offering something
+untrue — as soon as the source is changed by a route it does not record. The full technical workspace is
+one press away underneath, and an artwork opened from its card is exactly what it always was.
 
 **Appearance, none of which re-runs the APL.** Nine named palettes, plus a custom palette editor with
 draggable stops that travel in a share link. Pixel and Smooth display. Five escape-colouring modes for

@@ -220,16 +220,20 @@
 /*
  * In Focus mode the artwork fills the window, so the panel floats over the foot
  * of it: the reason to be in Focus mode with a session is a large picture and
- * three sliders. It sits below the drawer's z-index, so opening the drawer still
- * wins.
+ * three sliders.
+ *
+ * Held to the right rather than centred, because the drawer opens on the left and
+ * opens by default on the way in. Centred, it slid underneath: the drawer is above
+ * it in the stack, which is correct, so a third of the panel — Complexity and
+ * Randomise among it — was simply covered. Anchored here it cannot be, at any
+ * width the drawer takes.
  */
 .page[data-focus='true'] .playArea {
   position: absolute;
-  left: 50%;
+  right: var(--space-5);
   bottom: var(--space-4);
-  transform: translateX(-50%);
   z-index: 20;
-  width: min(46rem, calc(100% - 2 * var(--space-5)));
+  width: min(34rem, 55%);
   max-height: 60%;
   overflow-y: auto;
 }

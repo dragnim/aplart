@@ -97,18 +97,15 @@
 }
 
 /*
- * Shorter than the app's usual tap target, deliberately.
- *
- * Three of these sit under three sliders in a column beside the artwork, and at
- * 44px each they pushed the panel past the foot of the window — which would cost
- * the artwork its place as the largest thing on the page to buy comfort on a
- * secondary control. It spans the full width of the control, so the pressable area
- * is wide, and 32px clears the 24px minimum by half again.
+ * The same target every other standalone control in this application gets. It was
+ * briefly smaller, to stop three of them pushing the panel past the foot of the
+ * window — but the panel is bounded and scrolls now, so that was buying with an
+ * accessibility standard something the layout already had.
  */
 .peekSummary {
   display: flex;
   align-items: center;
-  min-height: 2rem;
+  min-height: var(--tap-target);
   cursor: pointer;
   color: var(--ui-accent-text);
   font-weight: 600;

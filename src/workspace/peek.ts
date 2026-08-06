@@ -105,12 +105,3 @@ export function peekAt(preset: ArtworkPreset, control: InstantPlayControl, code:
     target,
   };
 }
-
-/** Every Play control's view of this source, in the order they are offered. */
-export function peekAtAll(preset: ArtworkPreset, code: string): readonly PeekView[] {
-  const controls = preset.instantPlay?.controls ?? [];
-
-  return controls
-    .map((control) => peekAt(preset, control, code))
-    .filter((view): view is PeekView => view !== null);
-}

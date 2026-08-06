@@ -124,6 +124,30 @@ describe('the starter preset', () => {
     }
   });
 
+  it('never lets a modulus drift onto a factor of its multiplier', () => {
+    /*
+     * `(multiplier×r×c) mod modulus` takes exactly `modulus ÷ gcd` distinct
+     * values, so a multiplier and a modulus sharing a factor draw an artwork with
+     * a handful of shades — 11 against 22 is two, which on screen is a flat
+     * speckle. The parameters look perfectly reasonable; only the arithmetic and
+     * the picture say otherwise.
+     *
+     * Checked across the whole window each recipe can drift into, because the
+     * drift is what reaches these values: every base here is fine on its own.
+     */
+    const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+
+    for (const recipe of base.recipes) {
+      const multiplier = recipe.values['multiplier'] as number;
+      const modulus = recipe.values['modulus'] as number;
+      const drift = recipe.drift?.['modulus'] ?? 0;
+
+      for (let value = modulus - drift; value <= modulus + drift; value += 1) {
+        expect(gcd(multiplier, value), `${recipe.id}: multiplier ${multiplier}, modulus ${value}`).toBe(1);
+      }
+    }
+  });
+
   it('binds every Play control to a real assignment in the source', () => {
     /*
      * What Peek will claim later: this control changes that line. Asserted here

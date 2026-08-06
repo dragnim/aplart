@@ -28,7 +28,8 @@ import {
   numberAssignedTo,
   setParameterValues,
 } from '@/editor/parameterBinding';
-import { generateInstantPlayVariation, randomSeed } from '@/workspace/instantPlayVariation';
+import { generateInstantPlayVariation } from '@/workspace/instantPlayVariation';
+import { randomSeed } from '@/workspace/randomise';
 
 const config = modularBloom.instantPlay as InstantPlayConfig;
 

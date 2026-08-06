@@ -30,6 +30,18 @@ export function seededRandom(seed: number): () => number {
 }
 
 /**
+ * A fresh seed, when the caller has no reason to prefer a particular one.
+ *
+ * Here beside the generator it feeds, so the range mulberry32 accepts is stated
+ * once. Two callers wrote this expression themselves before Instant Play needed
+ * a third, and a seed produced differently in one place is a link that does not
+ * reproduce what it names.
+ */
+export function randomSeed(): number {
+  return Math.floor(Math.random() * 0xffff_ffff);
+}
+
+/**
  * Pulls a sample towards the middle of its range.
  *
  * The average of two uniform draws is triangular: still capable of reaching
@@ -101,7 +113,7 @@ export interface RandomisedParameters {
  */
 export function randomiseParameters(
   parameters: readonly ArtworkParameter[],
-  seed: number = Math.floor(Math.random() * 0xffff_ffff),
+  seed: number = randomSeed(),
 ): RandomisedParameters {
   const random = seededRandom(seed);
   const values = new Map<string, ParameterValue>();

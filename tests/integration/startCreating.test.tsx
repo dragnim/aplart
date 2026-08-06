@@ -19,6 +19,8 @@ import { modularBloom } from '@/presets/modular-bloom';
 import { numberAssignedTo } from '@/editor/parameterBinding';
 import { parseRoute } from '@/app/router';
 import { decodeShareState } from '@/sharing/decodeShareState';
+import { encodeShareState } from '@/sharing/encodeShareState';
+import { SHARE_SCHEMA_VERSION } from '@/sharing/shareState';
 import { PROJECT_SCHEMA_VERSION, type Project } from '@/storage/ProjectRepository';
 import { defaultRenderOptions } from '@/renderer/renderOptions';
 import { localProjects, projectIdFor } from '@/workspace/useLocalProject';
@@ -253,6 +255,39 @@ describe('arriving from Start creating', () => {
     expect(shared.ok).toBe(true);
     expect(shared.ok ? shared.state.seed : null).toBe(SEED);
     expect(shared.ok ? shared.state.code : '').toBe(started?.code);
+  });
+});
+
+describe('when a link carries both a shared artwork and a seed', () => {
+  it('opens what was shared, because that is what somebody was sent', async () => {
+    /*
+     * Nothing in the application writes both, but a URL can hold anything and the
+     * precedence has to be decided rather than discovered. A shared link is
+     * somebody else's creation; a seed is an invitation to make your own, and the
+     * creation wins.
+     */
+    const shared = encodeShareState({
+      v: SHARE_SCHEMA_VERSION,
+      preset: modularBloom.id,
+      code: modularBloom.code.replace(/modulus←\d+/u, 'modulus←13'),
+      params: {},
+      palette: modularBloom.defaultPaletteId,
+      render: { invert: false, rotation: 0, mirrorH: false, mirrorV: false, smooth: false },
+      title: modularBloom.title,
+    });
+
+    const service = serviceReturning();
+    render(
+      <WorkspacePage presetId={modularBloom.id} sharedState={shared} play={String(SEED)} service={service} />,
+    );
+
+    expect(source()).toContain('modulus←13');
+    expect(source()).not.toBe(asRendered(started?.code ?? ''));
+    // And it behaves as a shared link throughout: announced as one, and waiting
+    // to be run rather than drawing itself.
+    expect(screen.getByText(/shared with you/)).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(service.executionCount).toBe(0);
   });
 });
 

@@ -89,7 +89,15 @@ export const modularBloom: ArtworkPreset = {
         parameterId: 'multiplier',
         label: 'Complexity',
         description: 'How intricate the pattern becomes, from open blooms to a fine lattice.',
-        range: { min: 1, max: 12 },
+        /*
+         * Eleven rather than twelve, and the difference is arithmetic rather than
+         * taste. The values drawn number `modulus ÷ gcd`, so a composite end
+         * collapses against everything it shares a factor with: twelve is thin
+         * against a dozen of the Scale values it can meet, and flat against
+         * twenty-four. A prime end meets only its own multiple — eleven against
+         * twenty-two — and the two look the same on screen.
+         */
+        range: { min: 1, max: 11 },
         endpoints: { low: 'Calm', high: 'Intricate' },
       },
       {
@@ -117,6 +125,15 @@ export const modularBloom: ArtworkPreset = {
      * quietest thing it draws; the rest sit above it, so opening twice rarely
      * gives the same character twice. None pairs a high multiplier with a small
      * modulus, which is the one corner of this space that turns to noise.
+     *
+     * And none lets its modulus drift onto a number sharing a factor with its
+     * multiplier. `(multiplier×r×c) mod modulus` takes only `modulus ÷ gcd` values,
+     * so 11 against 22 is two shades — an artwork that is blank in everything but
+     * name. That is invisible in the parameters and obvious on screen, which is how
+     * it was found: a review of twenty-four live variations turned up two flat
+     * ones and two thin ones. Drift on the modulus is therefore small and chosen
+     * against the multiplier, while drift on `size` stays generous because the
+     * count of values does not depend on it at all.
      */
     recipes: [
       {
@@ -129,34 +146,42 @@ export const modularBloom: ArtworkPreset = {
         values: { multiplier: 1, modulus: 7, size: 48 },
         drift: { modulus: 2, size: 8 },
       },
+      /*
+       * An even modulus halves an even multiplier's values, and every window of
+       * three consecutive numbers holds a multiple of three — so these three hold
+       * their modulus still and take a wider drift on `size` instead, which
+       * changes how many blooms fill the square and can change nothing else.
+       */
       {
         id: 'star-centres',
         values: { multiplier: 2, modulus: 15, size: 56 },
-        drift: { modulus: 2, size: 8 },
+        drift: { size: 12 },
       },
       {
         id: 'woven-crosses',
-        values: { multiplier: 3, modulus: 17, size: 64 },
-        drift: { modulus: 3, size: 8 },
+        values: { multiplier: 3, modulus: 17, size: 60 },
+        drift: { size: 12 },
       },
       {
         id: 'bold-tiles',
         values: { multiplier: 3, modulus: 11, size: 40 },
-        drift: { modulus: 2, size: 4 },
+        drift: { size: 8 },
       },
+      // 16, 17 and 18 are all coprime to five, as 22, 23, 24 are to seven and
+      // 18, 19, 20 are to eleven — so these three may drift by one.
       {
         id: 'snowflakes',
-        values: { multiplier: 5, modulus: 19, size: 64 },
-        drift: { modulus: 3, size: 8 },
+        values: { multiplier: 5, modulus: 17, size: 64 },
+        drift: { modulus: 1, size: 8 },
       },
       {
         id: 'fine-lattice',
-        values: { multiplier: 7, modulus: 21, size: 64 },
-        drift: { modulus: 2, size: 8 },
+        values: { multiplier: 7, modulus: 23, size: 64 },
+        drift: { modulus: 1, size: 8 },
       },
       {
         id: 'dense-weave',
-        values: { multiplier: 11, modulus: 23, size: 72 },
+        values: { multiplier: 11, modulus: 19, size: 72 },
         drift: { modulus: 1, size: 8 },
       },
     ],

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { hrefForPlay } from '@/app/router';
 import { presets, starterPreset } from '@/presets/presets';
-import { randomSeed } from '@/workspace/instantPlayVariation';
+import { randomSeed } from '@/workspace/randomise';
 import { ArtworkCard } from './ArtworkCard';
 import { GalleryFilters } from './GalleryFilters';
 import { FILTERS, matchesFilter, type FilterId } from './filterModel';

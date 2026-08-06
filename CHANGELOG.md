@@ -1,10 +1,71 @@
 # Changelog
 
-## Unreleased
+## v1.2.0 — Instant Play
+
+Added a new Start creating experience that opens an attractive artwork immediately
+with expressive creative controls. Randomise, Undo, Save image and Share are
+available directly from the Play surface, and each creative control can reveal and
+open the APL assignment it changes.
+
+### A way in that has already made something
+
+The gallery's hero offers **Start creating** beside the existing invitation to
+browse. It opens Modular Bloom on one of eight curated variations and draws it, so
+the first thing you see is an artwork rather than a blank canvas and a Run button.
+
+The seed is written into the link. Reloading, sharing the address, Back and Forward
+all show the same artwork, because the variation is a pure function of the preset
+and that number — nothing is stored, and nothing is chosen again behind your back.
+Coming back to the gallery offers a fresh one.
+
+### Complexity, Scale and Detail
+
+Three controls in the artwork's own words, over the parameters the workspace
+already had. Each reads its value out of the visible APL and writes changes back
+into it, so the technical sliders agree with them without being told to and the
+picture changes because the program did. Their ranges are narrower than the
+technical ones on purpose: dependable rather than complete.
+
+The labels come from watching the artwork rather than reading the code. A higher
+multiplier makes the pattern finer, so that is Complexity; a higher modulus makes
+each bloom larger and therefore fewer of them, so that is Scale.
+
+### Randomise, Undo, Save image and Share
+
+All four are on the Play surface. Randomise moves to another curated variation,
+never the one already on screen, and keeps its seed for sharing.
+
+Undo is workspace state rather than a stack belonging to one surface: it restores
+the source, the seed and the artwork together, without asking the service for
+something it already had. A drag of a slider is one step back however many values
+it passed through. Anything the history does not describe — typing, a technical
+control, a Reset — ends it rather than being silently undone past, so Undo stops
+offering rather than offering something untrue.
+
+### How this changes the APL
+
+Every creative control can show its working: the variable it writes, the
+assignment as the source currently has it, and a way straight to that line in the
+editor. The text comes from the code rather than from the configuration, so it
+follows a slider, a Randomise and an Undo, and says plainly when a line has been
+edited into something a control can no longer claim.
+
+**Edit the APL** opens the editor wherever the layout keeps it — behind the
+disclosure, in the Code tab, or in the Focus-mode drawer — scrolls to the line and
+selects the value, ready to type over. It changes nothing on the way: not the
+source, the artwork, the seed, the palette, the history or the address.
+
+### Elsewhere
 
 The rounded square holding a `⍴` has gone from the header. It dated from when the
 wordmark was plain text and the header needed a mark of its own; the pixel logo
 says the same thing, and one mark reads better than two.
+
+Play is responsive and keyboard-operable throughout: the artwork leads on a wide
+screen with its controls beside it, stacks above them on a phone, and floats its
+controls clear of the drawer in Focus mode. Every action is reachable by Tab, the
+disclosures announce their state, the assignment is text rather than a highlight,
+and the editor can always be left the way it was entered.
 
 ## v1.1.0 — 2026-08-05
 

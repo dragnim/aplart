@@ -172,7 +172,7 @@ test.describe('the Play workspace', () => {
     const opened = { detail: await valueOf(page, 'Detail'), scale: await valueOf(page, 'Scale') };
     const drawnBefore = await artwork(page).getAttribute('aria-label');
 
-    await playPanel(page).getByRole('button', { name: 'Randomise' }).click();
+    await playPanel(page).getByRole('button', { name: 'Randomise', exact: true }).click();
     await expect
       .poll(async () => `${String(await valueOf(page, 'Detail'))}:${String(await valueOf(page, 'Scale'))}`)
       .not.toBe(`${String(opened.detail)}:${String(opened.scale)}`);
@@ -382,6 +382,30 @@ test.describe('the Play workspace', () => {
     await expect(playPanel(page)).toBeVisible();
   });
 
+  test('keeps its controls clear of the Focus-mode drawer', async ({ page }) => {
+    /*
+     * The drawer opens on the way into Focus mode and sits above the panel, so a
+     * centred panel had a third of itself covered — Complexity and Randomise
+     * among it. Overlap is measured rather than eyeballed because the two are
+     * positioned independently and nothing else would notice them meeting.
+     */
+    await stubTryApl(page);
+    await openSession(page);
+    await page.getByRole('button', { name: 'Focus mode' }).click();
+
+    const drawer = await page.locator('#focus-drawer').boundingBox();
+    const panel = await playPanel(page).boundingBox();
+
+    expect(drawer?.width ?? 0).toBeGreaterThan(0);
+    expect(panel?.x ?? 0).toBeGreaterThanOrEqual((drawer?.x ?? 0) + (drawer?.width ?? 0));
+
+    // And every action in it is genuinely pressable where it now sits.
+    for (const name of ['Randomise', 'Save image', 'Share']) {
+      await expect(playPanel(page).getByRole('button', { name })).toBeVisible();
+    }
+    await expect(slider(page, 'Complexity')).toBeVisible();
+  });
+
   test('reveals the line inside Focus mode, in the drawer that is already there', async ({ page }) => {
     await stubTryApl(page);
     await openSession(page);
@@ -397,6 +421,59 @@ test.describe('the Play workspace', () => {
     const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '');
     expect(selected).toBe(String(await valueOf(page, 'Complexity')));
     await expect(page.getByRole('button', { name: 'Exit focus' })).toBeVisible();
+  });
+
+  test('can be played, explained and left from the keyboard alone', async ({ page, isMobile }) => {
+    // iOS Safari does not tab to controls unless the user has turned that on,
+    // which is a platform preference rather than something this application sets.
+    test.skip(isMobile === true, 'iOS Safari does not tab to controls by default.');
+
+    await stubTryApl(page);
+    await openSession(page);
+
+    // Reach the first Play control by tabbing, and move it with the arrow keys.
+    const focusedLabel = () =>
+      page.evaluate(() => {
+        const active = document.activeElement;
+        if (active === null) return '';
+        const label = active.id === '' ? null : document.querySelector(`label[for="${active.id}"]`);
+        return label?.textContent ?? active.textContent ?? '';
+      });
+
+    let reached = '';
+    for (let press = 0; press < 40 && reached !== 'Complexity'; press += 1) {
+      await page.keyboard.press('Tab');
+      reached = (await focusedLabel()).trim();
+    }
+    expect(reached, 'Complexity was not reachable by Tab').toBe('Complexity');
+
+    const from = await valueOf(page, 'Complexity');
+    await page.keyboard.press('ArrowRight');
+    expect(await valueOf(page, 'Complexity')).toBe(from + 1);
+
+    // The disclosure is the next stop, and opens from the keyboard.
+    await page.keyboard.press('Tab');
+    expect((await focusedLabel()).trim()).toBe('How this changes the APL');
+    await expect(page.locator('details[data-control="multiplier"]')).toHaveJSProperty('open', false);
+    await page.keyboard.press('Enter');
+    await expect(page.locator('details[data-control="multiplier"]')).toHaveJSProperty('open', true);
+
+    // Then its action, which leaves focus in the editor.
+    await page.keyboard.press('Tab');
+    expect((await focusedLabel()).trim()).toBe('Edit the APL');
+    await page.keyboard.press('Enter');
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.className ?? ''))
+      .toContain('cm-content');
+
+    /*
+     * And out again. CodeMirror is where a keyboard user could get stuck, so Tab
+     * has to leave it rather than indent — this is the check that it does.
+     */
+    await page.keyboard.press('Tab');
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.className ?? ''))
+      .not.toContain('cm-content');
   });
 
   test('leaves an artwork opened from its card exactly as it was', async ({ page }) => {

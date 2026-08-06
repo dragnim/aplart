@@ -172,6 +172,57 @@ test.describe('accessibility of the workspace', () => {
   });
 });
 
+test.describe('accessibility of a Play session', () => {
+  test.use({ viewport: { width: 1440, height: 950 } });
+
+  /** Opened the way the gallery's own action opens it, seed and all. */
+  async function openSession(page: Page) {
+    await stubTryApl(page);
+    await page.goto('./#/art/modular-bloom?play=20260805');
+    await expect(page.getByRole('img', { name: /grid/ })).toBeVisible({ timeout: 30_000 });
+  }
+
+  test('has no violations on arrival', async ({ page }) => {
+    await openSession(page);
+    await audit(page);
+  });
+
+  test('has no violations with every control explaining itself', async ({ page }) => {
+    // The disclosures hold the one piece of colour-adjacent presentation on this
+    // surface — an assignment on a dark chip — so they are worth auditing open.
+    await openSession(page);
+    /*
+     * Bottom-up, because the panel scrolls: opening one disclosure grows the
+     * content above the next, which then never holds still long enough to be
+     * clicked. Opened from the last one back, nothing above a target moves.
+     */
+    for (const control of ['size', 'modulus', 'multiplier']) {
+      await page.locator(`details[data-control="${control}"]`).getByText('How this changes the APL').click();
+    }
+    await audit(page);
+  });
+
+  test('has no violations with the technical workspace opened beneath it', async ({ page }) => {
+    await openSession(page);
+    await page.getByText('Code and full controls').click();
+    await page.waitForSelector('.cm-content');
+    await audit(page);
+  });
+
+  test('has no violations in Focus mode', async ({ page }) => {
+    await openSession(page);
+    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await expect(page.getByRole('region', { name: 'Make it yours' })).toBeVisible();
+    await audit(page);
+  });
+
+  test('has no violations on a narrow screen', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openSession(page);
+    await audit(page);
+  });
+});
+
 test.describe('accessibility on a narrow viewport', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
@@ -282,9 +333,44 @@ test.describe('target sizes', () => {
     // The spec asks for roughly 44x44, which is stricter than WCAG 2.2 AA's
     // 24x24. Inline links inside prose are exempt from both and are excluded
     // here; standalone controls are not.
+    await assertComfortableTargets(page);
+  });
+
+  test('the Play surface is comfortable to hit too', async ({ page }) => {
+    // Its own test rather than a second URL in the one above, because a session
+    // is a different page: three sliders, three disclosures and four actions that
+    // exist nowhere else.
+    await stubTryApl(page);
+    await page.goto('./#/art/modular-bloom?play=20260805');
+    await expect(page.getByRole('img', { name: /grid/ })).toBeVisible({ timeout: 30_000 });
+
+    /*
+     * Bottom-up, because the panel scrolls: opening one disclosure grows the
+     * content above the next, which then never holds still long enough to be
+     * clicked. Opened from the last one back, nothing above a target moves.
+     */
+    for (const control of ['size', 'modulus', 'multiplier']) {
+      await page.locator(`details[data-control="${control}"]`).getByText('How this changes the APL').click();
+    }
+
+    await assertComfortableTargets(page);
+  });
+});
+
+/**
+ * Every standalone control on the page, measured.
+ *
+ * The spec asks for roughly 44x44, which is stricter than WCAG 2.2 AA's 24x24.
+ * Inline links inside prose are exempt from both and are excluded here;
+ * standalone controls, including a disclosure's own summary, are not.
+ */
+async function assertComfortableTargets(page: Page): Promise<void> {
+  {
     const undersized = await page.evaluate(() => {
       const failures: string[] = [];
-      const elements = document.querySelectorAll('button, input[type="range"], select, [role="tab"]');
+      const elements = document.querySelectorAll(
+        'button, input[type="range"], select, summary, [role="tab"]',
+      );
 
       for (const element of elements) {
         const box = element.getBoundingClientRect();
@@ -301,5 +387,5 @@ test.describe('target sizes', () => {
     });
 
     expect(undersized, `undersized controls:\n  ${undersized.join('\n  ')}`).toEqual([]);
-  });
-});
+  }
+}

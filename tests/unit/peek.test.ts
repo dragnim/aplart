@@ -17,7 +17,7 @@ import { setParameterValue } from '@/editor/parameterBinding';
 import { modularBloom } from '@/presets/modular-bloom';
 import { truchetGrid } from '@/presets/truchet-grid';
 import { type InstantPlayConfig, type InstantPlayControl } from '@/presets/instantPlay';
-import { peekAt, peekAtAll, revealTargetFor } from '@/workspace/peek';
+import { peekAt, revealTargetFor } from '@/workspace/peek';
 import { type ArtworkParameter } from '@/presets/schema';
 
 const config = modularBloom.instantPlay as InstantPlayConfig;
@@ -60,14 +60,16 @@ describe('what every Play control says about the source it opened with', () => {
   });
 
   it('offers one view per control, in the order they are shown', () => {
-    const views = peekAtAll(modularBloom, modularBloom.code);
+    const views = config.controls.map((control) => peekAt(modularBloom, control, modularBloom.code));
 
-    expect(views.map((view) => view.label)).toEqual(['Complexity', 'Scale', 'Detail']);
-    expect(views.map((view) => view.variable)).toEqual(['multiplier', 'modulus', 'size']);
+    expect(views.map((view) => view?.label)).toEqual(['Complexity', 'Scale', 'Detail']);
+    expect(views.map((view) => view?.variable)).toEqual(['multiplier', 'modulus', 'size']);
   });
 
-  it('says nothing at all for a preset with no Play controls', () => {
-    expect(peekAtAll(truchetGrid, truchetGrid.code)).toEqual([]);
+  it('declines a control belonging to another preset', () => {
+    // Truchet has no Play controls at all, so one of Modular Bloom's names
+    // nothing there — which is the same refusal as a mistyped parameter id.
+    expect(peekAt(truchetGrid, controlFor('modulus'), truchetGrid.code)).toBeNull();
   });
 
   it('declines a control naming no parameter of this preset', () => {
