@@ -15,6 +15,11 @@
  * the picture keep up, but the run waits for the release and so does the undo
  * entry: the gesture is what somebody did, not the forty values it passed
  * through.
+ *
+ * Each control can also show its own working: a disclosure naming the variable it
+ * writes and the assignment as the source currently has it, with a way straight to
+ * that line in the editor. Everything in it comes from `peekAt`, so a control can
+ * never describe a program other than the one on screen.
  */
 
 import { useCallback, useRef, type MutableRefObject } from 'react';
@@ -27,6 +32,7 @@ import {
   type InstantPlayControl,
 } from '@/presets/instantPlay';
 import { type ArtworkParameter, type ArtworkPreset } from '@/presets/schema';
+import { peekAt, type PeekView } from './peek';
 import styles from './PlayControls.module.css';
 
 interface Props {
@@ -38,6 +44,8 @@ interface Props {
   readonly onAdjust: (parameter: ArtworkParameter, value: number, gesture: string) => void;
   /** The gesture ended, so the artwork can be drawn once. */
   readonly onAdjustEnd: () => void;
+  /** Opens the editor at this control's own line. Changes nothing. */
+  readonly onEditApl: (parameter: ArtworkParameter) => void;
   readonly onRandomise: () => void;
   readonly onUndo: () => void;
   /** What Undo would take back, or null when there is nothing behind you. */
@@ -55,6 +63,7 @@ export function PlayControls({
   code,
   onAdjust,
   onAdjustEnd,
+  onEditApl,
   onRandomise,
   onUndo,
   undoLabel,
@@ -91,9 +100,11 @@ export function PlayControls({
             control={control}
             parameter={parameterForControl(preset, control)}
             code={code}
+            peek={peekAt(preset, control, code)}
             gesture={gesture}
             onAdjust={onAdjust}
             onEnd={endGesture}
+            onEditApl={onEditApl}
           />
         ))}
       </div>
@@ -138,16 +149,20 @@ function PlayControl({
   control,
   parameter,
   code,
+  peek,
   gesture,
   onAdjust,
   onEnd,
+  onEditApl,
 }: {
   readonly control: InstantPlayControl;
   readonly parameter: ArtworkParameter | undefined;
   readonly code: string;
+  readonly peek: PeekView | null;
   readonly gesture: MutableRefObject<number>;
   readonly onAdjust: (parameter: ArtworkParameter, value: number, gesture: string) => void;
   readonly onEnd: () => void;
+  readonly onEditApl: (parameter: ArtworkParameter) => void;
 }) {
   /*
    * Validation guarantees the parameter exists and is numeric, and the gallery
@@ -174,9 +189,12 @@ function PlayControl({
     return (
       <div className={styles.control} data-detached="true">
         <span className={styles.label}>{control.label}</span>
-        <p className={styles.detached}>
-          The code no longer sets this to a number. Open the code below to put it back.
-        </p>
+        <p className={styles.detached}>The code no longer sets this to a number.</p>
+        {/*
+          Still offered, and it matters most here: the disclosure is where the
+          control says what happened to it and how to get to the line.
+        */}
+        <PeekDisclosure peek={peek} parameter={parameter} onEditApl={onEditApl} />
       </div>
     );
   }
@@ -239,6 +257,91 @@ function PlayControl({
           <span>{control.endpoints.high}</span>
         </div>
       )}
+
+      <PeekDisclosure peek={peek} parameter={parameter} onEditApl={onEditApl} />
     </div>
+  );
+}
+
+/**
+ * What this control does to the program, on request.
+ *
+ * A native disclosure, so it is keyboard operable and its state is announced
+ * without any of that having to be built. Closed by default: somebody who has just
+ * arrived is here to move a slider, and the code is an answer to a question they
+ * have not asked yet.
+ *
+ * Everything in it is read from the source. The assignment is shown as text rather
+ * than communicated by highlighting it somewhere, so the relationship survives
+ * being read aloud, and it is marked up as code because that is what it is.
+ */
+function PeekDisclosure({
+  peek,
+  parameter,
+  onEditApl,
+}: {
+  readonly peek: PeekView | null;
+  readonly parameter: ArtworkParameter;
+  readonly onEditApl: (parameter: ArtworkParameter) => void;
+}) {
+  if (peek === null) return null;
+
+  return (
+    // Named after the parameter it explains, because the summary reads the same
+    // in all three — which is the point of it, and no way to tell them apart.
+    <details className={styles.peek} data-control={parameter.id}>
+      <summary className={styles.peekSummary}>How this changes the APL</summary>
+
+      <div className={styles.peekBody}>
+        {peek.status === 'bound' ? (
+          <>
+            <p className={styles.peekLine}>
+              Changes <code className={styles.variable}>{peek.variable}</code> in the APL.
+            </p>
+            {/*
+              The line as the source has it now. Not built from the slider or the
+              configuration: those would agree with it until somebody edited the
+              code, which is exactly when a claim like this has to be right.
+            */}
+            <p className={styles.assignment}>
+              <code>{peek.assignment}</code>
+            </p>
+            <p className={styles.peekDescription}>
+              Moving {peek.label} rewrites this line, and the artwork is drawn again when you let go.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className={styles.peekLine}>
+              {peek.status === 'unrepresentable'
+                ? `This control is no longer connected to a simple assignment: the code sets ${peek.variable} to an expression.`
+                : `This control is no longer connected to a simple assignment: the code no longer sets ${peek.variable}.`}
+            </p>
+            {/*
+              The control's own sentence, which is only worth repeating here: a
+              control in this state has no slider, so this is the one place left
+              that says what it was for. A bound control has it on screen already,
+              directly above, and printing it twice is noise rather than help.
+            */}
+            <p className={styles.peekDescription}>{peek.description}</p>
+          </>
+        )}
+
+        {/*
+          Named after the control as well, because three buttons reading "Edit the
+          APL" are three identical names in a list of what is on the page. The
+          visible words are still the first words of the name, so saying "Edit the
+          APL" to a voice control still works.
+        */}
+        <button
+          type="button"
+          className={styles.peekAction}
+          onClick={() => onEditApl(parameter)}
+          aria-label={`Edit the APL for ${peek.label}`}
+        >
+          Edit the APL
+        </button>
+      </div>
+    </details>
   );
 }

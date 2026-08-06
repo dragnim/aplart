@@ -39,6 +39,28 @@ async function valueOf(page: Page, label: string): Promise<number> {
   return Number(await slider(page, label).inputValue());
 }
 
+/**
+ * Opens a control's disclosure and returns it.
+ *
+ * Located by the parameter it explains rather than by its contents: a closed
+ * disclosure hides them from the accessibility tree, which is exactly the
+ * behaviour being relied on elsewhere, so nothing inside it can be used to find
+ * it. Idempotent, because some of these journeys arrive with it already open.
+ */
+async function openPeek(page: Page, parameterId: string): Promise<Locator> {
+  const peek = page.locator(`details[data-control="${parameterId}"]`);
+  const open = await peek.evaluate((element) => (element as HTMLDetailsElement).open);
+  if (!open) await peek.getByText('How this changes the APL').click();
+
+  return peek;
+}
+
+/** Presses one control's "Edit the APL", opening its disclosure if need be. */
+async function editApl(page: Page, parameterId: string): Promise<void> {
+  const peek = await openPeek(page, parameterId);
+  await peek.getByRole('button', { name: /^Edit the APL/ }).click();
+}
+
 /** Drags a slider from its thumb towards the right-hand end of its track. */
 async function dragRight(page: Page, control: Locator): Promise<void> {
   const box = await control.boundingBox();
@@ -261,6 +283,86 @@ test.describe('the Play workspace', () => {
     await expect(undo).toBeDisabled();
   });
 
+  test('explains itself, and takes you to the line it changes', async ({ page }) => {
+    await stubTryApl(page);
+    await openSession(page);
+
+    const peek = playPanel(page).locator('details[data-control="modulus"]');
+
+    // Closed until asked, and its contents genuinely away rather than merely
+    // unstyled — a closed disclosure takes them out of the page.
+    await expect(peek).toHaveJSProperty('open', false);
+    await expect(peek.getByRole('button', { name: /^Edit the APL/ })).toBeHidden();
+
+    await peek.getByText('How this changes the APL').click();
+    await expect(peek).toHaveJSProperty('open', true);
+
+    const scale = await valueOf(page, 'Scale');
+    await expect(peek).toContainText('Changes modulus in the APL.');
+    await expect(peek).toContainText(`modulus←${String(scale)}`);
+
+    await peek.getByRole('button', { name: 'Edit the APL for Scale' }).click();
+
+    // The editor is showing, the line is on screen, and the value itself is
+    // selected — not the whole line, and not merely coloured.
+    await expect(page.locator('.cm-content')).toBeVisible();
+    const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '');
+    expect(selected).toBe(String(scale));
+
+    const line = await page.evaluate(() => {
+      const node = window.getSelection()?.anchorNode ?? null;
+      const element = node instanceof Element ? node : node?.parentElement;
+      return element?.closest('.cm-line')?.textContent ?? '';
+    });
+    expect(line).toBe(`modulus←${String(scale)}`);
+
+    // And the caret is in the editor, so typing goes where the eye was sent.
+    const focused = await page.evaluate(() => document.activeElement?.className ?? '');
+    expect(focused).toContain('cm-content');
+  });
+
+  test('opening the editor is not a page, and costs no history', async ({ page }) => {
+    const stub = await stubTryApl(page);
+    await page.goto('./');
+    await page.getByRole('link', { name: 'Start creating' }).click();
+    await expect(artwork(page)).toBeVisible({ timeout: 30_000 });
+
+    await dragRight(page, slider(page, 'Detail'));
+    const undo = playPanel(page).getByRole('button', { name: /^Undo/ });
+    await expect(undo).toBeEnabled();
+
+    const url = page.url();
+    const before = runs(stub.requests);
+    await editApl(page, 'size');
+    await expect(page.locator('.cm-content')).toBeVisible();
+
+    // Nothing ran, the address did not move, and the step back survived.
+    expect(runs(stub.requests)).toBe(before);
+    expect(page.url()).toBe(url);
+    await expect(undo).toBeEnabled();
+
+    // One press of Back leaves the artwork for the gallery, rather than closing
+    // an editor somebody never navigated to.
+    await page.goBack();
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Tiny programs.');
+  });
+
+  test('lets you type straight away, and says so by dropping Undo', async ({ page }) => {
+    await stubTryApl(page);
+    await openSession(page);
+
+    await dragRight(page, slider(page, 'Scale'));
+    const undo = playPanel(page).getByRole('button', { name: /^Undo/ });
+    await expect(undo).toBeEnabled();
+
+    await editApl(page, 'modulus');
+    // The value is selected, so typing replaces it: no clicking, no hunting.
+    await page.keyboard.type('9');
+
+    await expect(page.locator('.cm-content')).toContainText('modulus←9');
+    await expect(undo).toBeDisabled();
+  });
+
   test('survives Focus mode with its controls over the artwork', async ({ page }) => {
     await stubTryApl(page);
     await openSession(page);
@@ -280,6 +382,23 @@ test.describe('the Play workspace', () => {
     await expect(playPanel(page)).toBeVisible();
   });
 
+  test('reveals the line inside Focus mode, in the drawer that is already there', async ({ page }) => {
+    await stubTryApl(page);
+    await openSession(page);
+
+    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await editApl(page, 'multiplier');
+
+    // The drawer is where the editor lives in Focus mode, and there is one editor
+    // rather than a second one mounted into the overlay.
+    await expect(page.locator('.cm-content')).toBeVisible();
+    expect(await page.locator('.cm-content').count()).toBe(1);
+
+    const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '');
+    expect(selected).toBe(String(await valueOf(page, 'Complexity')));
+    await expect(page.getByRole('button', { name: 'Exit focus' })).toBeVisible();
+  });
+
   test('leaves an artwork opened from its card exactly as it was', async ({ page }) => {
     const stub = await stubTryApl(page);
     await page.goto('./#/art/modular-bloom');
@@ -290,6 +409,11 @@ test.describe('the Play workspace', () => {
     await expect(page.getByText('Code and full controls')).toHaveCount(0);
     await expect(page.getByRole('button', { name: /^Run/ })).toBeVisible();
     expect(stub.requests).toHaveLength(0);
+
+    // And no Peek: the technical controls are named after the code already, so
+    // there is nothing for a disclosure to explain.
+    await expect(page.getByText('How this changes the APL')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Edit the APL/ })).toHaveCount(0);
   });
 });
 
@@ -323,6 +447,23 @@ test.describe('the Play workspace on a phone', () => {
 
     await page.getByRole('tab', { name: 'Code' }).click();
     await expect(page.locator('.cm-content')).toContainText(`modulus←${String(from + 1)}`);
+  });
+
+  test('Edit the APL moves to the Code tab and reveals the line there', async ({ page }) => {
+    await stubTryApl(page);
+    await openSession(page);
+    await showArtwork(page);
+
+    const detail = await valueOf(page, 'Detail');
+    await editApl(page, 'size');
+
+    // The narrow layout keeps the editor in a tab, so the tab is what has to
+    // change — and it is the Code tab that ends up selected.
+    await expect(page.getByRole('tab', { name: 'Code' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('.cm-content')).toBeVisible();
+
+    const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '');
+    expect(selected).toBe(String(detail));
   });
 });
 

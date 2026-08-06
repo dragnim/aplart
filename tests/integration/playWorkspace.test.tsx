@@ -9,7 +9,7 @@
  * being there.
  */
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ADAPTIVE_MARKER } from '@/execution/adaptiveProbe';
@@ -98,7 +98,22 @@ function serviceTellingArtworksApart(): MockAplExecutionService {
 const playPanel = () => screen.getByRole('region', { name: 'Make it yours' });
 const noPlayPanel = () => screen.queryByRole('region', { name: 'Make it yours' });
 const slider = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
-const source = () => screen.getByRole('textbox', { name: /APL/i }).textContent ?? '';
+/**
+ * CodeMirror's own sample text, for measuring character widths.
+ *
+ * jsdom has no layout, so the measurement never succeeds and the sample is left
+ * in the content as an extra line the moment the editor is displayed — which
+ * revealing a line does. It is not part of the document and must not be read as
+ * though it were.
+ */
+const MEASUREMENT_LINE = 'abc def ghi jkl mno pqr stu';
+
+/** The program the editor holds, assembled from its line elements. */
+const source = () =>
+  [...screen.getByRole('textbox', { name: /APL/i }).querySelectorAll('.cm-line')]
+    .map((line) => line.textContent ?? '')
+    .filter((text) => text !== MEASUREMENT_LINE)
+    .join('');
 const asRendered = (code: string) => code.split('\n').join('');
 
 /** How many runs have happened: one first request per run, then its bands. */
@@ -190,9 +205,11 @@ describe('when a session is what opened the workspace', () => {
     const { view } = openPlay();
     await drawn();
 
-    const details = view.container.querySelector('details');
+    // The disclosure that owns this summary, named through it: the controls have
+    // disclosures of their own now, and the first in the document is one of those.
+    const summary = screen.getByText('Code and full controls');
+    const details = summary.closest('details');
     expect(details?.open).toBe(false);
-    expect(screen.getByText('Code and full controls')).toBeInTheDocument();
 
     /*
      * Rendered while closed, which is what a disclosure gives and a conditional
@@ -637,6 +654,148 @@ describe('what Undo may and may not reach', () => {
     expect(source()).toContain('modulus←13');
     expect(source()).not.toContain('size←64');
     expect(undo()).toBeDisabled();
+  });
+});
+
+describe('what a control says about the code', () => {
+  /** The disclosure belonging to one control, found through its own action. */
+  const peekFor = (label: string) =>
+    screen.getByRole('button', { name: `Edit the APL for ${label}` }).closest('details') as HTMLElement;
+
+  const assignmentFor = (label: string, variable: string) =>
+    within(peekFor(label)).getByText(new RegExp(`^${variable}←`, 'u')).textContent;
+
+  it('names the variable and the assignment the source currently makes', async () => {
+    openPlay();
+    await drawn();
+
+    expect(peekFor('Complexity')).toHaveTextContent('Changes multiplier in the APL.');
+    for (const [label, variable] of [
+      ['Complexity', 'multiplier'],
+      ['Scale', 'modulus'],
+      ['Detail', 'size'],
+    ] as const) {
+      // The value the session opened on, read from its source rather than from
+      // the configuration the session was built from.
+      expect(assignmentFor(label, variable), label).toBe(
+        `${variable}←${String(numberAssignedTo(started?.code ?? '', variable))}`,
+      );
+    }
+  });
+
+  it('follows a Play control as it is moved', async () => {
+    openPlay();
+    await drawn();
+
+    drag('Scale', [11]);
+
+    expect(assignmentFor('Scale', 'modulus')).toBe('modulus←11');
+  });
+
+  it('follows Randomise', async () => {
+    const user = userEvent.setup();
+    openPlay();
+    await drawn();
+
+    const seed = Math.floor(0.4242 * 0xffff_ffff);
+    const expected = generateInstantPlayVariation(modularBloom, seed, started?.recipeId);
+    vi.spyOn(Math, 'random').mockReturnValue(0.4242);
+    await user.click(within(playPanel()).getByRole('button', { name: 'Randomise' }));
+    vi.restoreAllMocks();
+
+    // The value the generator chose, named by the disclosure — which is the same
+    // number the source now holds, since the source is where it read it.
+    for (const [label, variable] of [
+      ['Complexity', 'multiplier'],
+      ['Scale', 'modulus'],
+      ['Detail', 'size'],
+    ] as const) {
+      expect(assignmentFor(label, variable), label).toBe(
+        `${variable}←${String(expected?.values.get(variable))}`,
+      );
+    }
+  });
+
+  it('follows Undo back', async () => {
+    const user = userEvent.setup();
+    openPlay();
+    await drawn();
+    const opened = assignmentFor('Scale', 'modulus');
+
+    drag('Scale', [11]);
+    expect(assignmentFor('Scale', 'modulus')).toBe('modulus←11');
+
+    await user.click(within(playPanel()).getByRole('button', { name: /^Undo/ }));
+
+    expect(assignmentFor('Scale', 'modulus')).toBe(opened);
+  });
+});
+
+describe('Edit the APL', () => {
+  const editAction = (label: string) => screen.getByRole('button', { name: `Edit the APL for ${label}` });
+
+  it('opens the technical workspace and puts the caret in the editor', async () => {
+    const user = userEvent.setup();
+    openPlay();
+    await drawn();
+
+    const details = screen.getByText('Code and full controls').closest('details') as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+
+    await user.click(editAction('Scale'));
+
+    expect(details.open).toBe(true);
+    // Focus lands in the editor, not on the button that opened it: the point of
+    // the action is to be somewhere you can type.
+    expect(document.activeElement?.className).toContain('cm-content');
+  });
+
+  it('changes nothing: not the source, not the artwork, not the history', async () => {
+    const user = userEvent.setup();
+    const { service } = openPlay();
+    await drawn();
+
+    drag('Scale', [11]);
+    const before = { code: source(), runs: runs(service.received) };
+    const artwork = screen.getByRole('img').getAttribute('aria-label');
+
+    await user.click(editAction('Detail'));
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    expect(source()).toBe(before.code);
+    expect(runs(service.received)).toBe(before.runs);
+    expect(screen.getByRole('img').getAttribute('aria-label')).toBe(artwork);
+    // And the step back is still there to take, which is the one somebody would
+    // most expect to lose by opening the code.
+    const undo = within(playPanel()).getByRole('button', { name: /^Undo/ });
+    expect(undo).toBeEnabled();
+    await user.click(undo);
+    expect(source()).toBe(asRendered(started?.code ?? ''));
+  });
+
+  it('can be pressed again for another control', async () => {
+    const user = userEvent.setup();
+    openPlay();
+    await drawn();
+
+    await user.click(editAction('Complexity'));
+    await user.click(editAction('Detail'));
+
+    // Nothing latched: a second request is honoured like the first.
+    expect(document.activeElement?.className).toContain('cm-content');
+    expect(source()).toBe(asRendered(started?.code ?? ''));
+  });
+
+  it('is offered by every control, and only inside a session', async () => {
+    openPlay();
+    await drawn();
+    expect(screen.getAllByRole('button', { name: /^Edit the APL/ })).toHaveLength(3);
+
+    cleanup();
+
+    openPlay(null);
+    expect(screen.queryByRole('button', { name: /^Edit the APL/ })).toBeNull();
+    expect(screen.queryByText('How this changes the APL')).toBeNull();
   });
 });
 

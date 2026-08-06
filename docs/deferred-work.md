@@ -50,29 +50,6 @@ inside a named link, and every state it colours also carries a non-colour
 indicator — but the plan should be run before claiming the interface is accessible
 rather than structurally correct.
 
-## Instant Play needs one more thing the workspace does not have
-
-Two were recorded here during the configuration stage. The workspace-level undo
-was built in Stage 4 — `WorkspaceSnapshot`, `past`, `codeCommitted` and `undone` in
-`workspaceState.ts`, exactly as sketched — and this is what is left.
-
-### The editor cannot be asked to show a line
-
-`AplEditorHandle` exposes `insertAtCursor`, `focus`, `undo` and `redo`. Peek's whole
-claim is "this control changes that line", which means scrolling the line into view,
-so it needs one more method:
-
-```ts
-revealLine(line: number, options?: { readonly select?: boolean }): void;
-```
-
-`line` is zero-based, matching `AssignmentLocation.line`, and `select` highlights
-the assigned value rather than the whole line. No new parsing is required for
-either: `findAssignment` already returns the line index and the `prefix` whose
-length is the value's start column. `tests/unit/instantPlay.test.ts` already asserts
-that every Play control resolves to a real assignment, so the line Peek will be
-handed is known to exist.
-
 ## Near-black palettes: hover is numerically, not visually, distinct
 
 A palette whose source is near-black (`#0a0118`, say) produces a near-black fill.

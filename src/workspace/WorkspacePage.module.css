@@ -152,11 +152,27 @@
  * window allows and its three controls are all visible without scrolling.
  */
 .columns[data-play='true'] {
-  grid-template-columns: minmax(0, 1fr) minmax(17rem, 22rem);
+  grid-template-columns: minmax(0, 1fr) minmax(17rem, 20rem);
 }
 
 .playArea {
   min-width: 0;
+}
+
+/*
+ * Bounded by the same height the artwork is, and scrolls if it must.
+ *
+ * Three controls, each able to explain itself, can outgrow a short window — and
+ * the answer to that is not to shrink the artwork. The column keeps its place
+ * beside the piece and takes a scrollbar on the rare screen that needs one.
+ *
+ * On the panel itself rather than on this wrapper: a bounded box with an
+ * unbounded child inside it is still a panel running off the foot of the window,
+ * however tidy the wrapper's own measurements look.
+ */
+.columns[data-play='true'] .playArea > * {
+  max-height: calc(100dvh - 14rem);
+  overflow-y: auto;
 }
 
 /*

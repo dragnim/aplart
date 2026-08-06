@@ -48,6 +48,7 @@ import { readPlaySeed, startCreating } from './startCreating';
 import { generateInstantPlayVariation, randomSeed } from './instantPlayVariation';
 import { playLabelFor } from '@/presets/instantPlay';
 import { PlayControls } from './PlayControls';
+import { revealTargetFor, type RevealTarget } from './peek';
 import { readSavedProjectImmediate, useLocalProject } from './useLocalProject';
 import { FocusToolbar } from './FocusToolbar';
 import { type SourceCell, type SourceRect } from '@/renderer/displayMapping';
@@ -300,6 +301,35 @@ function Workspace({
    * card is the ordinary way in and stays exactly that.
    */
   const playConfig = started === null ? undefined : preset.instantPlay;
+
+  /*
+   * The technical workspace's disclosure, held rather than controlled.
+   *
+   * Two things open it: the summary somebody presses, and "Edit the APL". A React
+   * `open` prop cannot serve both — the element's toggle event is queued rather
+   * than dispatched, so React restores the prop it last rendered before the event
+   * arrives and the disclosure never opens at all. Left native and opened through
+   * the ref, pressing the summary behaves exactly as a disclosure does and this is
+   * only a second way to the same state.
+   */
+  const fullWorkspace = useRef<HTMLDetailsElement>(null);
+
+  /**
+   * A line the editor should be shown, once it is on screen to be shown it.
+   *
+   * Held rather than acted on immediately: the editor may be inside a closed
+   * disclosure, an unselected tab or a shut drawer, and CodeMirror cannot scroll
+   * something that is not being displayed. The state that uncovers it is set
+   * first, and the reveal happens in an effect afterwards, by which time it is.
+   *
+   * The target is a ref and the trigger is a count, rather than one piece of
+   * state holding both: an effect that cleared its own state would be a render
+   * cascade, and the count already says "asked again" without anything to clear.
+   * A null target is still a request — the control's line has gone, and the editor
+   * should open and take focus anyway rather than the press seeming to do nothing.
+   */
+  const pendingReveal = useRef<RevealTarget | null>(null);
+  const [revealRequest, setRevealRequest] = useState(0);
 
   /*
    * Focus mode is session state and nothing more.
@@ -921,6 +951,55 @@ function Workspace({
    * rather than read through `run`, whose ref is written by an effect — this fires
    * in the same breath as the last adjustment, which is too soon to rely on that.
    */
+  /**
+   * "Edit the APL": show me the line this control writes.
+   *
+   * Everything it does is presentation. It opens whichever container is hiding
+   * the editor in this layout — the disclosure on a wide screen, the Code tab on a
+   * narrow one, the drawer in Focus mode — and asks the editor to reveal the line.
+   * Nothing is dispatched to the workspace, so the source, the artwork, the seed,
+   * the palette and the Play history are all exactly as they were, and the address
+   * does not change: opening the editor is not a page somebody should have to
+   * press Back out of.
+   */
+  const handleEditApl = useCallback(
+    (parameter: ArtworkParameter) => {
+      if (fullWorkspace.current !== null) fullWorkspace.current.open = true;
+      // The narrow layout keeps the editor in a tab; harmless on a wide one,
+      // which does not render tabs at all.
+      setTab('code');
+      // In Focus mode the drawer is where the editor lives. Opening it is the
+      // existing way to work on the code there, and it keeps one editor rather
+      // than putting a second one in the overlay.
+      if (focus) setDrawerOpen(true);
+
+      pendingReveal.current = revealTargetFor(state.code, parameter);
+      setRevealRequest((count) => count + 1);
+    },
+    [focus, state.code],
+  );
+
+  /*
+   * The reveal itself, once the render that uncovered the editor has happened.
+   *
+   * Cleared as it fires, so an unrelated render cannot repeat it. Focus lands in
+   * the editor either way: with the assignment selected when there is one, and at
+   * the caret where it was when the control's line has gone — a press that opened
+   * the editor and left focus behind would be the confusing outcome.
+   */
+  useEffect(() => {
+    if (revealRequest === 0) return;
+
+    const target = pendingReveal.current;
+    pendingReveal.current = null;
+
+    if (target === null) {
+      editorHandle.current?.focus();
+      return;
+    }
+    editorHandle.current?.revealLine(target.line, { select: { from: target.from, to: target.to } });
+  }, [revealRequest]);
+
   const handlePlayAdjustEnd = useCallback(() => {
     const drawn = state.result !== null && state.result.source === state.code;
     const arriving = state.progress !== null && state.progress.source === state.code;
@@ -1203,6 +1282,7 @@ function Workspace({
           code={state.code}
           onAdjust={handlePlayAdjust}
           onAdjustEnd={handlePlayAdjustEnd}
+          onEditApl={handleEditApl}
           onRandomise={handlePlayRandomise}
           onUndo={undo}
           undoLabel={state.past.at(-1)?.label ?? null}
@@ -1244,7 +1324,7 @@ function Workspace({
           {controlsPanel}
         </>
       ) : (
-        <details className={styles.fullWorkspace}>
+        <details className={styles.fullWorkspace} ref={fullWorkspace}>
           <summary className={styles.fullWorkspaceSummary}>Code and full controls</summary>
           {editorPanel}
           {controlsPanel}

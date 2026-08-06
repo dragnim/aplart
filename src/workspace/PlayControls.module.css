@@ -83,6 +83,92 @@
   color: var(--text-muted);
 }
 
+/*
+ * The control's own working, on request.
+ *
+ * Quiet by design: a small summary under each control, in the muted text colour,
+ * so three of them do not compete with the three sliders above them. What it
+ * reveals is not decorated either — the assignment is the point, and it is set in
+ * the editor's own typeface so it reads as the line it is.
+ */
+.peek {
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+/*
+ * Shorter than the app's usual tap target, deliberately.
+ *
+ * Three of these sit under three sliders in a column beside the artwork, and at
+ * 44px each they pushed the panel past the foot of the window — which would cost
+ * the artwork its place as the largest thing on the page to buy comfort on a
+ * secondary control. It spans the full width of the control, so the pressable area
+ * is wide, and 32px clears the 24px minimum by half again.
+ */
+.peekSummary {
+  display: flex;
+  align-items: center;
+  min-height: 2rem;
+  cursor: pointer;
+  color: var(--ui-accent-text);
+  font-weight: 600;
+}
+
+.peekBody {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md);
+}
+
+.peekLine,
+.peekDescription {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.variable,
+.assignment code {
+  font-family: var(--font-apl, var(--font-mono));
+}
+
+.assignment {
+  margin: 0;
+  /* The line may be long and must not be truncated into a different claim. */
+  overflow-x: auto;
+}
+
+.assignment code {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-dark);
+  color: var(--text-on-dark);
+  border-radius: var(--radius-sm);
+  white-space: pre;
+}
+
+.peekAction {
+  justify-self: start;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--text-xs);
+}
+
+.peekAction:hover {
+  background: var(--surface-sunken);
+}
+
+.peekAction:active {
+  transform: translateY(1px);
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

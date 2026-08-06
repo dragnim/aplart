@@ -24,12 +24,34 @@ import { useEffect, useImperativeHandle, useRef, type RefObject } from 'react';
 import { aplLanguageSupport } from './aplLanguage';
 import styles from './AplEditor.module.css';
 
+/** A span within one line, in zero-based columns, as `findAssignment` measures. */
+export interface EditorColumns {
+  readonly from: number;
+  readonly to: number;
+}
+
 export interface AplEditorHandle {
   /** Inserts text at the cursor and keeps focus, for the symbol toolbar. */
   insertAtCursor: (text: string) => void;
   focus: () => void;
   undo: () => void;
   redo: () => void;
+  /**
+   * Shows somebody a line: scrolls it into view, selects part of it, and takes
+   * focus.
+   *
+   * The selection moves and nothing else. No transaction here carries a change,
+   * so revealing a line cannot mark the artwork as edited, cannot invalidate an
+   * undo history and cannot provoke a run — which is the whole reason this is a
+   * separate method rather than a dispatch at the call site.
+   *
+   * `line` is zero-based, matching `AssignmentLocation.line`. `select` names
+   * columns within that line, so what is highlighted is the value a control
+   * writes rather than the whole line. A line the document does not have is
+   * ignored rather than clamped: it means the caller and the editor disagree
+   * about the source, and the nearest line would be the wrong one.
+   */
+  revealLine: (line: number, options?: { readonly select?: EditorColumns }) => void;
 }
 
 interface Props {
@@ -176,6 +198,35 @@ export function AplEditor({ value, onChange, onRun, ariaLabel, handleRef }: Prop
         instance.focus();
       },
       focus: () => view.current?.focus(),
+      revealLine: (line: number, options?: { readonly select?: EditorColumns }) => {
+        const instance = view.current;
+        if (instance === null) return;
+
+        // CodeMirror counts lines from one; everything else in this application
+        // counts from zero, and the conversion belongs here rather than at every
+        // call site.
+        const number = line + 1;
+        if (number < 1 || number > instance.state.doc.lines) return;
+
+        const target = instance.state.doc.line(number);
+        const columns = options?.select;
+        /*
+         * Clamped to this line rather than to the document, so a column left over
+         * from an older source cannot select into the line below. Equal ends mean
+         * a caret instead of a selection, which is what a line with no value to
+         * point at should get.
+         */
+        const from = columns === undefined ? target.from : Math.min(target.from + columns.from, target.to);
+        const to = columns === undefined ? target.from : Math.min(target.from + columns.to, target.to);
+
+        instance.dispatch({
+          selection: { anchor: from, head: to },
+          // Centred, so the line does not arrive flush against the top edge where
+          // it reads as the first line of the program.
+          effects: EditorView.scrollIntoView(from, { y: 'center' }),
+        });
+        instance.focus();
+      },
       undo: () => {
         const instance = view.current;
         if (instance !== null) undo(instance);
