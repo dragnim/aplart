@@ -61,15 +61,24 @@ test.describe('the Instant Play journey', () => {
     for (const label of ['Complexity', 'Scale', 'Detail']) {
       const from = await valueOf(page, label);
       const before = runs(stub.requests);
-
       const input = slider(page, label);
+
+      /*
+       * Whichever way has room. The seed is the gallery's own, so a control can
+       * open at either end of its Play range — and a journey that always pressed
+       * upwards would sit there failing whenever the variation happened to start
+       * at the top.
+       */
+      const max = Number(await input.getAttribute('max'));
+      const up = from < max;
+
       await input.focus();
       // Confirmed before the key is sent: under load WebKit can take a moment to
       // move focus, and a key pressed into the gap goes nowhere at all.
       await expect(input).toBeFocused();
-      await page.keyboard.press('ArrowRight');
+      await page.keyboard.press(up ? 'ArrowRight' : 'ArrowLeft');
 
-      await expect.poll(() => valueOf(page, label)).toBe(from + 1);
+      await expect.poll(() => valueOf(page, label)).toBe(up ? from + 1 : from - 1);
       await expect.poll(() => runs(stub.requests)).toBe(before + 1);
     }
     const adjusted = await settings(page);

@@ -40,6 +40,17 @@ beforeAll(() => {
     addEventListener: () => undefined,
     removeEventListener: () => undefined,
   }));
+
+  /*
+   * CodeMirror measures text, and jsdom has no layout to measure with — it has no
+   * `Range.prototype.getClientRects` at all. Revealing a line asks the editor to
+   * scroll, which starts a measure, which throws from inside CodeMirror's own
+   * asynchronous measure phase: not a failing assertion, but an unhandled error,
+   * which Vitest reports and exits non-zero for even when every test has passed.
+   */
+  const nothing = { x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 } as DOMRect;
+  Range.prototype.getClientRects = () => Object.assign([], { item: () => null }) as unknown as DOMRectList;
+  Range.prototype.getBoundingClientRect = () => nothing;
 });
 
 beforeEach(() => {
