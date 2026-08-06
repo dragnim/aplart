@@ -143,16 +143,35 @@
  * read a line of APL when it is opened, and a summary when it is not.
  */
 /*
- * The artwork takes the height, the controls take a column beside it, and the way
- * into everything else spans the foot of both.
+ * One centred row — the artwork beside its three controls — and everything
+ * technical in a row of its own beneath both.
  *
- * Beside rather than beneath, because the artwork is square: stacking the controls
- * under it either pushed them off the screen or shrank the picture to make room,
- * and neither is "the artwork is the point". This way the piece is as large as the
- * window allows and its three controls are all visible without scrolling.
+ * The tracks are sized to their contents rather than to fractions of the window.
+ * A fraction gave the artwork a track far wider than the square it draws, and the
+ * leftover became a few hundred pixels of nothing between the picture and the
+ * controls; `auto` beside a bounded column hugs the artwork instead, and
+ * `justify-content: center` puts the pair in the middle of whatever is left.
  */
 .columns[data-play='true'] {
-  grid-template-columns: minmax(0, 1fr) minmax(17rem, 20rem);
+  /*
+   * The artwork's own size, named once and used by both the track and the square
+   * inside it. Written as a track rather than left to `auto`, because the
+   * technical row below spans both columns — and a spanning item's content sizes
+   * an `auto` track, so opening the disclosure widened the artwork's column and
+   * shoved the controls three hundred pixels to the right. An explicit track
+   * cannot be moved by what is underneath it.
+   */
+  /*
+   * Thirteen rem of chrome, not twelve: the header, the artwork's toolbar and its
+   * margin measure 199px above the row, so a twelve-rem allowance left the foot of
+   * the square seven pixels below the fold.
+   */
+  --play-artwork: min(52rem, calc(100dvh - 13rem), 100%);
+
+  grid-template-columns: var(--play-artwork) minmax(22rem, 24rem);
+  justify-content: center;
+  gap: var(--space-6);
+  align-items: start;
 }
 
 .playArea {
@@ -160,54 +179,89 @@
 }
 
 /*
- * Bounded by the same height the artwork is, and scrolls if it must.
+ * Sized from its width, with the height following.
  *
- * Three controls, each able to explain itself, can outgrow a short window — and
- * the answer to that is not to shrink the artwork. The column keeps its place
- * beside the piece and takes a scrollbar on the rare screen that needs one.
- *
- * On the panel itself rather than on this wrapper: a bounded box with an
- * unbounded child inside it is still a panel running off the foot of the window,
- * however tidy the wrapper's own measurements look.
+ * `inline-size` and `aspect-ratio` rather than a height and a percentage width:
+ * a percentage height against an auto-height parent resolves to auto, which is
+ * how the square came to disagree with its own track in the first place. The
+ * three limits are the artwork's own comfortable maximum, what the window can
+ * show without scrolling, and the space actually available.
  */
-.columns[data-play='true'] .playArea > * {
-  max-height: calc(100dvh - 14rem);
-  overflow-y: auto;
+.columns[data-play='true'] .artworkPanel {
+  /*
+   * Static, unlike the ordinary workspace's sticky artwork. Sticky belongs to a
+   * layout where a long column scrolls *beside* the picture; here the technical
+   * workspace is *below* it, so pinning the artwork left it hanging over the
+   * expanded content — same paint order, later element on top, unreadable text
+   * across the pattern. The ordinary workspace keeps its sticky behaviour.
+   */
+  position: static;
+  inline-size: var(--play-artwork);
+  aspect-ratio: 1;
+  block-size: auto;
+  max-height: none;
 }
 
 /*
- * A little shorter than the ordinary workspace allows, so the whole square is
- * above the fold. The ordinary layout can afford to run past it — the column
- * beside it scrolls anyway — but a session should open with the artwork whole.
+ * Content-sized, and the page scrolls.
+ *
+ * It used to be capped to the artwork's height with its own scrollbar, which cut
+ * off Randomise, Undo, Save image and Share on any window shorter than about a
+ * thousand pixels — the four actions the surface exists for, hidden inside a
+ * panel that looked complete.
  */
-.columns[data-play='true'] .artworkPanel {
-  max-height: calc(100dvh - 14rem);
+.columns[data-play='true'] .playArea > * {
+  max-height: none;
+  overflow: visible;
 }
 
+/*
+ * The technical workspace: its own full-width row, below both, in normal flow.
+ */
 .columns[data-play='true'] .leftColumn {
-  /* Below both, and free to be as tall as its contents once it is opened. */
   grid-column: 1 / -1;
   max-height: none;
   overflow: visible;
 }
 
 /*
- * The route into everything else. A quiet summary rather than a button: it is a
- * disclosure, and the words say what is behind it.
+ * The route into everything else — a disclosure bar rather than a line of text,
+ * because it is the boundary between playing and reading.
  */
 .fullWorkspaceSummary {
   min-height: var(--tap-target);
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  padding: 0 var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 600;
   font-size: var(--text-sm);
   color: var(--ui-accent-text);
+  transition: background var(--motion-fast) var(--ease);
+}
+
+.fullWorkspaceSummary:hover {
+  background: var(--surface-sunken);
+}
+
+/*
+ * The marker is the disclosure's own; the focus ring is the application's. Both
+ * are needed: colour alone would not say which state it is in, and the global
+ * ring is what a keyboard user looks for.
+ */
+.fullWorkspaceSummary:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .fullWorkspace[open] .fullWorkspaceSummary {
   margin-bottom: var(--space-4);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .fullWorkspace {
@@ -215,6 +269,21 @@
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-5);
   min-width: 0;
+}
+
+/*
+ * Opaque, bordered and its own block once opened.
+ *
+ * The controls inside have no background of their own, so without this their text
+ * sat on whatever was behind them — which, while the artwork was pinned, was the
+ * artwork. An opaque surface is the guarantee, rather than a promise about
+ * stacking order.
+ */
+.columns[data-play='true'] .fullWorkspace[open] {
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
 }
 
 /*
@@ -377,6 +446,13 @@
   max-height: none;
   aspect-ratio: auto;
   padding: 0;
+  /*
+   * Undoes a session's square. Focus mode wants the whole window, and a session
+   * sizes the artwork with `inline-size` — which this rule did not override, so
+   * entering Focus mode from a session left the picture clamped to its
+   * side-by-side width with the rest of the screen empty.
+   */
+  inline-size: auto;
 }
 
 .page[data-focus='true'] .artworkPanel > * {
