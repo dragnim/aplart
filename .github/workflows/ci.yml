@@ -175,3 +175,14 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+        with:
+          # Thirty minutes rather than the default ten.
+          #
+          # Cancelling is what this action does when its timeout expires, so a
+          # Pages service that is merely slow has its work thrown away. Four
+          # consecutive attempts to publish one artifact were accepted, reported
+          # `deployment_in_progress` for ten minutes, and were then cancelled —
+          # while the same workflow had published an artifact of the same size in
+          # fifteen seconds the day before. The limit is about how long to wait for
+          # the service, not about anything this repository builds.
+          timeout: 1800000
