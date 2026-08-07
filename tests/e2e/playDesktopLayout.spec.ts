@@ -92,6 +92,75 @@ for (const size of SIZES) {
       expect(await gutter()).toBe(closed);
     });
 
+    test('opens on the artwork, and lets it run past the fold rather than shrink', async ({ page }) => {
+      await openSession(page, size);
+
+      const picture = await canvas(page).boundingBox();
+      const overhang = (picture?.y ?? 0) + (picture?.height ?? 0) - size.height;
+
+      /*
+       * Fully visible where it starts. The earlier rule required the whole square
+       * above the fold, and that is precisely what held the composition to
+       * two-thirds of a wide window — a square that must clear the fold is sized
+       * by the screen's shortest side, whatever width is going spare.
+       */
+      expect(picture?.y ?? 0).toBeGreaterThanOrEqual(0);
+      expect(picture?.y ?? 0).toBeLessThan(size.height * 0.35);
+
+      // Overhang is allowed, but it is a modest scroll rather than a second page.
+      expect(overhang).toBeLessThan(size.height * 0.4);
+
+      // And the artwork still leads the row it is in.
+      const panel = await playPanel(page).boundingBox();
+      expect(picture?.width ?? 0).toBeGreaterThan((panel?.width ?? 0) * 1.5);
+    });
+
+    test('uses the width it has, without overflowing it', async ({ page }) => {
+      await openSession(page, size);
+
+      const measured = await page.evaluate(() => ({
+        overflow: document.documentElement.scrollWidth > window.innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        innerWidth: window.innerWidth,
+      }));
+
+      // No horizontal scrolling, at any size: a row whose tracks outgrow their
+      // container pushes the page sideways, which is worse than a small artwork.
+      expect(measured.overflow, `${String(measured.scrollWidth)} > ${String(measured.innerWidth)}`).toBe(
+        false,
+      );
+
+      /*
+       * And the composition is not marooned in the middle of the window. The
+       * margins either side used to take a third of a 1920 screen; two thirds of
+       * the window is the floor for how much of it the piece and its controls
+       * should occupy.
+       */
+      const picture = await canvas(page).boundingBox();
+      const panel = await playPanel(page).boundingBox();
+      const composition = (panel?.x ?? 0) + (panel?.width ?? 0) - (picture?.x ?? 0);
+      expect(composition / size.width).toBeGreaterThan(0.66);
+      // Not edge to edge either — the page keeps a margin.
+      expect(composition).toBeLessThanOrEqual(size.width - 96);
+    });
+
+    test('scrolls the whole page normally, artwork and all', async ({ page }) => {
+      await openSession(page, size);
+
+      const before = await documentBox(page, 'canvas');
+      await page.evaluate(() => window.scrollBy(0, 400));
+      await page.waitForTimeout(200);
+
+      const offset = await page.evaluate(() => window.scrollY);
+      const after = await documentBox(page, 'canvas');
+
+      // The page moved, and the artwork moved with it: nothing is pinned.
+      expect(offset).toBeGreaterThan(0);
+      expect(after).toEqual(before);
+      const viewportRect = await canvas(page).boundingBox();
+      expect(viewportRect?.y ?? 0).toBeLessThan((before?.y ?? 0) - 300);
+    });
+
     test('gives the Play panel its content, with no scrollbar of its own', async ({ page }) => {
       await openSession(page, size);
 
@@ -255,9 +324,14 @@ for (const size of SIZES) {
       // that is exactly how technical text ended up painted onto the pattern.
       expect(block?.background).toMatch(/^rgb\(/u);
       expect(block?.background).not.toMatch(/rgba/u);
-      // No wider than the artwork-and-panel composition it sits beneath.
-      expect(block?.width ?? 0).toBeLessThanOrEqual(composition + 2);
-      expect(block?.width ?? 0).toBeGreaterThan(composition - 60);
+      /*
+       * The same width as the artwork-and-panel composition it sits beneath —
+       * exactly, not approximately. A tolerance of sixty pixels here hid a
+       * scrollbar gutter the Play column has no scrollbar for, which left the
+       * block eight pixels narrow and eight pixels off centre.
+       */
+      expect(block?.width ?? 0).toBeLessThanOrEqual(composition + 1);
+      expect(block?.width ?? 0).toBeGreaterThanOrEqual(composition - 1);
     });
   });
 }

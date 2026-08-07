@@ -162,11 +162,28 @@
    * cannot be moved by what is underneath it.
    */
   /*
-   * Thirteen rem of chrome, not twelve: the header, the artwork's toolbar and its
-   * margin measure 199px above the row, so a twelve-rem allowance left the foot of
-   * the square seven pixels below the fold.
+   * Width-led, with the height as a floor rather than a ceiling.
+   *
+   * Sizing the square to whatever cleared the fold meant sizing it by the
+   * *shortest* dimension of a wide screen, and the composition then used
+   * two-thirds of the window with three hundred pixels of nothing either side. A
+   * session may scroll a little; the artwork may not be small. Its three limits:
+   *
+   *   what the width allows   100vw − 46rem: the panel (24rem), the gutter
+   *                           (2rem), and 20rem of page margin either side
+   *   what the height allows  100dvh − 13rem — the header, the artwork's toolbar
+   *                           and its margin measure 199px — bounded in turn by
+   *                           100vw − 43rem, so a tall narrow window cannot size
+   *                           the square past the row it has to fit in
+   *   the cap                 60rem, so the piece stays a composition rather than
+   *                           a wall on a very large display
+   *
+   * In vw, dvh and rem, never percentages: this one value sizes both the grid
+   * track and the panel within it, and a percentage resolves against the grid
+   * container in the first and against the track in the second. Tried, and it
+   * measured as a 448px gutter.
    */
-  --play-artwork: min(52rem, calc(100dvh - 13rem), 100%);
+  --play-artwork: min(60rem, max(calc(100vw - 46rem), min(calc(100dvh - 13rem), calc(100vw - 43rem))));
 
   grid-template-columns: var(--play-artwork) minmax(22rem, 24rem);
   justify-content: center;
@@ -184,8 +201,8 @@
  * `inline-size` and `aspect-ratio` rather than a height and a percentage width:
  * a percentage height against an auto-height parent resolves to auto, which is
  * how the square came to disagree with its own track in the first place. The
- * three limits are the artwork's own comfortable maximum, what the window can
- * show without scrolling, and the space actually available.
+ * width is `--play-artwork`, so the square and its track are the same number by
+ * construction and the picture can extend below the fold without the row moving.
  */
 .columns[data-play='true'] .artworkPanel {
   /*
@@ -222,6 +239,13 @@
   grid-column: 1 / -1;
   max-height: none;
   overflow: visible;
+  /*
+   * No gutter for a scrollbar that is not there. The ordinary workspace reserves
+   * `--space-2` on the right because that column scrolls; here it does not, and
+   * the reservation left the technical block eight pixels narrower than the
+   * composition above it, and eight pixels off its centre.
+   */
+  padding-right: 0;
 }
 
 /*

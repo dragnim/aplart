@@ -109,9 +109,18 @@ test.describe('the Play workspace', () => {
     expect(canvas?.width ?? 0).toBeGreaterThan((controls?.width ?? 0) * 1.5);
     expect(controls?.x ?? 0).toBeGreaterThan((canvas?.x ?? 0) + (canvas?.width ?? 0) - 1);
 
-    // The artwork is whole in the window; the page may scroll to reach the rest.
+    /*
+     * The artwork begins fully visible and may finish below the fold.
+     *
+     * This once required the whole square above the fold, which is what kept the
+     * composition to two-thirds of a wide window: a square sized to clear the
+     * fold is a square sized by the shortest side of the screen. A session is
+     * allowed to scroll; what it is not allowed to do is open on a picture the
+     * visitor has to go looking for.
+     */
     const viewport = page.viewportSize() ?? { width: 0, height: 0 };
-    expect((canvas?.y ?? 0) + (canvas?.height ?? 0)).toBeLessThanOrEqual(viewport.height);
+    expect(canvas?.y ?? 0).toBeGreaterThanOrEqual(0);
+    expect(canvas?.y ?? 0).toBeLessThan(viewport.height * 0.35);
   });
 
   test('gives every control and action a comfortable target', async ({ page }) => {
