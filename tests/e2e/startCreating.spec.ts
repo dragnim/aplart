@@ -30,14 +30,23 @@ function runStatus(page: Page) {
  * already. Any of them is one press away, which is the point being relied on
  * here rather than asserted — `playWorkspace.spec.ts` is where it is asserted.
  */
-async function fullWorkspaceOn(page: Page, tab: 'Code' | 'Controls' = 'Code'): Promise<void> {
-  const disclosure = page.getByText('Code and full controls');
-  if ((await disclosure.count()) > 0) {
-    if (!(await page.locator('.cm-content').isVisible())) await disclosure.click();
+async function fullWorkspaceOn(page: Page, tab: 'Code' | 'Controls' | 'Colour' = 'Code'): Promise<void> {
+  /*
+   * A session divides the old "Controls" between two modes — Colour for the
+   * palette, Advanced for the parameters — while a narrow screen keeps one
+   * Controls tab and an ordinary wide workspace has everything open already. The
+   * caller says which of the two it wants; anything else is Advanced.
+   */
+  const mode = page.getByRole('tab', {
+    name: tab === 'Code' ? 'Code' : tab === 'Colour' ? 'Colour' : 'Advanced',
+    exact: true,
+  });
+  if ((await mode.count()) > 0) {
+    await mode.first().click();
     return;
   }
 
-  const tabs = page.getByRole('tab', { name: tab });
+  const tabs = page.getByRole('tab', { name: tab === 'Colour' ? 'Controls' : tab });
   if ((await tabs.count()) > 0) await tabs.click();
 }
 
@@ -53,11 +62,6 @@ async function sourceOn(page: Page): Promise<string> {
 
   await page.waitForSelector('.cm-content', { state: 'visible' });
   return page.locator('.cm-content').innerText();
-}
-
-/** Reveals the controls panel, wherever this layout keeps it. */
-async function controlsOn(page: Page): Promise<void> {
-  await fullWorkspaceOn(page, 'Controls');
 }
 
 /**
@@ -170,7 +174,7 @@ test.describe('a Start creating session', () => {
     expect(runs(stub.requests)).toBe(1);
 
     // A re-render with nothing to do with the artwork must not start another.
-    await controlsOn(page);
+    await fullWorkspaceOn(page, 'Colour');
     await page.getByRole('checkbox', { name: /Invert palette/ }).click();
     await page.waitForTimeout(300);
     expect(runs(stub.requests)).toBe(1);

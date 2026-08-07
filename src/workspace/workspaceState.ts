@@ -100,6 +100,20 @@ export interface RunInFlight {
 export interface WorkspaceSnapshot {
   readonly code: string;
   readonly seed: number | undefined;
+  /**
+   * How the artwork was drawn, not only what was calculated.
+   *
+   * Undo offers to take back "the last thing you changed", and once the palette
+   * sits in the same panel as the sliders, a visitor who recolours an artwork and
+   * presses Undo means the colour — not the Complexity they moved a minute
+   * earlier. Appearance therefore travels in the same snapshot as the source
+   * rather than in a history of its own, so one stack answers for both and the
+   * order is the order things happened.
+   *
+   * Cheap to keep: this is a handful of scalars and a palette id beside a result
+   * that is already held by reference.
+   */
+  readonly renderOptions: RenderOptions;
   readonly result: ArtworkResult | null;
   readonly warnings: readonly string[];
   readonly lastRunAt: number | null;
@@ -196,6 +210,24 @@ export type WorkspaceAction =
   | { readonly type: 'undone' }
   | { readonly type: 'cellInspected'; readonly cell: SourceCell | null }
   | { readonly type: 'renderOptionsChanged'; readonly options: Partial<RenderOptions> }
+  /**
+   * An appearance change somebody deliberately made, which Undo can take back.
+   *
+   * The same distinction `codeCommitted` draws against `codeChanged`, for the
+   * same reason: dragging a colour stop through forty shades is one decision, and
+   * only the caller knows when the drag ended. A route that has not been taught to
+   * commit still records nothing — but unlike source, appearance invalidates
+   * nothing either, because recolouring cannot make an earlier snapshot's source
+   * wrong.
+   */
+  | {
+      readonly type: 'renderOptionsCommitted';
+      readonly options: Partial<RenderOptions>;
+      /** Names the action, for Undo's accessible label. */
+      readonly label: string;
+      /** Identity of the gesture in progress, if this is part of one. */
+      readonly coalesce?: string | undefined;
+    }
   | { readonly type: 'runStarted' }
   | { readonly type: 'runProgressed'; readonly progress: RunInFlight }
   | {
@@ -211,6 +243,34 @@ export type WorkspaceAction =
   | { readonly type: 'runFailed'; readonly error: WorkspaceError }
   | { readonly type: 'runCancelled' }
   | { readonly type: 'restored'; readonly state: WorkspaceState };
+
+/**
+ * Whether two sets of render options describe the same appearance.
+ *
+ * By value rather than by reference, because every commit builds a fresh object
+ * by spreading the old one — so identity is never equal, and a palette chosen
+ * twice would otherwise cost a step of the history that takes nothing back.
+ *
+ * These options are exactly what a share link and a saved project carry, so they
+ * are plain JSON: primitives, arrays of them, and objects of them. That is the
+ * whole domain this walks.
+ */
+function sameRenderOptions(before: RenderOptions, after: RenderOptions): boolean {
+  const same = (a: unknown, b: unknown): boolean => {
+    if (Object.is(a, b)) return true;
+    if (Array.isArray(a) && Array.isArray(b)) {
+      return a.length === b.length && a.every((item, index) => same(item, b[index]));
+    }
+    if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    return [...keys].every((key) =>
+      same((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]),
+    );
+  };
+
+  return same(before, after);
+}
 
 export function initialWorkspaceState(preset: ArtworkPreset): WorkspaceState {
   return {
@@ -284,6 +344,7 @@ export function workspaceReducer(
       const snapshot: WorkspaceSnapshot = {
         code: state.code,
         seed: state.seed,
+        renderOptions: state.renderOptions,
         result: state.result,
         warnings: state.warnings,
         lastRunAt: state.lastRunAt,
@@ -325,6 +386,13 @@ export function workspaceReducer(
         ...state,
         code: previous.code,
         seed: previous.seed,
+        /*
+         * Appearance travels with the source it was seen in. A step back over a
+         * colour change restores the colour and leaves the source alone, because
+         * a colour-only snapshot holds the source unchanged — the same field
+         * restores both kinds of step without either knowing about the other.
+         */
+        renderOptions: previous.renderOptions,
         result: previous.result,
         warnings: previous.warnings,
         lastRunAt: previous.lastRunAt,
@@ -348,6 +416,43 @@ export function workspaceReducer(
           withinMatrix(previous.result.matrix, state.inspected.row, state.inspected.column)
             ? state.inspected
             : null,
+      };
+    }
+
+    case 'renderOptionsCommitted': {
+      const options = { ...state.renderOptions, ...action.options };
+
+      // Nothing changed, so there is nothing to undo back to — choosing the
+      // palette already in use should not consume a step of the history.
+      if (sameRenderOptions(state.renderOptions, options)) return state;
+
+      const current = state.past.at(-1);
+      const sameGesture = action.coalesce !== undefined && current?.coalesce === action.coalesce;
+
+      const snapshot: WorkspaceSnapshot = {
+        code: state.code,
+        seed: state.seed,
+        renderOptions: state.renderOptions,
+        result: state.result,
+        warnings: state.warnings,
+        lastRunAt: state.lastRunAt,
+        lastDurationMs: state.lastDurationMs,
+        lastRequestCount: state.lastRequestCount,
+        label: action.label,
+        ...(action.coalesce === undefined ? { coalesce: undefined } : { coalesce: action.coalesce }),
+      };
+
+      /*
+       * Recorded, but nothing else about the artwork moves.
+       *
+       * `status`, `modified` and `result` are all left exactly as they were, for
+       * the reason `renderOptionsChanged` gives below: recolouring must never
+       * imply that the source needs running again. All this adds is a step back.
+       */
+      return {
+        ...state,
+        renderOptions: options,
+        past: sameGesture ? state.past : [...state.past, snapshot].slice(-HISTORY_LIMIT),
       };
     }
 

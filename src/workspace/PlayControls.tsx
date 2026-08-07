@@ -46,32 +46,10 @@ interface Props {
   readonly onAdjustEnd: () => void;
   /** Opens the editor at this control's own line. Changes nothing. */
   readonly onEditApl: (parameter: ArtworkParameter) => void;
-  readonly onRandomise: () => void;
-  readonly onUndo: () => void;
-  /** What Undo would take back, or null when there is nothing behind you. */
-  readonly undoLabel: string | null;
-  readonly onSaveImage: () => void;
-  readonly onShare: () => void;
-  /** False before the first artwork exists, when there is nothing to save. */
-  readonly canSave: boolean;
   readonly busy: boolean;
 }
 
-export function PlayControls({
-  preset,
-  config,
-  code,
-  onAdjust,
-  onAdjustEnd,
-  onEditApl,
-  onRandomise,
-  onUndo,
-  undoLabel,
-  onSaveImage,
-  onShare,
-  canSave,
-  busy,
-}: Props) {
+export function PlayControls({ preset, config, code, onAdjust, onAdjustEnd, onEditApl, busy }: Props) {
   /*
    * Which gesture is in progress, as a number that only ever goes up.
    *
@@ -107,33 +85,6 @@ export function PlayControls({
             onEditApl={onEditApl}
           />
         ))}
-      </div>
-
-      <div className={styles.actions}>
-        <button type="button" className={styles.primary} onClick={onRandomise}>
-          Randomise
-        </button>
-        <button
-          type="button"
-          className={styles.action}
-          onClick={onUndo}
-          disabled={undoLabel === null}
-          /*
-           * "Undo" plus what it would take back, so a screen reader user knows
-           * what is behind them without having to try it. The visible word is
-           * still the first word of the name, which is what keeps voice control
-           * working.
-           */
-          aria-label={undoLabel === null ? 'Undo' : `Undo ${undoLabel}`}
-        >
-          Undo
-        </button>
-        <button type="button" className={styles.action} onClick={onSaveImage} disabled={!canSave}>
-          Save image
-        </button>
-        <button type="button" className={styles.action} onClick={onShare}>
-          Share
-        </button>
       </div>
 
       {/*

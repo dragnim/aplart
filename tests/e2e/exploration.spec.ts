@@ -321,3 +321,42 @@ test.describe('exploring on a phone', () => {
     expect(await code(page)).not.toContain('zoom←1.4');
   });
 });
+
+test.describe('the navigation cluster on the artwork', () => {
+  test('collapses out of sight, and comes back', async ({ page }) => {
+    await openMandelbrot(page);
+
+    /*
+     * The narrow layout keeps the editor and its Run button in a tab, and the
+     * artwork — with the cluster on it — in another. So the run is asked for
+     * where the button is, and the artwork is returned to before anything on it
+     * is looked at.
+     */
+    const codeTab = page.getByRole('tab', { name: 'Code' });
+    if ((await codeTab.count()) > 0) await codeTab.click();
+    await runAndWait(page);
+
+    const artworkTab = page.getByRole('tab', { name: 'Artwork' });
+    if ((await artworkTab.count()) > 0) await artworkTab.click();
+
+    const zoomIn = page.getByRole('button', { name: 'Zoom in' });
+    await expect(zoomIn).toBeVisible();
+
+    /*
+     * Asserted in a browser because only a browser applies the stylesheet. The
+     * `hidden` attribute is what takes these out of the accessibility tree, but a
+     * class setting `display` outranks it — so collapsing once left every button
+     * on screen while a test asking by role was told they had gone. What is
+     * checked here is the picture, not the tree.
+     */
+    await page.getByRole('button', { name: 'Hide navigation' }).click();
+    await expect(zoomIn).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Pan up' })).toBeHidden();
+
+    // The artwork is unobstructed, and the way back is a single press.
+    const toggle = page.getByRole('button', { name: 'Show navigation' });
+    await expect(toggle).toBeVisible();
+    await toggle.click();
+    await expect(zoomIn).toBeVisible();
+  });
+});

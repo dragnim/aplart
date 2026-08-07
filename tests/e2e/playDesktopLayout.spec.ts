@@ -5,12 +5,13 @@
  * plausible in a screenshot taken at the right window size: the artwork's track
  * was hundreds of pixels wider than the square it drew, the controls panel was
  * capped and hid its own four actions on any window shorter than about a thousand
- * pixels, and a sticky artwork hung over the expanded technical workspace so its
- * text was painted across the pattern.
+ * pixels, and a sticky artwork hung over the technical workspace so its text was
+ * painted across the pattern.
  *
- * Geometry is therefore measured rather than looked at, at three window sizes,
- * closed and expanded, and after scrolling — because the overlap only appeared
- * once the page moved.
+ * Those faults all came from the same arrangement — controls a page-length scroll
+ * below the picture they change. The controls are now beside it, in one panel of
+ * four modes, so what is measured here is that the panel and the artwork are one
+ * composition and that changing mode moves neither of them.
  */
 
 import { expect, test, type Page } from '@playwright/test';
@@ -31,9 +32,9 @@ interface Box {
   readonly height: number;
 }
 
-const playPanel = (page: Page) => page.getByRole('region', { name: 'Make it yours' });
+const panel = (page: Page) => page.locator('[data-session-panel]');
 const canvas = (page: Page) => page.locator('canvas').first();
-const summary = (page: Page) => page.getByText('Code and full controls');
+const modeTab = (page: Page, name: string) => page.getByRole('tab', { name, exact: true });
 
 async function openSession(page: Page, size: { width: number; height: number }) {
   await page.setViewportSize(size);
@@ -60,9 +61,6 @@ async function documentBox(page: Page, selector: string): Promise<Box | null> {
   }, selector);
 }
 
-const overlaps = (a: Box, b: Box) =>
-  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
-
 for (const size of SIZES) {
   test.describe(`a session at ${size.name}`, () => {
     test('sets a modest gutter between the artwork and its controls', async ({ page }) => {
@@ -70,8 +68,8 @@ for (const size of SIZES) {
 
       const gutter = async () => {
         const picture = await canvas(page).boundingBox();
-        const panel = await playPanel(page).boundingBox();
-        return (panel?.x ?? 0) - ((picture?.x ?? 0) + (picture?.width ?? 0));
+        const box = await panel(page).boundingBox();
+        return (box?.x ?? 0) - ((picture?.x ?? 0) + (picture?.width ?? 0));
       };
 
       // A gutter, not a gulf. It was 396px here when the artwork's grid track was
@@ -81,38 +79,35 @@ for (const size of SIZES) {
       expect(closed).toBeLessThanOrEqual(48);
 
       /*
-       * And unchanged with the technical row expanded. Measured in both states
-       * because the row spans both columns: while the artwork's track was `auto`,
-       * expanding it sized that track to the technical content and pushed the
-       * controls three hundred pixels sideways — a defect a closed-state
-       * measurement passed happily.
+       * And unchanged in every mode. Measured in each because the panel's content
+       * differs wildly between them — an editor in one, a dozen controls in
+       * another — and a panel whose width followed its content would move the
+       * artwork every time somebody changed tab.
        */
-      await summary(page).click();
-      await page.waitForTimeout(300);
-      expect(await gutter()).toBe(closed);
+      for (const mode of ['Colour', 'Animate', 'Advanced', 'Code']) {
+        await modeTab(page, mode).click();
+        await page.waitForTimeout(200);
+        expect(await gutter(), mode).toBe(closed);
+      }
     });
 
     test('opens on the artwork, and lets it run past the fold rather than shrink', async ({ page }) => {
       await openSession(page, size);
 
       const picture = await canvas(page).boundingBox();
-      const overhang = (picture?.y ?? 0) + (picture?.height ?? 0) - size.height;
+      const box = await panel(page).boundingBox();
 
       /*
-       * Fully visible where it starts. The earlier rule required the whole square
-       * above the fold, and that is precisely what held the composition to
-       * two-thirds of a wide window — a square that must clear the fold is sized
-       * by the screen's shortest side, whatever width is going spare.
+       * Fully visible where it starts. Requiring the whole square above the fold
+       * is what held the composition to two-thirds of a wide window — a square
+       * that must clear the fold is sized by the screen's shortest side, whatever
+       * width is going spare.
        */
       expect(picture?.y ?? 0).toBeGreaterThanOrEqual(0);
       expect(picture?.y ?? 0).toBeLessThan(size.height * 0.35);
 
-      // Overhang is allowed, but it is a modest scroll rather than a second page.
-      expect(overhang).toBeLessThan(size.height * 0.4);
-
       // And the artwork still leads the row it is in.
-      const panel = await playPanel(page).boundingBox();
-      expect(picture?.width ?? 0).toBeGreaterThan((panel?.width ?? 0) * 1.5);
+      expect(picture?.width ?? 0).toBeGreaterThan((box?.width ?? 0) * 1.5);
     });
 
     test('uses the width it has, without overflowing it', async ({ page }) => {
@@ -132,206 +127,86 @@ for (const size of SIZES) {
 
       /*
        * And the composition is not marooned in the middle of the window. The
-       * margins either side used to take a third of a 1920 screen; two thirds of
-       * the window is the floor for how much of it the piece and its controls
-       * should occupy.
+       * margins either side used to take a third of a 1920 screen; the session is
+       * laid out as an application now, so most of the width is the work.
        */
       const picture = await canvas(page).boundingBox();
-      const panel = await playPanel(page).boundingBox();
-      const composition = (panel?.x ?? 0) + (panel?.width ?? 0) - (picture?.x ?? 0);
-      expect(composition / size.width).toBeGreaterThan(0.66);
-      // Not edge to edge either — the page keeps a margin.
-      expect(composition).toBeLessThanOrEqual(size.width - 96);
+      const box = await panel(page).boundingBox();
+      const composition = (box?.x ?? 0) + (box?.width ?? 0) - (picture?.x ?? 0);
+      expect(composition / size.width).toBeGreaterThan(0.75);
+      // Not edge to edge either — the page keeps its margin.
+      expect(composition).toBeLessThanOrEqual(size.width - 48);
     });
 
-    test('scrolls the whole page normally, artwork and all', async ({ page }) => {
+    test('keeps the panel in the window, with its own content scrolling', async ({ page }) => {
+      await openSession(page, size);
+
+      const measured = await panel(page).evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const content = element.querySelector('[role="tabpanel"]:not([hidden])')?.parentElement ?? null;
+        return {
+          bottom: rect.y + rect.height,
+          tabsVisible: element.querySelector('[role="tablist"]')?.getBoundingClientRect().y ?? -1,
+          actionsBottom:
+            element.querySelector('[role="group"]')?.getBoundingClientRect().bottom ??
+            Number.MAX_SAFE_INTEGER,
+          contentScrolls: content === null ? 'none' : getComputedStyle(content).overflowY,
+        };
+      });
+
+      /*
+       * The whole panel is on screen — tab bar, current mode and the four actions
+       * — whatever the artwork is doing. The artwork may run past the fold; the
+       * controls may not, because a control you have to scroll the page to find
+       * is the fault this arrangement exists to fix.
+       */
+      expect(measured.bottom).toBeLessThanOrEqual(size.height + 1);
+      expect(measured.tabsVisible).toBeGreaterThanOrEqual(0);
+      expect(measured.actionsBottom).toBeLessThanOrEqual(size.height + 1);
+      // One scrolling region inside the panel, not several.
+      expect(measured.contentScrolls).toBe('auto');
+    });
+
+    test('changing mode moves neither the artwork nor the panel', async ({ page }) => {
       await openSession(page, size);
 
       const before = await documentBox(page, 'canvas');
-      await page.evaluate(() => window.scrollBy(0, 400));
-      await page.waitForTimeout(200);
+      const panelBefore = await panel(page).boundingBox();
 
-      const offset = await page.evaluate(() => window.scrollY);
-      const after = await documentBox(page, 'canvas');
+      for (const mode of ['Colour', 'Animate', 'Advanced', 'Code', 'Create']) {
+        await modeTab(page, mode).click();
+        await page.waitForTimeout(200);
 
-      // The page moved, and the artwork moved with it: nothing is pinned.
-      expect(offset).toBeGreaterThan(0);
-      expect(after).toEqual(before);
-      const viewportRect = await canvas(page).boundingBox();
-      expect(viewportRect?.y ?? 0).toBeLessThan((before?.y ?? 0) - 300);
-    });
-
-    test('gives the Play panel its content, with no scrollbar of its own', async ({ page }) => {
-      await openSession(page, size);
-
-      const clipped = await playPanel(page).evaluate((element) => ({
-        scrollHeight: element.scrollHeight,
-        clientHeight: element.clientHeight,
-        overflowY: getComputedStyle(element).overflowY,
-      }));
-
-      expect(clipped.scrollHeight).toBeLessThanOrEqual(clipped.clientHeight + 1);
-      expect(clipped.overflowY).not.toBe('auto');
-      expect(clipped.overflowY).not.toBe('scroll');
-    });
-
-    test('shows all four actions, inside the panel and inside the page', async ({ page }) => {
-      await openSession(page, size);
-
-      const panel = await playPanel(page).boundingBox();
-      for (const name of ['Randomise', 'Undo', 'Save image', 'Share']) {
-        const button = await playPanel(page).getByRole('button', { name, exact: true }).boundingBox();
-
-        expect(button, name).not.toBeNull();
-        expect(button?.height ?? 0, name).toBeGreaterThan(0);
-        // Within the panel's own box, which is what "not clipped" means for a
-        // panel that used to scroll internally.
-        expect((button?.y ?? 0) + (button?.height ?? 0), name).toBeLessThanOrEqual(
-          (panel?.y ?? 0) + (panel?.height ?? 0) + 1,
-        );
+        // Same element, same place: the artwork is not re-rendered by a tab.
+        expect(await documentBox(page, 'canvas'), mode).toEqual(before);
+        const now = await panel(page).boundingBox();
+        expect(now?.x, mode).toBe(panelBefore?.x);
+        expect(now?.width, mode).toBe(panelBefore?.width);
       }
     });
 
-    test('puts the disclosure below the artwork rather than over it', async ({ page }) => {
+    test('keeps the four actions available in every mode', async ({ page }) => {
       await openSession(page, size);
 
-      const picture = await documentBox(page, 'canvas');
-      const bar = await summary(page).boundingBox();
+      for (const mode of ['Create', 'Colour', 'Animate', 'Advanced', 'Code']) {
+        await modeTab(page, mode).click();
+        const actions = page.getByRole('group', { name: 'Artwork actions' });
 
-      expect(bar?.y ?? 0).toBeGreaterThanOrEqual((picture?.y ?? 0) + (picture?.height ?? 0));
-      // And it is a bar: opaque, bordered, and as wide as the composition above it.
-      const style = await summary(page).evaluate((element) => {
-        const computed = getComputedStyle(element);
-        return {
-          background: computed.backgroundColor,
-          border: computed.borderTopWidth,
-          width: element.getBoundingClientRect().width,
-        };
-      });
-      expect(style.background).not.toContain('rgba(0, 0, 0, 0)');
-      expect(Number.parseFloat(style.border)).toBeGreaterThan(0);
-      expect(style.width).toBeGreaterThan(400);
-    });
-
-    test('expanding it makes the document taller rather than layering it', async ({ page }) => {
-      await openSession(page, size);
-
-      const before = await page.evaluate(() => document.documentElement.scrollHeight);
-      await summary(page).click();
-      await page.waitForTimeout(300);
-      const after = await page.evaluate(() => document.documentElement.scrollHeight);
-
-      expect(after).toBeGreaterThan(before);
-    });
-
-    test('keeps every technical control clear of the artwork, before and after scrolling', async ({
-      page,
-    }) => {
-      await openSession(page, size);
-      await summary(page).click();
-      await page.waitForTimeout(300);
-
-      const picture = await documentBox(page, 'canvas');
-      expect(picture).not.toBeNull();
-
-      // The whole technical block first, then the individual controls inside it.
-      const editor = await documentBox(page, '.cm-editor');
-      expect(editor?.y ?? 0).toBeGreaterThanOrEqual((picture?.y ?? 0) + (picture?.height ?? 0));
-
-      const intersecting = await page.evaluate(() => {
-        const canvasRect = document.querySelector('canvas')?.getBoundingClientRect();
-        if (canvasRect === undefined) return ['no canvas'];
-
-        const area = {
-          x: canvasRect.x + window.scrollX,
-          y: canvasRect.y + window.scrollY,
-          width: canvasRect.width,
-          height: canvasRect.height,
-        };
-
-        const details = [...document.querySelectorAll('details')].find(
-          (element) => element.querySelector('summary')?.textContent === 'Code and full controls',
-        );
-        const found: string[] = [];
-
-        for (const element of details?.querySelectorAll('input, select, button, .cm-editor, h2, label') ??
-          []) {
-          const rect = element.getBoundingClientRect();
-          if (rect.width === 0 && rect.height === 0) continue;
-          const box = {
-            x: rect.x + window.scrollX,
-            y: rect.y + window.scrollY,
-            width: rect.width,
-            height: rect.height,
-          };
-          const hits =
-            box.x < area.x + area.width &&
-            area.x < box.x + box.width &&
-            box.y < area.y + area.height &&
-            area.y < box.y + box.height;
-          if (hits) {
-            found.push(
-              `${element.tagName.toLowerCase()} "${(element.textContent ?? '').trim().slice(0, 24)}"`,
-            );
-          }
+        for (const name of ['Randomise', 'Save image', 'Share']) {
+          await expect(
+            actions.getByRole('button', { name, exact: true }),
+            `${name} in ${mode}`,
+          ).toBeVisible();
         }
-        return found;
-      });
+        await expect(actions.getByRole('button', { name: /^Undo/ }), `Undo in ${mode}`).toBeVisible();
+      }
 
-      expect(intersecting, `technical controls over the artwork:\n  ${intersecting.join('\n  ')}`).toEqual(
-        [],
-      );
-
-      /*
-       * And again after scrolling, which is where a pinned artwork used to meet
-       * the expanded content. Document coordinates do not move when the page
-       * does, so a scrolled overlap is a real one.
-       */
-      await page.evaluate(() => window.scrollBy(0, 500));
-      await page.waitForTimeout(200);
-
-      const scrolledPicture = await documentBox(page, 'canvas');
-      const scrolledEditor = await documentBox(page, '.cm-editor');
-      expect(scrolledPicture).toEqual(picture);
-      expect(overlaps(scrolledPicture as Box, scrolledEditor as Box)).toBe(false);
-    });
-
-    test('reveals the technical workspace in one opaque block, no wider than the row', async ({ page }) => {
-      await openSession(page, size);
-
-      const composition = await page.evaluate(() => {
-        const canvasRect = document.querySelector('canvas')?.getBoundingClientRect();
-        const panelRect = document
-          .querySelector('section[aria-labelledby="play-heading"]')
-          ?.getBoundingClientRect();
-        if (canvasRect === undefined || panelRect === undefined) return 0;
-        return panelRect.right - canvasRect.left;
-      });
-
-      await summary(page).click();
-      await page.waitForTimeout(300);
-
-      const block = await page.evaluate(() => {
-        const details = [...document.querySelectorAll('details')].find(
-          (element) => element.querySelector('summary')?.textContent === 'Code and full controls',
-        );
-        if (details === undefined) return null;
-        const computed = getComputedStyle(details);
-        return { background: computed.backgroundColor, width: details.getBoundingClientRect().width };
-      });
-
-      // Opaque: an alpha of anything less than one lets the artwork through, and
-      // that is exactly how technical text ended up painted onto the pattern.
-      expect(block?.background).toMatch(/^rgb\(/u);
-      expect(block?.background).not.toMatch(/rgba/u);
-      /*
-       * The same width as the artwork-and-panel composition it sits beneath —
-       * exactly, not approximately. A tolerance of sixty pixels here hid a
-       * scrollbar gutter the Play column has no scrollbar for, which left the
-       * block eight pixels narrow and eight pixels off centre.
-       */
-      expect(block?.width ?? 0).toBeLessThanOrEqual(composition + 1);
-      expect(block?.width ?? 0).toBeGreaterThanOrEqual(composition - 1);
+      // Run belongs to Code, not to the session: it means "run this source".
+      await expect(
+        page.getByRole('group', { name: 'Artwork actions' }).getByRole('button', { name: /^Run/ }),
+      ).toHaveCount(0);
+      await modeTab(page, 'Code').click();
+      await expect(page.getByRole('button', { name: /^Run/ })).toBeVisible();
     });
   });
 }

@@ -18,7 +18,7 @@ import { stubTryApl } from './stubTryApl';
 /** WCAG 2.2 AA is the stated target. */
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
-async function audit(page: Page, context?: string) {
+async function audit(page: Page, context?: string, where?: string) {
   const builder = new AxeBuilder({ page }).withTags(TAGS);
   const results = await (context === undefined ? builder : builder.include(context)).analyze();
 
@@ -29,7 +29,9 @@ async function audit(page: Page, context?: string) {
         return `  [${violation.impact ?? 'unknown'}] ${violation.id}: ${violation.help}\n${nodes}`;
       })
       .join('\n');
-    throw new Error(`axe found ${results.violations.length} violation(s):\n${report}`);
+    throw new Error(
+      `axe found ${results.violations.length} violation(s)${where === undefined ? '' : ` in ${where}`}:\n${report}`,
+    );
   }
 
   expect(results.violations).toEqual([]);
@@ -202,11 +204,14 @@ test.describe('accessibility of a Play session', () => {
     await audit(page);
   });
 
-  test('has no violations with the technical workspace opened beneath it', async ({ page }) => {
+  test('has no violations in any editing mode', async ({ page }) => {
     await openSession(page);
-    await page.getByText('Code and full controls').click();
-    await page.waitForSelector('.cm-content');
-    await audit(page);
+
+    for (const mode of ['Colour', 'Advanced', 'Code']) {
+      await page.getByRole('tab', { name: mode }).click();
+      if (mode === 'Code') await page.waitForSelector('.cm-content');
+      await audit(page, undefined, mode);
+    }
   });
 
   test('has no violations in Focus mode', async ({ page }) => {

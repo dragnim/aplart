@@ -4,6 +4,19 @@
   padding: 0 var(--space-5) var(--space-7);
 }
 
+/*
+ * A session takes the window, with a margin rather than a measure.
+ *
+ * The rest of APL Art is read — a gallery, an About page, a workspace whose left
+ * column is prose and controls — and a reading measure is right for all of it. A
+ * session is used, and a picture that stops two-thirds of the way across a desk
+ * to preserve a text column is the wrong trade.
+ */
+.page[data-session='true'] {
+  max-width: none;
+  padding-inline: var(--space-6);
+}
+
 .shareNotice {
   margin-bottom: var(--space-4);
   padding: var(--space-3) var(--space-4);
@@ -162,33 +175,27 @@
    * cannot be moved by what is underneath it.
    */
   /*
-   * Width-led, with the height as a floor rather than a ceiling.
+   * The composition is capped, not the artwork.
    *
-   * Sizing the square to whatever cleared the fold meant sizing it by the
-   * *shortest* dimension of a wide screen, and the composition then used
-   * two-thirds of the window with three hundred pixels of nothing either side. A
-   * session may scroll a little; the artwork may not be small. Its three limits:
+   * Eighty rem of picture, twenty-four of panel and two of gutter: past that a
+   * very large display gets margin rather than a still larger square. Below it
+   * the window decides, and the artwork takes whatever the panel does not.
    *
-   *   what the width allows   100vw − 46rem: the panel (24rem), the gutter
-   *                           (2rem), and 20rem of page margin either side
-   *   what the height allows  100dvh − 13rem — the header, the artwork's toolbar
-   *                           and its margin measure 199px — bounded in turn by
-   *                           100vw − 43rem, so a tall narrow window cannot size
-   *                           the square past the row it has to fit in
-   *   the cap                 60rem, so the piece stays a composition rather than
-   *                           a wall on a very large display
-   *
-   * In vw, dvh and rem, never percentages: this one value sizes both the grid
-   * track and the panel within it, and a percentage resolves against the grid
-   * container in the first and against the track in the second. Tried, and it
-   * measured as a 448px gutter.
+   * `1fr` is safe here in a way it was not before, because the other track is
+   * bounded and the square below fills its track exactly. The dead gap this
+   * layout once had was a track sized to a fraction of the window with a square
+   * capped below it; there is no second number to disagree with now.
    */
-  --play-artwork: min(60rem, max(calc(100vw - 46rem), min(calc(100dvh - 13rem), calc(100vw - 43rem))));
-
-  grid-template-columns: var(--play-artwork) minmax(22rem, 24rem);
-  justify-content: center;
+  max-inline-size: calc(80rem + 24rem + var(--space-6));
+  margin-inline: auto;
+  grid-template-columns: minmax(0, 1fr) minmax(22rem, 24rem);
   gap: var(--space-6);
-  align-items: start;
+  /*
+   * Stretch, so the panel is as tall as the artwork and can divide that height
+   * between its tab bar, its scrolling content and its actions. The artwork opts
+   * out below: a square stretched to a row's height would not be square.
+   */
+  align-items: stretch;
 }
 
 .playArea {
@@ -196,24 +203,29 @@
 }
 
 /*
- * Sized from its width, with the height following.
+ * The square fills its track exactly.
  *
- * `inline-size` and `aspect-ratio` rather than a height and a percentage width:
- * a percentage height against an auto-height parent resolves to auto, which is
- * how the square came to disagree with its own track in the first place. The
- * width is `--play-artwork`, so the square and its track are the same number by
- * construction and the picture can extend below the fold without the row moving.
+ * `100%` of a bounded track with `aspect-ratio: 1`, rather than a length written
+ * out twice: the track and the picture cannot disagree when only one of them is
+ * a number. A percentage *height* against an auto-height parent would resolve to
+ * auto, which is how they came to disagree in the first place.
  */
 .columns[data-play='true'] .artworkPanel {
   /*
    * Static, unlike the ordinary workspace's sticky artwork. Sticky belongs to a
-   * layout where a long column scrolls *beside* the picture; here the technical
-   * workspace is *below* it, so pinning the artwork left it hanging over the
-   * expanded content — same paint order, later element on top, unreadable text
-   * across the pattern. The ordinary workspace keeps its sticky behaviour.
+   * layout where a long column scrolls *beside* the picture. The panel beside
+   * this one is a bounded height that scrolls within itself, so there is nothing
+   * left for the artwork to be pinned against. The ordinary workspace keeps its
+   * sticky behaviour.
    */
-  position: static;
-  inline-size: var(--play-artwork);
+  /*
+   * Relative rather than sticky: it kills the stickiness the ordinary workspace
+   * wants, and gives the navigation cluster laid over the artwork something to
+   * be positioned against.
+   */
+  position: relative;
+  align-self: start;
+  inline-size: 100%;
   aspect-ratio: 1;
   block-size: auto;
   max-height: none;
@@ -233,81 +245,19 @@
 }
 
 /*
- * The technical workspace: its own full-width row, below both, in normal flow.
+ * The session panel is the second column, and in Focus mode the same element is
+ * the drawer.
+ *
+ * One element in the tree either way, which is what keeps one editor and one
+ * palette between the two arrangements. It carries none of the ordinary
+ * workspace's column behaviour: the panel manages its own height and its own
+ * scrolling, and reserves no gutter for a scrollbar it does not have.
  */
 .columns[data-play='true'] .leftColumn {
-  grid-column: 1 / -1;
+  min-inline-size: 0;
   max-height: none;
   overflow: visible;
-  /*
-   * No gutter for a scrollbar that is not there. The ordinary workspace reserves
-   * `--space-2` on the right because that column scrolls; here it does not, and
-   * the reservation left the technical block eight pixels narrower than the
-   * composition above it, and eight pixels off its centre.
-   */
   padding-right: 0;
-}
-
-/*
- * The route into everything else — a disclosure bar rather than a line of text,
- * because it is the boundary between playing and reading.
- */
-.fullWorkspaceSummary {
-  min-height: var(--tap-target);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-4);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-weight: 600;
-  font-size: var(--text-sm);
-  color: var(--ui-accent-text);
-  transition: background var(--motion-fast) var(--ease);
-}
-
-.fullWorkspaceSummary:hover {
-  background: var(--surface-sunken);
-}
-
-/*
- * The marker is the disclosure's own; the focus ring is the application's. Both
- * are needed: colour alone would not say which state it is in, and the global
- * ring is what a keyboard user looks for.
- */
-.fullWorkspaceSummary:focus-visible {
-  outline: 3px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.fullWorkspace[open] .fullWorkspaceSummary {
-  margin-bottom: var(--space-4);
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.fullWorkspace {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-5);
-  min-width: 0;
-}
-
-/*
- * Opaque, bordered and its own block once opened.
- *
- * The controls inside have no background of their own, so without this their text
- * sat on whatever was behind them — which, while the artwork was pinned, was the
- * artwork. An opaque surface is the guarantee, rather than a promise about
- * stacking order.
- */
-.columns[data-play='true'] .fullWorkspace[open] {
-  padding: var(--space-5);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
 }
 
 /*

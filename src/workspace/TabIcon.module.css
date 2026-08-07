@@ -1,0 +1,19 @@
+/*
+ * The icon itself is sized here rather than in the file.
+ *
+ * Each asset declares width and height of 28 on a 24-unit viewBox; overriding
+ * both to 100% of this box lets one rule size all four, and keeps the tab's own
+ * target size a decision of the tab rather than of the artwork.
+ */
+.icon {
+  display: inline-flex;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  /* Nothing to select or drag: the button is the control, not the picture. */
+  pointer-events: none;
+}
+
+.icon svg {
+  inline-size: 100%;
+  block-size: 100%;
+}

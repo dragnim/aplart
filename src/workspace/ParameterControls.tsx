@@ -21,14 +21,34 @@ interface Props {
   readonly onRestore: (parameter: ArtworkParameter) => void;
   /** Derived from the source that ran, or null before a first run. */
   readonly edges: EdgeClaim | null;
+  /**
+   * A change somebody has finished making.
+   *
+   * Absent in the ordinary workspace, where a technical control writes the code
+   * and Run draws it — the deliberate two-step that surface has always had. A
+   * session passes it, and the artwork redraws when a control is let go, chosen
+   * or ticked: within one panel, "the sliders draw and these do not" is a
+   * distinction nobody asked for and everybody trips over.
+   *
+   * A slider raises this on release rather than on every step, which is exactly
+   * what the Play sliders do and for the same reason: forty pictures nobody
+   * looked at is forty requests to a public service.
+   */
+  readonly onCommit?: (() => void) | undefined;
 }
 
-export function ParameterControls({ parameters, code, onChange, onRestore, edges }: Props) {
+export function ParameterControls({ parameters, code, onChange, onRestore, edges, onCommit }: Props) {
   return (
     <div className={styles.list}>
       {parameters.map((parameter) => (
         <Fragment key={parameter.id}>
-          <ParameterControl parameter={parameter} code={code} onChange={onChange} onRestore={onRestore} />
+          <ParameterControl
+            parameter={parameter}
+            code={code}
+            onChange={onChange}
+            onRestore={onRestore}
+            onCommit={onCommit}
+          />
           {/*
             Beside the control that decides it, so the claim and the setting it
             depends on are read together.
@@ -63,12 +83,23 @@ function ParameterControl({
   code,
   onChange,
   onRestore,
+  onCommit,
 }: {
   readonly parameter: ArtworkParameter;
   readonly code: string;
   readonly onChange: (parameter: ArtworkParameter, value: ParameterValue) => void;
   readonly onRestore: (parameter: ArtworkParameter) => void;
+  readonly onCommit?: (() => void) | undefined;
 }) {
+  /*
+   * Every way a drag can finish. The pointer is captured by the range input, so
+   * a release outside it still arrives here; a key let go ends a keyboard
+   * adjustment, and losing focus ends one that was never let go.
+   */
+  const release =
+    onCommit === undefined
+      ? {}
+      : { onPointerUp: onCommit, onKeyUp: onCommit, onBlur: onCommit, onTouchEnd: onCommit };
   const binding = bindingStateFor(code, parameter);
   const controlId = `parameter-${parameter.id}`;
   const describedBy = parameter.description === undefined ? undefined : `${controlId}-description`;
@@ -138,6 +169,7 @@ function ParameterControl({
             onChange={(event) =>
               onChange(parameter, fromSliderPosition(Number(event.target.value), min, max))
             }
+            {...release}
           />
         ) : (
           <input
@@ -150,6 +182,7 @@ function ParameterControl({
             value={numeric}
             aria-describedby={describedBy}
             onChange={(event) => onChange(parameter, Number(event.target.value))}
+            {...release}
           />
         ))}
 
@@ -163,7 +196,10 @@ function ParameterControl({
             const chosen = (parameter.options ?? []).find(
               (option) => String(option.value) === event.target.value,
             );
-            if (chosen !== undefined) onChange(parameter, chosen.value);
+            if (chosen === undefined) return;
+            onChange(parameter, chosen.value);
+            // Choosing is the whole gesture: there is no release to wait for.
+            onCommit?.();
           }}
         >
           {(parameter.options ?? []).map((option) => (
@@ -181,7 +217,11 @@ function ParameterControl({
             type="checkbox"
             checked={value === true}
             aria-describedby={describedBy}
-            onChange={(event) => onChange(parameter, event.target.checked)}
+            onChange={(event) => {
+              onChange(parameter, event.target.checked);
+              // As with a select: ticking is the decision, not a step towards one.
+              onCommit?.();
+            }}
           />
           <span>{value === true ? 'On' : 'Off'}</span>
         </label>

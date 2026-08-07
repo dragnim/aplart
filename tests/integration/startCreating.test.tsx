@@ -9,7 +9,7 @@
  * they actually made.
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GalleryPage } from '@/gallery/GalleryPage';
@@ -68,7 +68,13 @@ function serviceReturning(size = 8) {
   return service;
 }
 
-const source = () => screen.getByRole('textbox', { name: /APL/i }).textContent ?? '';
+/*
+ * From the document rather than through a role query: in a session the editor
+ * lives in the Code tab, and every panel but the one on show is hidden and so
+ * absent from the accessibility tree. The source is the same either way, which
+ * is the point of there being one of it.
+ */
+const source = () => document.querySelector('.cm-content')?.textContent ?? '';
 
 /**
  * A program as the editor renders it.
@@ -214,7 +220,12 @@ describe('arriving from Start creating', () => {
      * Appearance only, and twice, but each press re-renders the whole workspace —
      * which is exactly the moment a variation chosen during render rather than
      * from the seed would become a different one.
+     *
+     * Inverting lives in the Colour mode now, so the mode is chosen first: the
+     * point of the test is what re-rendering does to the seed, and a session
+     * offers this control one press away rather than in a column of its own.
      */
+    fireEvent.click(screen.getByRole('tab', { name: 'Colour' }));
     const invert = screen.getByRole('checkbox', { name: /Invert palette/ });
     await user.click(invert);
     await user.click(invert);

@@ -318,11 +318,18 @@ describe('exploring the plane', () => {
       return { user, service };
     }
 
-    it('says so, and disables the view controls', async () => {
+    it('says so, and withdraws the view controls', async () => {
       await openWithExpressionSpan();
 
-      expect(screen.getByRole('button', { name: 'Zoom out' })).toBeDisabled();
-      expect(screen.getByText(/available while the view lines are plain numbers/)).toBeInTheDocument();
+      /*
+       * The navigation cluster on the artwork explains itself rather than
+       * offering buttons that would overwrite somebody's expression. It stays put
+       * — vanishing mid-session would be its own kind of surprise — and says
+       * where the lines it needs have gone.
+       */
+      expect(screen.queryByRole('button', { name: 'Zoom out' })).toBeNull();
+      expect(screen.getByText(/no longer says where the view is/)).toBeInTheDocument();
+      expect(screen.getByText(/the artwork’s navigation cannot move them/)).toBeInTheDocument();
     });
 
     it('does not overwrite the expression when the artwork is dragged', async () => {

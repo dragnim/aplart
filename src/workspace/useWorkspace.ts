@@ -44,6 +44,19 @@ export interface CodeCommit {
   readonly seed?: number | undefined;
 }
 
+/**
+ * What a committed appearance change was, for the history it creates.
+ *
+ * `CodeCommit` without the seed: a palette does not produce a variation, so
+ * there is nothing for a seed to identify.
+ */
+export interface RenderCommit {
+  /** Names the action, for Undo's accessible label. */
+  readonly label: string;
+  /** The gesture this change belongs to, if any. */
+  readonly coalesce?: string | undefined;
+}
+
 export interface Workspace {
   readonly state: WorkspaceState;
   readonly setCode: (code: string) => void;
@@ -52,6 +65,8 @@ export interface Workspace {
   /** Steps back to the source, seed and artwork before the last commit. */
   readonly undo: () => void;
   readonly setRenderOptions: (options: Partial<RenderOptions>) => void;
+  /** As `setRenderOptions`, but recorded so that Undo can take it back. */
+  readonly commitRenderOptions: (options: Partial<RenderOptions>, commit: RenderCommit) => void;
   readonly run: () => void;
   /**
    * Runs code that has only just been decided on.
@@ -237,9 +252,33 @@ export function useWorkspace({ preset, service, initialState }: UseWorkspaceOpti
     dispatch({ type: 'renderOptionsChanged', options });
   }, []);
 
+  /**
+   * An appearance change Undo can take back.
+   *
+   * The counterpart of `commitCode` for the way an artwork is drawn, and the same
+   * bargain: routes that have not been taught to commit still record nothing.
+   * Nothing is cancelled here, unlike `undo` — recolouring does not disturb a run,
+   * because it never asked for one.
+   */
+  const commitRenderOptions = useCallback((options: Partial<RenderOptions>, commit: RenderCommit) => {
+    dispatch({ type: 'renderOptionsCommitted', options, ...commit });
+  }, []);
+
   const restore = useCallback((restored: WorkspaceState) => {
     dispatch({ type: 'restored', state: restored });
   }, []);
 
-  return { state, setCode, commitCode, undo, setRenderOptions, run, runCode, stop, restore, inspectCell };
+  return {
+    state,
+    setCode,
+    commitCode,
+    undo,
+    setRenderOptions,
+    commitRenderOptions,
+    run,
+    runCode,
+    stop,
+    restore,
+    inspectCell,
+  };
 }

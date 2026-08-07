@@ -40,7 +40,7 @@ import { edgeClaimFor } from './edgeClaim';
 import { buildArtworkImage } from '@/renderer/CanvasRenderer';
 import { DIAGNOSTIC_PALETTE, checkEdgeRendering, checkEdgeValues } from '@/renderer/edgeCheck';
 import { DEFAULT_TILING, isRepeating } from '@/renderer/tiling';
-import { defaultRenderOptions, transformMatrix } from '@/renderer/renderOptions';
+import { defaultRenderOptions, transformMatrix, type RenderOptions } from '@/renderer/renderOptions';
 import { decodeShareState, toRenderOptions } from '@/sharing/decodeShareState';
 import { numberAssignedTo } from '@/editor/parameterBinding';
 import { ParameterControls } from './ParameterControls';
@@ -54,7 +54,12 @@ import { readPlaySeed, startCreating } from './startCreating';
 import { generateInstantPlayVariation } from './instantPlayVariation';
 import { randomSeed } from './randomise';
 import { playLabelFor } from '@/presets/instantPlay';
+import { AnimationControls } from './AnimationControls';
+import { ArtworkNavigator } from './ArtworkNavigator';
 import { PlayControls } from './PlayControls';
+import { SessionActions } from './SessionActions';
+import { SessionPanel } from './SessionPanel';
+import { type EditorTab } from './editorTabs';
 import { revealTargetFor, type RevealTarget } from './peek';
 import { readSavedProjectImmediate, useLocalProject } from './useLocalProject';
 import { FocusToolbar } from './FocusToolbar';
@@ -257,7 +262,18 @@ function Workspace({
     ...(service === undefined ? {} : { service }),
     ...(initialState === undefined ? {} : { initialState }),
   });
-  const { state, setCode, commitCode, undo, setRenderOptions, run, runCode, stop, inspectCell } = workspace;
+  const {
+    state,
+    setCode,
+    commitCode,
+    undo,
+    setRenderOptions,
+    commitRenderOptions,
+    run,
+    runCode,
+    stop,
+    inspectCell,
+  } = workspace;
 
   /**
    * The last source Play asked the service for.
@@ -325,6 +341,13 @@ function Workspace({
   const editorHandle = useRef<AplEditorHandle>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [tab, setTab] = useState<MobileTab>('artwork');
+  /*
+   * Which editing mode a session is in. Presentation and nothing else: no run,
+   * no history entry, no address change, and the artwork does not know about it.
+   * Create, because arriving somewhere you can immediately change something is
+   * the point of a session.
+   */
+  const [editorTab, setEditorTab] = useState<EditorTab>('create');
   const wide = useMediaQuery(WIDE_LAYOUT_QUERY);
   const [confirmingReset, setConfirmingReset] = useState(false);
   /*
@@ -346,18 +369,6 @@ function Workspace({
    * card is the ordinary way in and stays exactly that.
    */
   const playConfig = session === null ? undefined : preset.instantPlay;
-
-  /*
-   * The technical workspace's disclosure, held rather than controlled.
-   *
-   * Two things open it: the summary somebody presses, and "Edit the APL". A React
-   * `open` prop cannot serve both — the element's toggle event is queued rather
-   * than dispatched, so React restores the prop it last rendered before the event
-   * arrives and the disclosure never opens at all. Left native and opened through
-   * the ref, pressing the summary behaves exactly as a disclosure does and this is
-   * only a second way to the same state.
-   */
-  const fullWorkspace = useRef<HTMLDetailsElement>(null);
 
   /**
    * A line the editor should be shown, once it is on screen to be shown it.
@@ -615,12 +626,36 @@ function Workspace({
         ? 'This artwork was shared with you. Press Run to draw it.'
         : `This shared link could not be opened: ${shared.reason}.`;
 
+  /**
+   * A technical control's new value.
+   *
+   * In a session this is recorded rather than merely written, and the artwork is
+   * redrawn when the control is let go — the same commit-and-draw path the Create
+   * sliders take, so both panels make one kind of history and neither has an
+   * execution model of its own. `advancedGesture` gives a drag its identity, so
+   * twenty steps of one slider remain one thing to undo.
+   *
+   * The ordinary workspace keeps writing and waiting for Run, which is the
+   * deliberate two-step that surface has always had.
+   */
+  const advancedGesture = useRef(0);
+
   const handleParameterChange = useCallback(
     (parameter: ArtworkParameter, value: ParameterValue) => {
       const updated = setParameterValue(state.code, parameter.variable, value);
-      if (updated.ok) setCode(updated.code);
+      if (!updated.ok) return;
+
+      if (playConfig === undefined) {
+        setCode(updated.code);
+        return;
+      }
+
+      commitCode(updated.code, {
+        label: parameter.label,
+        coalesce: `advanced:${parameter.id}:${String(advancedGesture.current)}`,
+      });
     },
-    [state.code, setCode],
+    [state.code, setCode, commitCode, playConfig],
   );
 
   const handleParameterRestore = useCallback(
@@ -628,6 +663,48 @@ function Workspace({
       setCode(restoreControlLine(state.code, parameter.variable, parameter.defaultValue));
     },
     [state.code, setCode],
+  );
+
+  /**
+   * An appearance change, named so Undo can say what it would take back.
+   *
+   * In a session this is recorded: Undo is one button and a visitor who has just
+   * recoloured an artwork means the colour by it, not the slider they moved
+   * before that. Elsewhere appearance stays outside the history, as it always
+   * has — the ordinary workspace's Undo does not exist to be surprised by.
+   *
+   * Dragging a colour stop coalesces, for the reason a dragged slider does: the
+   * drag is one decision expressed forty times. Choosing a palette does not, so
+   * two choices are two steps back.
+   */
+  const handleRenderChange = useCallback(
+    (options: Partial<RenderOptions>) => {
+      if (playConfig === undefined) {
+        setRenderOptions(options);
+        return;
+      }
+
+      const [key] = Object.keys(options);
+      const named: Record<string, string> = {
+        paletteId: 'Palette',
+        customStops: 'Colours',
+        invert: 'Invert',
+        colouring: 'Colouring',
+        rotation: 'Rotation',
+        mirrorHorizontally: 'Mirror',
+        mirrorVertically: 'Mirror',
+        smoothScaling: 'Display',
+        tiling: 'Tiling',
+      };
+
+      const continuous = key === 'customStops' || key === 'colouring';
+
+      commitRenderOptions(options, {
+        label: named[key ?? ''] ?? 'Appearance',
+        ...(continuous ? { coalesce: `colour:${key ?? ''}` } : {}),
+      });
+    },
+    [playConfig, setRenderOptions, commitRenderOptions],
   );
 
   const handleResetCode = useCallback(() => {
@@ -764,7 +841,7 @@ function Workspace({
   const [viewHistory, setViewHistory] = useState<readonly Viewport[]>([]);
 
   const applyViewport = useCallback(
-    (next: Viewport, options: { readonly remember: boolean }) => {
+    (next: Viewport, options: { readonly remember: boolean; readonly label?: string }) => {
       if (exploration === undefined || viewport === null) return;
       if (sameViewport(next, viewport)) return;
 
@@ -775,17 +852,32 @@ function Workspace({
       }
 
       const updated = writeViewport(state.code, exploration, next);
-      setCode(updated);
+
+      /*
+       * Recorded, so the one Undo answers for a zoom as it does for a slider:
+       * moving the view is a change to the artwork somebody can see, and an Undo
+       * that skipped over it would be lying about what it takes back.
+       *
+       * Recorded everywhere rather than only in a session. No preset today offers
+       * both a plane to explore and a session — the five fractals are opened from
+       * their cards — so gating this would be writing a rule that never runs and
+       * would quietly not hold the day a fractal gains one. The ordinary
+       * workspace shows no Undo, so recording there costs a snapshot nobody
+       * reads; it used to *clear* the history instead, which is the behaviour
+       * that would have been wrong later.
+       */
+      commitCode(updated, { label: options.label ?? 'View' });
+
       // Run the code that was just written, not whatever the ref still holds.
       runCode(updated);
     },
-    [exploration, viewport, state.code, setCode, runCode],
+    [exploration, viewport, state.code, commitCode, runCode],
   );
 
   const handleSelectRegion = useCallback(
     (rect: SourceRect) => {
       if (viewport === null || bounds === null) return;
-      applyViewport(selectionToViewport(viewport, rect, bounds), { remember: true });
+      applyViewport(selectionToViewport(viewport, rect, bounds), { remember: true, label: 'Zoom' });
     },
     [viewport, bounds, applyViewport],
   );
@@ -793,7 +885,7 @@ function Workspace({
   const handleZoom = useCallback(
     (factor: number) => {
       if (viewport === null || bounds === null) return;
-      applyViewport(scaleViewport(viewport, factor, bounds), { remember: true });
+      applyViewport(scaleViewport(viewport, factor, bounds), { remember: true, label: 'Zoom' });
     },
     [viewport, bounds, applyViewport],
   );
@@ -801,19 +893,57 @@ function Workspace({
   const handlePan = useCallback(
     (across: number, down: number) => {
       if (viewport === null || bounds === null) return;
-      applyViewport(panViewport(viewport, across, down, bounds), { remember: true });
+      applyViewport(panViewport(viewport, across, down, bounds), { remember: true, label: 'Pan' });
     },
     [viewport, bounds, applyViewport],
   );
 
+  /**
+   * The views actually behind this one.
+   *
+   * Two histories answer two different questions — Undo takes back the last
+   * change of any kind, Back walks the places you have looked — and they meet
+   * when a global Undo lands on a view that Back was also offering. A stack that
+   * still counted that view would offer a step to where you already are, and
+   * pressing it would appear to do nothing, because a viewport is never applied
+   * on top of itself.
+   *
+   * Derived rather than reconciled: any trailing entries equal to the current
+   * view are simply not behind you, however you came to be standing on them. The
+   * two mechanisms stay separate, and this is the one place they could disagree.
+   */
+  const viewsBehind = useMemo(() => {
+    /*
+     * Against the view the *code* asks for, not the one on screen.
+     *
+     * `viewport` follows the drawn artwork, which is right for mapping a drag
+     * onto the plane and wrong for this: while a zoom is still being calculated
+     * the picture is the old one, so a stack compared against it would decide the
+     * view it had just left was where you already are — and Back would grey out
+     * for the length of the run.
+     */
+    const asked = exploration === undefined ? null : readViewport(state.code, exploration);
+    if (asked === null) return viewHistory;
+
+    let end = viewHistory.length;
+    while (end > 0) {
+      const candidate = viewHistory[end - 1];
+      if (candidate === undefined || !sameViewport(candidate, asked)) break;
+      end -= 1;
+    }
+    return end === viewHistory.length ? viewHistory : viewHistory.slice(0, end);
+  }, [viewHistory, exploration, state.code]);
+
   const handleBack = useCallback(() => {
-    const previous = viewHistory.at(-1);
+    const previous = viewsBehind.at(-1);
     if (previous === undefined) return;
-    setViewHistory((history) => history.slice(0, -1));
+    // Written from what is actually behind you, so a stale top left by an Undo is
+    // dropped here rather than lingering as a step that goes nowhere.
+    setViewHistory(viewsBehind.slice(0, -1));
     // Not remembered: stepping back and forth would otherwise fill the history
     // with the same two views.
-    applyViewport(previous, { remember: false });
-  }, [viewHistory, applyViewport]);
+    applyViewport(previous, { remember: false, label: 'Back' });
+  }, [viewsBehind, applyViewport]);
 
   /*
    * Inspecting a cell.
@@ -1000,9 +1130,9 @@ function Workspace({
    */
   const handleEditApl = useCallback(
     (parameter: ArtworkParameter) => {
-      if (fullWorkspace.current !== null) fullWorkspace.current.open = true;
-      // The narrow layout keeps the editor in a tab; harmless on a wide one,
-      // which does not render tabs at all.
+      // Both layouts keep the editor behind a tab now: the session panel's Code
+      // mode on a wide screen, the sheet's Code tab on a narrow one.
+      setEditorTab('code');
       setTab('code');
       // In Focus mode the drawer is where the editor lives. Opening it is the
       // existing way to work on the code there, and it keeps one editor rather
@@ -1054,6 +1184,18 @@ function Workspace({
     drawPlay(state.code);
   }, [state.result, state.progress, state.code, drawPlay]);
 
+  /**
+   * A technical control let go, chosen or ticked: draw what it wrote.
+   *
+   * The same ending as a Play slider's, through the same guarded draw — a control
+   * in the Advanced tab and a control in the Create tab are two ways of writing
+   * the same assignment, so they finish the same way.
+   */
+  const handleParameterCommit = useCallback(() => {
+    advancedGesture.current += 1;
+    handlePlayAdjustEnd();
+  }, [handlePlayAdjustEnd]);
+
   const editorPanel = (
     <div className={styles.editorPanel}>
       <div className={styles.editorWrapper}>
@@ -1090,132 +1232,96 @@ function Workspace({
    * the APL" and "changes only the picture" is visible at a glance — that
    * distinction is one of the things this application is trying to teach.
    */
-  const controlsPanel = (
-    <div className={styles.controlsPanel}>
-      <section aria-labelledby="code-controls-heading">
-        <h2 className={styles.sectionHeading} id="code-controls-heading">
-          Code controls
-        </h2>
-        <p className={styles.sectionNote}>These change the APL and need a run.</p>
-        <ParameterControls
-          parameters={preset.parameters}
-          code={state.code}
-          onChange={handleParameterChange}
-          onRestore={handleParameterRestore}
-          /*
-           * From the source that produced the artwork, not the editor. Editing
-           * the class count changes what the next run will be able to say and
-           * nothing about the one on screen.
-           */
-          edges={edgeClaim}
-        />
-        <div className={styles.parameterActions}>
-          <button type="button" className={styles.secondary} onClick={handleRandomise}>
-            Randomise
-          </button>
-          <button type="button" className={styles.secondary} onClick={handleResetParameters}>
-            Reset parameters
-          </button>
-        </div>
-
-        {/*
-          The plane controls sit inside Code controls rather than in a section of
-          their own, because that is exactly what they are: another way of
-          setting the same three assignments the sliders above set. Separating
-          them would suggest the artwork has a camera as well as a formula.
-
-          They are also the keyboard route to everything the drag does. The
-          sliders set the centre and the span directly; these step the view in
-          and out without needing a pointer at all.
-        */}
-        {exploration !== undefined && (
-          <div className={styles.viewActions}>
-            <p className={styles.viewHint}>
-              {viewport === null
-                ? 'Drag a region on the artwork to zoom into it — available while the view lines are plain numbers.'
-                : 'Drag a region on the artwork to zoom into it. The centre and span above are rewritten, and the code is run again.'}
-            </p>
-            {/*
-              Zoom and pan in steps, which is the same view change the drag
-              makes and the only one available without a pointer. Each step is a
-              fraction of the current span rather than a fixed amount: no single
-              fixed step works across a seven-hundredfold range of zoom.
-            */}
-            <div className={styles.parameterActions}>
-              <button
-                type="button"
-                className={styles.secondary}
-                onClick={() => handleZoom(0.5)}
-                disabled={viewport === null}
-              >
-                Zoom in
-              </button>
-              <button
-                type="button"
-                className={styles.secondary}
-                onClick={() => handleZoom(2)}
-                disabled={viewport === null}
-              >
-                Zoom out
-              </button>
-              <button
-                type="button"
-                className={styles.secondary}
-                onClick={handleBack}
-                disabled={viewHistory.length === 0}
-              >
-                Back{viewHistory.length > 0 ? ` (${String(viewHistory.length)})` : ''}
-              </button>
-            </div>
-
-            <div className={styles.parameterActions}>
-              {(
-                [
-                  ['Pan left', -0.5, 0],
-                  ['Pan right', 0.5, 0],
-                  ['Pan up', 0, -0.5],
-                  ['Pan down', 0, 0.5],
-                ] as const
-              ).map(([label, across, down]) => (
-                <button
-                  key={label}
-                  type="button"
-                  className={styles.secondary}
-                  onClick={() => handlePan(across, down)}
-                  disabled={viewport === null}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </section>
-
-      <section aria-labelledby="appearance-heading">
-        <h2 className={styles.sectionHeading} id="appearance-heading">
-          Appearance
-        </h2>
-        <p className={styles.sectionNote}>These change only how the result is drawn.</p>
-        <RenderControls
-          options={state.renderOptions}
-          availablePaletteIds={preset.availablePaletteIds}
-          onChange={setRenderOptions}
-          animation={animation}
-          onAnimationChange={setAnimation}
-          onAnimationReset={resetAnimation}
-          reducedMotion={reducedMotion}
-          escape={shownEscape}
-          edges={edges}
-          cells={preset.renderMode !== 'tiles'}
-        />
-      </section>
+  const codeControlsSection = (
+    <section aria-labelledby="code-controls-heading">
+      <h2 className={styles.sectionHeading} id="code-controls-heading">
+        Code controls
+      </h2>
+      <p className={styles.sectionNote}>
+        {playConfig === undefined
+          ? 'These change the APL and need a run.'
+          : 'These change the APL. The artwork redraws when you let go.'}
+      </p>
+      <ParameterControls
+        parameters={preset.parameters}
+        code={state.code}
+        onChange={handleParameterChange}
+        onRestore={handleParameterRestore}
+        // A session draws what a control writes; the ordinary workspace waits
+        // for Run, as it always has.
+        onCommit={playConfig === undefined ? undefined : handleParameterCommit}
+        /*
+         * From the source that produced the artwork, not the editor. Editing
+         * the class count changes what the next run will be able to say and
+         * nothing about the one on screen.
+         */
+        edges={edgeClaim}
+      />
+      <div className={styles.parameterActions}>
+        <button type="button" className={styles.secondary} onClick={handleRandomise}>
+          Randomise
+        </button>
+        <button type="button" className={styles.secondary} onClick={handleResetParameters}>
+          Reset parameters
+        </button>
+      </div>
 
       {/*
-        The other way to choose a cell. Pressing the artwork is quicker and needs
-        a pointer; this needs neither, and it is in the controls panel so that
-        Focus mode gets it too — the drawer holds the same panel.
+        The precise numbers stay here; moving about the plane happens on the
+        artwork. The sliders above set the centre and the span exactly, which is
+        a different act from looking around — and a control that steers a picture
+        belongs on the picture, not a panel away from it.
       */}
+      {exploration !== undefined && (
+        <p className={styles.viewHint}>
+          {viewport === null
+            ? 'The view lines are no longer plain numbers, so the artwork’s navigation cannot move them.'
+            : 'Pan, zoom and drag-to-zoom on the artwork rewrite the centre and span above.'}
+        </p>
+      )}
+    </section>
+  );
+
+  /**
+   * Appearance, in whole or in half.
+   *
+   * A session asks about colour in one tab and about shape in another, so this
+   * takes the half to render. One component either way, over one set of render
+   * options: the tabs are two views of the same state, never two copies of it.
+   */
+  const appearanceSection = (section: 'colour' | 'form' | 'both') => (
+    <section aria-labelledby={`appearance-heading-${section}`}>
+      <h2 className={styles.sectionHeading} id={`appearance-heading-${section}`}>
+        {section === 'colour' ? 'Colour' : section === 'form' ? 'Appearance' : 'Appearance'}
+      </h2>
+      <p className={styles.sectionNote}>
+        {section === 'colour'
+          ? 'These change the colours only. The artwork redraws as you choose.'
+          : 'These change only how the result is drawn.'}
+      </p>
+      <RenderControls
+        section={section}
+        options={state.renderOptions}
+        availablePaletteIds={preset.availablePaletteIds}
+        onChange={handleRenderChange}
+        animation={animation}
+        onAnimationChange={setAnimation}
+        onAnimationReset={resetAnimation}
+        reducedMotion={reducedMotion}
+        escape={shownEscape}
+        edges={edges}
+        cells={preset.renderMode !== 'tiles'}
+      />
+    </section>
+  );
+
+  /*
+    The other way to choose a cell. Pressing the artwork is quicker and needs
+    a pointer; this needs neither, and it is in the controls panel so that
+    Focus mode gets it too — the drawer holds the same panel.
+  */
+  const inspectSection = (
+    <>
       {state.result !== null && (
         <section aria-labelledby="inspect-heading">
           <h2 className={styles.sectionHeading} id="inspect-heading">
@@ -1232,15 +1338,99 @@ function Workspace({
           />
         </section>
       )}
+    </>
+  );
 
+  const readingSection = (
+    <>
       <TryChangingThis
         prompts={preset.tryChangingThis ?? []}
         openByDefault={preset.difficulty === 'beginner'}
       />
-
       <PrimitivePanel primitives={preset.primitives} />
+    </>
+  );
+
+  /**
+   * The ordinary workspace's one long column, exactly as it has always been.
+   *
+   * Built only when this is not a session, so the nodes below can hold the same
+   * components without either arrangement mounting a second copy of anything.
+   */
+  const controlsPanel =
+    playConfig !== undefined ? null : (
+      <div className={styles.controlsPanel}>
+        {codeControlsSection}
+        {appearanceSection('both')}
+        {inspectSection}
+        {readingSection}
+      </div>
+    );
+
+  /* ── A session's editing modes ───────────────────────────────────────────
+   *
+   * The same components as the column above, dealt into separate hands. Each is
+   * built once and given to whichever layout is rendering — wide, narrow or
+   * Focus — and since those are alternatives, nothing here is ever mounted
+   * twice. That is what keeps one editor, one palette and one set of parameter
+   * controls over one piece of state.
+   */
+  const colourPanel = <div className={styles.controlsPanel}>{appearanceSection('colour')}</div>;
+
+  /**
+   * Movement, as a mode of its own.
+   *
+   * The same `AnimationControls` the ordinary workspace keeps beside its palette.
+   * Making an artwork move is a creative decision rather than a detail of how it
+   * is coloured, and every artwork can do it — the animation moves the palette,
+   * and every artwork has one — so this mode is always offered.
+   */
+  const animatePanel = (
+    <div className={styles.controlsPanel}>
+      <section aria-labelledby="animate-heading">
+        <h2 className={styles.sectionHeading} id="animate-heading">
+          Animate
+        </h2>
+        <p className={styles.sectionNote}>
+          Movement is something done to the artwork, not part of it. Nothing here is saved or exported, and
+          pausing puts the palette back.
+        </p>
+        <AnimationControls
+          settings={animation}
+          onChange={setAnimation}
+          onReset={resetAnimation}
+          reducedMotion={reducedMotion}
+        />
+      </section>
     </div>
   );
+
+  const advancedPanel = (
+    <div className={styles.controlsPanel}>
+      {codeControlsSection}
+      {appearanceSection('form')}
+      {inspectSection}
+    </div>
+  );
+
+  const codePanel = (
+    <div className={styles.controlsPanel}>
+      {editorPanel}
+      {readingSection}
+    </div>
+  );
+
+  const sessionActions =
+    playConfig === undefined ? null : (
+      <SessionActions
+        onRandomise={handlePlayRandomise}
+        onUndo={undo}
+        undoLabel={state.past.at(-1)?.label ?? null}
+        onSaveImage={() => actions.exportAt(PLAY_EXPORT_SIZE)}
+        onShare={actions.share}
+        canSave={state.result !== null}
+      />
+    );
 
   const artworkPanel = (
     <div className={styles.artworkPanel}>
@@ -1286,6 +1476,26 @@ function Workspace({
         singleCopy={partial !== null && state.result === null}
       />
 
+      {/*
+        Navigation, on the thing being navigated — and only where there is a
+        plane to move about in. An artwork without `planeExploration` has nowhere
+        to pan to, so it gets no compass rather than a disabled one.
+
+        Before the reading panel in the document, so that when a cell has been
+        chosen the panel is the thing on top: both are laid over the same corner
+        of the artwork, and a reading somebody asked for outranks a control that
+        is always there.
+      */}
+      {exploration !== undefined && (
+        <ArtworkNavigator
+          onPan={handlePan}
+          onZoom={handleZoom}
+          onBack={handleBack}
+          backCount={viewsBehind.length}
+          available={viewport !== null}
+        />
+      )}
+
       <ValueInspector
         reading={readingHidden ? null : reading}
         viewNote={readingHidden ? null : viewNote}
@@ -1319,25 +1529,40 @@ function Workspace({
    * always was, which is also why no existing behaviour can be affected by
    * anything in here.
    */
-  const playPanel =
+  const createPanel =
     playConfig === undefined ? null : (
-      <div className={styles.playArea}>
-        <PlayControls
-          preset={preset}
-          config={playConfig}
-          code={state.code}
-          onAdjust={handlePlayAdjust}
-          onAdjustEnd={handlePlayAdjustEnd}
-          onEditApl={handleEditApl}
-          onRandomise={handlePlayRandomise}
-          onUndo={undo}
-          undoLabel={state.past.at(-1)?.label ?? null}
-          onSaveImage={() => actions.exportAt(PLAY_EXPORT_SIZE)}
-          onShare={actions.share}
-          canSave={state.result !== null}
-          busy={state.status === 'running'}
-        />
-      </div>
+      <PlayControls
+        preset={preset}
+        config={playConfig}
+        code={state.code}
+        onAdjust={handlePlayAdjust}
+        onAdjustEnd={handlePlayAdjustEnd}
+        onEditApl={handleEditApl}
+        busy={state.status === 'running'}
+      />
+    );
+
+  /**
+   * The session's one panel, beside the artwork it edits.
+   *
+   * Built once and handed to whichever layout renders — which is why the wide
+   * column, the narrow sheet and the Focus drawer can all show it without any of
+   * them owning a second copy of the editor or the palette.
+   */
+  const sessionPanel =
+    playConfig === undefined ? null : (
+      <SessionPanel
+        tab={editorTab}
+        onTabChange={setEditorTab}
+        panels={{
+          create: createPanel,
+          colour: colourPanel,
+          animate: animatePanel,
+          advanced: advancedPanel,
+          code: codePanel,
+        }}
+        actions={sessionActions}
+      />
     );
 
   /*
@@ -1370,11 +1595,7 @@ function Workspace({
           {controlsPanel}
         </>
       ) : (
-        <details className={styles.fullWorkspace} ref={fullWorkspace}>
-          <summary className={styles.fullWorkspaceSummary}>Code and full controls</summary>
-          {editorPanel}
-          {controlsPanel}
-        </details>
+        sessionPanel
       )}
     </div>
   );
@@ -1390,7 +1611,13 @@ function Workspace({
    * parameters and unsaved edits are necessarily the same in both.
    */
   const shell = (
-    <div className={styles.page} data-focus={focus ? 'true' : undefined}>
+    <div
+      className={styles.page}
+      data-focus={focus ? 'true' : undefined}
+      // A session is laid out as an application rather than as a page; every
+      // other route keeps the reading measure.
+      data-session={playConfig === undefined ? undefined : 'true'}
+    >
       {focus ? (
         <FocusToolbar
           title={preset.title}
@@ -1471,7 +1698,6 @@ function Workspace({
           ) : (
             <>
               {artworkPanel}
-              {playPanel}
               {secondaryColumn}
             </>
           )}
@@ -1479,10 +1705,7 @@ function Workspace({
       ) : (
         <div className={styles.stacked} data-play={playConfig === undefined ? undefined : 'true'}>
           {/* The artwork sits behind the sheet in Focus mode, always visible. */}
-          <div className={styles.focusBackdrop}>
-            {focus ? artworkPanel : null}
-            {focus ? playPanel : null}
-          </div>
+          <div className={styles.focusBackdrop}>{focus ? artworkPanel : null}</div>
 
           <button
             type="button"
@@ -1542,14 +1765,31 @@ function Workspace({
               {/* Never both: in Focus mode the artwork lives in the backdrop. */}
               {shownTab === 'artwork' && !focus ? artworkPanel : null}
               {/*
-                With the artwork, not in a tab of its own. On a phone the Play
-                controls are the workspace — putting them one tab away from the
-                picture they change would make a session feel like the long route
-                in, and the two are what somebody arrived to use together.
+                A session's four modes, in the sheet this layout already had.
+                The same components as the wide panel and the same state, laid
+                out for a narrow screen rather than rebuilt for one: Create sits
+                with the artwork, because on a phone those two together are what
+                somebody arrived to use.
               */}
-              {shownTab === 'artwork' && !focus ? playPanel : null}
-              {shownTab === 'code' ? editorPanel : null}
-              {shownTab === 'controls' ? controlsPanel : null}
+              {playConfig !== undefined ? (
+                <>
+                  {shownTab === 'artwork' && !focus ? createPanel : null}
+                  {shownTab === 'artwork' && !focus ? sessionActions : null}
+                  {shownTab === 'code' ? codePanel : null}
+                  {shownTab === 'controls' ? (
+                    <>
+                      {colourPanel}
+                      {advancedPanel}
+                      {sessionActions}
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  {shownTab === 'code' ? editorPanel : null}
+                  {shownTab === 'controls' ? controlsPanel : null}
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -1,0 +1,159 @@
+/*
+ * One panel, three bands: the modes, the mode you are in, and what you can do to
+ * the artwork whichever mode that is.
+ *
+ * The middle band is the only one that scrolls. Advanced holds a dozen controls
+ * and Code holds an editor, so something has to give on a short window — and what
+ * must not give is the tab bar or the four actions, because losing either is how
+ * the old workspace ended up with its controls a screen away from its artwork.
+ */
+.panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  /*
+   * As tall as the artwork beside it, but never taller than the window.
+   *
+   * The artwork is allowed to run past the fold; the panel is not. A control you
+   * have to scroll the page to reach is the problem this stage exists to fix, so
+   * the tab bar, the current mode and the four actions all stay on screen and the
+   * middle band scrolls instead.
+   */
+  block-size: 100%;
+  max-block-size: calc(100dvh - 13rem);
+  min-block-size: 24rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* ── The modes ─────────────────────────────────────────────────────────── */
+
+.tabs {
+  display: grid;
+  /* However many modes there are: the count comes from the list that defines them. */
+  grid-template-columns: repeat(var(--tab-count, 4), 1fr);
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-block-end: 1px solid var(--border);
+  background: var(--surface-sunken);
+}
+
+.tab {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-block-size: var(--tap-target);
+  padding: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease),
+    color var(--motion-fast) var(--ease);
+}
+
+.tab:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.tab:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/*
+ * Selected is a colour, a surface, a border and a bar — four signals, because
+ * colour alone is not one. The icons carry their secondary shapes at 40% opacity
+ * and their outline at full strength, so a selected tab reads as heavier as well
+ * as warmer.
+ */
+.tab[data-selected='true'] {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--ui-accent-strong, var(--text));
+}
+
+.tab[data-selected='true']::after {
+  content: '';
+  position: absolute;
+  inset-inline: 20%;
+  inset-block-end: -1px;
+  block-size: 2px;
+  border-radius: 999px;
+  background: currentcolor;
+}
+
+/*
+ * The name, on hover and on keyboard focus.
+ *
+ * Always in the accessible tree — this is a visual reveal, not the labelling.
+ * Positioned out of flow so four names appearing cannot change the height of the
+ * bar they sit in.
+ */
+.tabName {
+  position: absolute;
+  inset-block-start: calc(100% + var(--space-1));
+  inset-inline-start: 50%;
+  translate: -50% 0;
+  z-index: 2;
+  padding: 0.15rem var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface-dark);
+  color: var(--text-on-dark);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  /*
+   * Hidden rather than merely transparent. An audit reads opacity into the
+   * colour, so a label at zero opacity is a label with no contrast at all —
+   * flagged, correctly, as unreadable. `visibility` says what is meant: this is
+   * not on screen yet.
+   */
+  /*
+   * Hidden outright, and shown outright — no fade.
+   *
+   * An audit reads opacity into the colour, so a label caught mid-transition is
+   * a label with almost no contrast, and it is flagged as unreadable. It is also
+   * true: for those milliseconds nobody can read it either. A tooltip is not
+   * worth a transition that has to be argued with.
+   */
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.tab:hover .tabName,
+.tab:focus-visible .tabName {
+  visibility: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab,
+  .tabName {
+    transition: none;
+  }
+}
+
+/* ── The mode you are in ───────────────────────────────────────────────── */
+
+.content {
+  min-block-size: 0;
+  overflow-y: auto;
+  /* Room for a focus ring against the scrolling edge. */
+  padding: var(--space-4);
+}
+
+.tabPanel:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ── What you can do ───────────────────────────────────────────────────── */
+
+.actions {
+  padding: var(--space-3) var(--space-4);
+  border-block-start: 1px solid var(--border);
+  background: var(--surface-sunken);
+}

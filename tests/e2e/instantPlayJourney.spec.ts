@@ -13,9 +13,11 @@ import { ADAPTIVE_MARKER } from '@/execution/adaptiveProbe';
 import { stubTryApl } from './stubTryApl';
 
 const playPanel = (page: Page) => page.getByRole('region', { name: 'Make it yours' });
+/** The four session actions, which sit beneath the editing modes rather than in them. */
+const sessionActions = (page: Page) => page.getByRole('group', { name: 'Artwork actions' });
 const slider = (page: Page, label: string) => page.getByLabel(label, { exact: true });
 const artwork = (page: Page) => page.getByRole('img', { name: /grid/ });
-const undo = (page: Page) => playPanel(page).getByRole('button', { name: /^Undo/ });
+const undo = (page: Page) => sessionActions(page).getByRole('button', { name: /^Undo/ });
 
 const runs = (requests: readonly string[]) =>
   requests.filter((request) => request.includes(ADAPTIVE_MARKER)).length;
@@ -88,7 +90,7 @@ test.describe('the Instant Play journey', () => {
     const seen = new Set([adjusted]);
     for (let press = 0; press < 3; press += 1) {
       const before = await settings(page);
-      await playPanel(page).getByRole('button', { name: 'Randomise', exact: true }).click();
+      await sessionActions(page).getByRole('button', { name: 'Randomise', exact: true }).click();
       await expect.poll(() => settings(page)).not.toBe(before);
       seen.add(await settings(page));
     }
@@ -114,7 +116,7 @@ test.describe('the Instant Play journey', () => {
 
     // 7. Save the image.
     const download = page.waitForEvent('download');
-    await playPanel(page).getByRole('button', { name: 'Save image' }).click();
+    await sessionActions(page).getByRole('button', { name: 'Save image' }).click();
     const file = await (await download).path();
     const { readFile } = await import('node:fs/promises');
     expect([...(await readFile(file)).subarray(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
@@ -124,7 +126,7 @@ test.describe('the Instant Play journey', () => {
       await context.grantPermissions(['clipboard-read', 'clipboard-write']);
       const sessionUrl = page.url();
 
-      await playPanel(page).getByRole('button', { name: 'Share' }).click();
+      await sessionActions(page).getByRole('button', { name: 'Share' }).click();
       const link = await page.evaluate(() => navigator.clipboard.readText());
       expect(link).toContain('#/art/modular-bloom?s=');
 

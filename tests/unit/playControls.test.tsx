@@ -29,12 +29,6 @@ function mount(code: string) {
       onAdjust={() => undefined}
       onAdjustEnd={() => undefined}
       onEditApl={onEditApl}
-      onRandomise={() => undefined}
-      onUndo={() => undefined}
-      undoLabel={null}
-      onSaveImage={() => undefined}
-      onShare={() => undefined}
-      canSave={false}
       busy={false}
     />,
   );

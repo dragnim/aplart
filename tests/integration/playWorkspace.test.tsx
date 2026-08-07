@@ -108,6 +108,27 @@ function serviceTellingArtworksApart(): MockAplExecutionService {
 
 const playPanel = () => screen.getByRole('region', { name: 'Make it yours' });
 const noPlayPanel = () => screen.queryByRole('region', { name: 'Make it yours' });
+/**
+ * Randomise, Undo, Save image and Share.
+ *
+ * Beneath the editing modes rather than inside the curated controls: they belong
+ * to the artwork, not to one way of changing it, so they stay put as the tab
+ * changes. Tests reach them here rather than through the Create panel, which is
+ * where they used to live.
+ */
+const sessionActions = () => screen.getByRole('group', { name: 'Artwork actions' });
+
+/**
+ * Chooses an editing mode, as somebody pressing its icon would.
+ *
+ * The panel behind every other tab is `hidden`, so its controls are out of the
+ * accessibility tree and a role query will not find them — which is exactly what
+ * should happen, and why a test that wants a technical control now says which
+ * mode it is in first.
+ */
+const chooseTab = (name: 'Create' | 'Colour' | 'Advanced' | 'Code') => {
+  fireEvent.click(screen.getByRole('tab', { name }));
+};
 const slider = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
 /**
  * CodeMirror's own sample text, for measuring character widths.
@@ -119,9 +140,17 @@ const slider = (label: string) => screen.getByLabelText(label) as HTMLInputEleme
  */
 const MEASUREMENT_LINE = 'abc def ghi jkl mno pqr stu';
 
-/** The program the editor holds, assembled from its line elements. */
+/**
+ * The program the editor holds, assembled from its line elements.
+ *
+ * Read from the document rather than through a role query, because the editor
+ * now lives in a tab panel: while another mode is showing, that panel is hidden
+ * and therefore absent from the accessibility tree — correctly so. The source is
+ * a fact about the workspace whichever mode happens to be on screen, which is the
+ * whole point of there being only one of it.
+ */
 const source = () =>
-  [...screen.getByRole('textbox', { name: /APL/i }).querySelectorAll('.cm-line')]
+  [...(document.querySelector('.cm-content')?.querySelectorAll('.cm-line') ?? [])]
     .map((line) => line.textContent ?? '')
     .filter((text) => text !== MEASUREMENT_LINE)
     .join('');
@@ -202,44 +231,57 @@ describe('when a session is what opened the workspace', () => {
     }
   });
 
-  it('exposes Randomise, Undo, Save image and Share directly', () => {
+  it('exposes Randomise, Undo, Save image and Share directly, in every mode', () => {
     openPlay();
-    const panel = playPanel();
 
-    for (const name of ['Randomise', 'Save image', 'Share']) {
-      expect(within(panel).getByRole('button', { name })).toBeInTheDocument();
+    for (const mode of ['Create', 'Colour', 'Advanced', 'Code'] as const) {
+      chooseTab(mode);
+      const actions = sessionActions();
+
+      for (const name of ['Randomise', 'Save image', 'Share']) {
+        expect(within(actions).getByRole('button', { name }), `${name} in ${mode}`).toBeInTheDocument();
+      }
+      expect(within(actions).getByRole('button', { name: /^Undo/ }), `Undo in ${mode}`).toBeInTheDocument();
     }
-    expect(within(panel).getByRole('button', { name: /^Undo/ })).toBeInTheDocument();
+
+    // Run is not among them: it means "run this source", which is a Code idea.
+    expect(within(sessionActions()).queryByRole('button', { name: /^Run/ })).toBeNull();
   });
 
   it('keeps the whole technical workspace one press away, and never unmounts it', async () => {
     const { view } = openPlay();
     await drawn();
 
-    // The disclosure that owns this summary, named through it: the controls have
-    // disclosures of their own now, and the first in the document is one of those.
-    const summary = screen.getByText('Code and full controls');
-    const details = summary.closest('details');
-    expect(details?.open).toBe(false);
+    const panelFor = (name: string) =>
+      view.container.querySelector(`#editor-panel-${name}`) as HTMLElement | null;
+
+    // Create is where a session opens, and the only panel on show.
+    expect(screen.getByRole('tab', { name: 'Create' })).toHaveAttribute('aria-selected', 'true');
+    expect(panelFor('code')?.hidden).toBe(true);
 
     /*
-     * Rendered while closed, which is what a disclosure gives and a conditional
-     * render would not: the editor is never torn down, so it never loses its own
-     * undo history. That a closed disclosure also takes its contents out of the
-     * tab order is the browser's doing, so it is asserted end to end — jsdom
-     * applies no stylesheet and would agree with anything here.
+     * Rendered while hidden, which is what `hidden` gives and a conditional render
+     * would not: the editor is never torn down, so it never loses its own undo
+     * history. That a hidden panel also leaves the tab order is the browser's
+     * doing, so it is asserted end to end — jsdom applies no stylesheet and would
+     * agree with anything here.
      */
     expect(view.container.querySelector('.cm-content')).not.toBeNull();
-    expect(screen.getByRole('button', { name: /^Run/ })).toBeInTheDocument();
-    // Every technical control, including the parameters Play does not offer.
-    // Under their own technical names, beside the Play controls' creative ones.
+
+    // Every technical control, including the parameters Create does not offer,
+    // under their own technical names — one mode away rather than a page away.
+    chooseTab('Advanced');
     expect(screen.getByLabelText('Modulus')).toBeInTheDocument();
     expect(screen.getByLabelText('Multiplier')).toBeInTheDocument();
     expect(screen.getByLabelText('Size')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reset parameters' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText('Code and full controls'));
-    expect(details?.open).toBe(true);
+    fireEvent.click(screen.getByRole('tab', { name: 'Code' }));
+    expect(screen.getByRole('button', { name: /^Run/ })).toBeInTheDocument();
+    expect(panelFor('code')?.hidden).toBe(false);
+    expect(panelFor('create')?.hidden).toBe(true);
+    // The same editor as before the tab changed, not a second one.
+    expect(view.container.querySelectorAll('.cm-content')).toHaveLength(1);
   });
 
   it('survives Focus mode, controls and all', async () => {
@@ -263,8 +305,8 @@ describe('when it is not', () => {
 
     expect(noPlayPanel()).toBeNull();
     expect(screen.getByText('Press Run to draw this artwork.')).toBeInTheDocument();
-    // And the full workspace is in front of you, not behind a disclosure.
-    expect(screen.queryByText('Code and full controls')).toBeNull();
+    // And the full workspace is in front of you, not behind a session's tabs.
+    expect(screen.queryByRole('tab', { name: 'Create' })).toBeNull();
   });
 
   it('a seed that is not a seed opens the ordinary workspace', () => {
@@ -340,7 +382,7 @@ describe('a Play control', () => {
     drag('Detail', [40, 44, 48, 52, 56]);
     expect(source()).toContain('size←56');
 
-    await userEvent.setup().click(within(playPanel()).getByRole('button', { name: /^Undo/ }));
+    await userEvent.setup().click(within(sessionActions()).getByRole('button', { name: /^Undo/ }));
 
     expect(source()).toBe(opened);
   });
@@ -354,7 +396,7 @@ describe('a Play control', () => {
     drag('Detail', [60, 64]);
     expect(source()).toContain('size←64');
 
-    const undo = () => within(playPanel()).getByRole('button', { name: /^Undo/ });
+    const undo = () => within(sessionActions()).getByRole('button', { name: /^Undo/ });
     await user.click(undo());
     expect(source()).toContain('size←44');
 
@@ -384,7 +426,7 @@ describe('a Play control', () => {
 
     expect(source()).toContain(`modulus←${String(from + 2)}`);
 
-    await user.click(within(playPanel()).getByRole('button', { name: /^Undo/ }));
+    await user.click(within(sessionActions()).getByRole('button', { name: /^Undo/ }));
     expect(Number(slider('Scale').value)).toBe(from + 1);
   });
 });
@@ -406,7 +448,7 @@ describe('Randomise, on the Play surface', () => {
     const expected = generateInstantPlayVariation(modularBloom, seed, started?.recipeId);
     expect(expected).not.toBeNull();
 
-    await user.click(within(playPanel()).getByRole('button', { name: 'Randomise' }));
+    await user.click(within(sessionActions()).getByRole('button', { name: 'Randomise' }));
 
     // Exactly the generator's answer, written into the source that was showing.
     expect(source()).toBe(asRendered(setParameterValues(started?.code ?? '', expected?.values ?? new Map())));
@@ -433,7 +475,7 @@ describe('Randomise, on the Play surface', () => {
     const openedArtwork = screen.getByRole('img').getAttribute('aria-label');
 
     withFixedSeed(0.77);
-    await user.click(within(playPanel()).getByRole('button', { name: 'Randomise' }));
+    await user.click(within(sessionActions()).getByRole('button', { name: 'Randomise' }));
     await waitFor(() => expect(source()).not.toBe(opened));
     await drawn();
     const afterRandomise = runs(service.received);
@@ -443,7 +485,7 @@ describe('Randomise, on the Play surface', () => {
     const randomisedArtwork = screen.getByRole('img').getAttribute('aria-label');
     expect(randomisedArtwork).not.toBe(openedArtwork);
 
-    await user.click(within(playPanel()).getByRole('button', { name: /^Undo/ }));
+    await user.click(within(sessionActions()).getByRole('button', { name: /^Undo/ }));
 
     expect(source()).toBe(opened);
     expect(screen.getByRole('img').getAttribute('aria-label')).toBe(openedArtwork);
@@ -458,7 +500,7 @@ describe('Randomise, on the Play surface', () => {
     await drawn();
 
     const seed = withFixedSeed(0.1234);
-    await user.click(within(playPanel()).getByRole('button', { name: 'Randomise' }));
+    await user.click(within(sessionActions()).getByRole('button', { name: 'Randomise' }));
     vi.restoreAllMocks();
 
     let copied = '';
@@ -472,7 +514,7 @@ describe('Randomise, on the Play surface', () => {
       },
     });
 
-    await user.click(within(playPanel()).getByRole('button', { name: 'Share' }));
+    await user.click(within(sessionActions()).getByRole('button', { name: 'Share' }));
     await waitFor(() => expect(copied).not.toBe(''));
 
     const shared = decodeShareState(new URL(copied).hash.split('?s=')[1] ?? '');
@@ -488,9 +530,9 @@ describe('Randomise, on the Play surface', () => {
     await drawn();
 
     withFixedSeed(0.31);
-    await user.click(within(playPanel()).getByRole('button', { name: 'Randomise' }));
+    await user.click(within(sessionActions()).getByRole('button', { name: 'Randomise' }));
     vi.restoreAllMocks();
-    await user.click(within(playPanel()).getByRole('button', { name: /^Undo/ }));
+    await user.click(within(sessionActions()).getByRole('button', { name: /^Undo/ }));
 
     let copied = '';
     Object.defineProperty(navigator, 'clipboard', {
@@ -503,7 +545,7 @@ describe('Randomise, on the Play surface', () => {
       },
     });
 
-    await user.click(within(playPanel()).getByRole('button', { name: 'Share' }));
+    await user.click(within(sessionActions()).getByRole('button', { name: 'Share' }));
     await waitFor(() => expect(copied).not.toBe(''));
 
     // The seed the session opened with, because that is what produced the artwork
@@ -519,7 +561,7 @@ describe('Undo', () => {
     openPlay();
     await drawn();
 
-    const undo = () => within(playPanel()).getByRole('button', { name: /^Undo/ });
+    const undo = () => within(sessionActions()).getByRole('button', { name: /^Undo/ });
     expect(undo()).toBeDisabled();
     expect(undo()).toHaveAccessibleName('Undo');
 
@@ -535,10 +577,12 @@ describe('Undo', () => {
     await drawn();
 
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
-    await user.click(within(playPanel()).getByRole('button', { name: 'Randomise' }));
+    await user.click(within(sessionActions()).getByRole('button', { name: 'Randomise' }));
     vi.restoreAllMocks();
 
-    expect(within(playPanel()).getByRole('button', { name: /^Undo/ })).toHaveAccessibleName('Undo Randomise');
+    expect(within(sessionActions()).getByRole('button', { name: /^Undo/ })).toHaveAccessibleName(
+      'Undo Randomise',
+    );
   });
 
   it('runs out, and is disabled again when it does', async () => {
@@ -549,7 +593,7 @@ describe('Undo', () => {
     drag('Scale', [11]);
     drag('Detail', [44]);
 
-    const undo = () => within(playPanel()).getByRole('button', { name: /^Undo/ });
+    const undo = () => within(sessionActions()).getByRole('button', { name: /^Undo/ });
     await user.click(undo());
     await user.click(undo());
 
@@ -559,7 +603,7 @@ describe('Undo', () => {
 });
 
 describe('what Undo may and may not reach', () => {
-  const undo = () => within(playPanel()).getByRole('button', { name: /^Undo/ });
+  const undo = () => within(sessionActions()).getByRole('button', { name: /^Undo/ });
 
   /** A session with one Play gesture behind it, so there is something to lose. */
   async function withAGestureBehindIt() {
@@ -573,10 +617,10 @@ describe('what Undo may and may not reach', () => {
     return { ...opened, before };
   }
 
-  it('opening the code and full controls costs nothing', async () => {
+  it('changing editing mode costs nothing', async () => {
     const { before } = await withAGestureBehindIt();
 
-    fireEvent.click(screen.getByText('Code and full controls'));
+    fireEvent.click(screen.getByRole('tab', { name: 'Code' }));
 
     // Reading the workspace is not changing the artwork.
     expect(undo()).toBeEnabled();
@@ -587,7 +631,7 @@ describe('what Undo may and may not reach', () => {
   it('nor does putting the caret in the editor', async () => {
     const { view } = await withAGestureBehindIt();
 
-    fireEvent.click(screen.getByText('Code and full controls'));
+    fireEvent.click(screen.getByRole('tab', { name: 'Code' }));
     const editor = view.container.querySelector('.cm-content') as HTMLElement;
     editor.focus();
     fireEvent.focus(editor);
@@ -595,17 +639,45 @@ describe('what Undo may and may not reach', () => {
     expect(undo()).toBeEnabled();
   });
 
-  it('nor does recolouring, or running the artwork again', async () => {
+  it('and running the artwork again reaches the gesture behind it', async () => {
     const { service, before } = await withAGestureBehindIt();
     const user = userEvent.setup();
+    // The gesture's own run has to land first, or the button says Stop.
+    await waitFor(() => expect(runs(service.received)).toBeGreaterThan(1));
 
-    await user.click(screen.getByRole('checkbox', { name: /Invert palette/ }));
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    chooseTab('Code');
+    await user.click(await screen.findByRole('button', { name: /^Run/ }));
     await waitFor(() => expect(runs(service.received)).toBeGreaterThan(2));
 
     expect(undo()).toBeEnabled();
     await user.click(undo());
     expect(source()).toBe(before);
+  });
+
+  it('recolouring is itself a step back, and leaves the source alone', async () => {
+    await withAGestureBehindIt();
+    const user = userEvent.setup();
+    const afterGesture = source();
+
+    /*
+     * Undo is one button, so it answers for the last thing somebody changed —
+     * and after inverting a palette that is the palette. Appearance travels in
+     * the same history as the source rather than a second one of its own, which
+     * is why a step back here restores the colour and leaves the slider alone.
+     */
+    chooseTab('Colour');
+    const invert = () => screen.getByRole('checkbox', { name: /Invert palette/ }) as HTMLInputElement;
+
+    await user.click(invert());
+    expect(invert().checked).toBe(true);
+    expect(undo()).toHaveAccessibleName('Undo Invert');
+
+    await user.click(undo());
+    expect(invert().checked).toBe(false);
+    // The recolour never touched the program, so undoing it does not either —
+    // and the gesture before it is still there to step back to.
+    expect(source()).toBe(afterGesture);
+    expect(undo()).toBeEnabled();
   });
 
   it('nor does saving the image or sharing the link', async () => {
@@ -617,54 +689,72 @@ describe('what Undo may and may not reach', () => {
       value: { writeText: () => Promise.resolve() },
     });
 
-    await user.click(within(playPanel()).getByRole('button', { name: 'Save image' }));
-    await user.click(within(playPanel()).getByRole('button', { name: 'Share' }));
+    await user.click(within(sessionActions()).getByRole('button', { name: 'Save image' }));
+    await user.click(within(sessionActions()).getByRole('button', { name: 'Share' }));
 
     expect(undo()).toBeEnabled();
   });
 
-  it('but a technical control does, rather than undoing past it', async () => {
+  it('and a technical control is a step of its own, not the end of the history', async () => {
     /*
-     * The Modulus slider writes the same line the Scale control does, and nothing
-     * records it. Stepping back would restore a program from before it and discard
-     * it in silence, so the offer is withdrawn instead.
+     * The Modulus slider writes the same line the Scale control does, so in a
+     * session it is recorded the same way. It used to invalidate the history
+     * instead — the only honest answer while nothing recorded it, and the reason
+     * the two panels could not sit together: one offered Undo and the other took
+     * it away.
      */
     await withAGestureBehindIt();
+    const user = userEvent.setup();
+    const afterGesture = source();
 
-    fireEvent.change(screen.getByLabelText('Modulus'), { target: { value: '13' } });
+    chooseTab('Advanced');
+    const modulus = screen.getByLabelText('Modulus');
+    fireEvent.change(modulus, { target: { value: '13' } });
+    fireEvent.pointerUp(modulus);
 
     expect(source()).toContain('modulus←13');
-    expect(undo()).toBeDisabled();
-    expect(undo()).toHaveAccessibleName('Undo');
+    expect(undo()).toBeEnabled();
+    expect(undo()).toHaveAccessibleName('Undo Modulus');
+
+    await user.click(undo());
+    expect(source()).toBe(afterGesture);
+    // And the gesture before it is still there to step back to.
+    expect(undo()).toBeEnabled();
   });
 
-  it('and so does a Reset, which cannot be stepped back over', async () => {
+  it('but a Reset still cannot be stepped back over', async () => {
     const user = userEvent.setup();
     await withAGestureBehindIt();
 
+    chooseTab('Advanced');
     await user.click(screen.getByRole('button', { name: 'Reset parameters' }));
 
-    // The preset's own values, and no way back to a session that is gone.
+    // The preset's own values, and no way back to a session that is gone. A
+    // Reset is not a control being committed; it discards what the controls were.
     expect(source()).toBe(asRendered(modularBloom.code));
     expect(undo()).toBeDisabled();
   });
 
-  it('and a Play control afterwards starts a fresh sequence', async () => {
+  it('and a Create control afterwards continues the same history', async () => {
     const user = userEvent.setup();
     await withAGestureBehindIt();
 
-    fireEvent.change(screen.getByLabelText('Modulus'), { target: { value: '13' } });
-    expect(undo()).toBeDisabled();
+    chooseTab('Advanced');
+    const modulus = screen.getByLabelText('Modulus');
+    fireEvent.change(modulus, { target: { value: '13' } });
+    fireEvent.pointerUp(modulus);
 
+    chooseTab('Create');
     drag('Detail', [64]);
     expect(undo()).toBeEnabled();
 
     // One step back reaches the technical change, which is where the source stood
-    // when this sequence began — never past it.
+    // when this sequence began — and another reaches past it, because both kinds
+    // of control now record.
     await user.click(undo());
     expect(source()).toContain('modulus←13');
     expect(source()).not.toContain('size←64');
-    expect(undo()).toBeDisabled();
+    expect(undo()).toBeEnabled();
   });
 });
 
@@ -711,7 +801,7 @@ describe('what a control says about the code', () => {
     const seed = Math.floor(0.4242 * 0xffff_ffff);
     const expected = generateInstantPlayVariation(modularBloom, seed, started?.recipeId);
     vi.spyOn(Math, 'random').mockReturnValue(0.4242);
-    await user.click(within(playPanel()).getByRole('button', { name: 'Randomise' }));
+    await user.click(within(sessionActions()).getByRole('button', { name: 'Randomise' }));
     vi.restoreAllMocks();
 
     // The value the generator chose, named by the disclosure — which is the same
@@ -736,7 +826,7 @@ describe('what a control says about the code', () => {
     drag('Scale', [11]);
     expect(assignmentFor('Scale', 'modulus')).toBe('modulus←11');
 
-    await user.click(within(playPanel()).getByRole('button', { name: /^Undo/ }));
+    await user.click(within(sessionActions()).getByRole('button', { name: /^Undo/ }));
 
     expect(assignmentFor('Scale', 'modulus')).toBe(opened);
   });
@@ -745,17 +835,19 @@ describe('what a control says about the code', () => {
 describe('Edit the APL', () => {
   const editAction = (label: string) => screen.getByRole('button', { name: `Edit the APL for ${label}` });
 
-  it('opens the technical workspace and puts the caret in the editor', async () => {
+  it('selects the Code mode and puts the caret in the editor', async () => {
     const user = userEvent.setup();
     openPlay();
     await drawn();
 
-    const details = screen.getByText('Code and full controls').closest('details') as HTMLDetailsElement;
-    expect(details.open).toBe(false);
+    const codeTab = () => screen.getByRole('tab', { name: 'Code' });
+    expect(codeTab()).toHaveAttribute('aria-selected', 'false');
 
     await user.click(editAction('Scale'));
 
-    expect(details.open).toBe(true);
+    // The panel changes mode; the artwork beside it does not move, and no page
+    // has been left. Peek and edit are the same place now.
+    expect(codeTab()).toHaveAttribute('aria-selected', 'true');
     // Focus lands in the editor, not on the button that opened it: the point of
     // the action is to be somewhere you can type.
     expect(document.activeElement?.className).toContain('cm-content');
@@ -778,7 +870,7 @@ describe('Edit the APL', () => {
     expect(screen.getByRole('img').getAttribute('aria-label')).toBe(artwork);
     // And the step back is still there to take, which is the one somebody would
     // most expect to lose by opening the code.
-    const undo = within(playPanel()).getByRole('button', { name: /^Undo/ });
+    const undo = within(sessionActions()).getByRole('button', { name: /^Undo/ });
     expect(undo).toBeEnabled();
     await user.click(undo);
     expect(source()).toBe(asRendered(started?.code ?? ''));
@@ -790,6 +882,10 @@ describe('Edit the APL', () => {
     await drawn();
 
     await user.click(editAction('Complexity'));
+    // Back to Create for the second one: the first press moved the panel to Code,
+    // and a control that is not on show cannot be pressed — which is the point of
+    // the modes, and the reason this is worth asserting rather than assuming.
+    chooseTab('Create');
     await user.click(editAction('Detail'));
 
     // Nothing latched: a second request is honoured like the first.
@@ -815,7 +911,7 @@ describe('Save image', () => {
     // Nothing has been drawn on arrival for a heartbeat, so the button says so by
     // being unavailable rather than by failing when pressed.
     openPlay();
-    const save = () => within(playPanel()).getByRole('button', { name: 'Save image' });
+    const save = () => within(sessionActions()).getByRole('button', { name: 'Save image' });
     expect(save()).toBeDisabled();
 
     await drawn();

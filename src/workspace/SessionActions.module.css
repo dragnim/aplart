@@ -1,0 +1,53 @@
+/*
+ * The same buttons as before, in a bar of their own.
+ *
+ * Carried over from the Play controls unchanged rather than restyled: only where
+ * they live has changed, and a visitor who has used a session before should find
+ * the same four things looking the same way.
+ */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.primary,
+.action {
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 600;
+  transition:
+    background var(--motion-fast) var(--ease),
+    transform var(--motion-fast) var(--ease);
+}
+
+.action:hover:not(:disabled) {
+  background: var(--surface-sunken);
+}
+
+.primary {
+  background: var(--ui-accent-solid);
+  border-color: var(--ui-accent-solid);
+  color: var(--ui-accent-on-solid);
+}
+
+.primary:hover {
+  background: var(--ui-accent-solid-hover);
+  border-color: var(--ui-accent-solid-hover);
+}
+
+.primary:active {
+  background: var(--ui-accent-solid-active);
+  border-color: var(--ui-accent-solid-active);
+  transform: translateY(1px);
+}
+
+.action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

@@ -16,6 +16,15 @@ const WIDE = { width: 1440, height: 950 };
 const SEED = 20_260_805;
 
 const playPanel = (page: Page) => page.getByRole('region', { name: 'Make it yours' });
+/**
+ * Randomise, Undo, Save image and Share.
+ *
+ * Beneath the editing modes rather than inside the curated controls: they act on
+ * the artwork, not on one way of changing it, so they stay put as the mode
+ * changes. They used to live in the Create panel, which is why so many of these
+ * tests once reached for them there.
+ */
+const sessionActions = (page: Page) => page.getByRole('group', { name: 'Artwork actions' });
 const slider = (page: Page, label: string) => page.getByLabel(label, { exact: true });
 const artwork = (page: Page) => page.getByRole('img', { name: /grid/ });
 
@@ -63,6 +72,14 @@ async function editApl(page: Page, parameterId: string): Promise<void> {
 
 /** Drags a slider from its thumb towards the right-hand end of its track. */
 async function dragRight(page: Page, control: Locator): Promise<void> {
+  /*
+   * Into view first. The panel's content scrolls within itself now, so a control
+   * further down it can be laid out beneath the action bar — and a bounding box
+   * is still returned for an element scrolled out of its scroller, so the drag
+   * would land on whatever is actually there. A person scrolls to a slider before
+   * dragging it; so does this.
+   */
+  await control.scrollIntoViewIfNeeded();
   const box = await control.boundingBox();
   if (box === null) throw new Error('the slider has no box to drag');
 
@@ -133,7 +150,12 @@ test.describe('the Play workspace', () => {
       expect(box?.height ?? 0, label).toBeGreaterThanOrEqual(44);
     }
     for (const name of ['Randomise', 'Undo', 'Save image', 'Share']) {
-      const box = await playPanel(page).getByRole('button', { name }).boundingBox();
+      const box = await sessionActions(page).getByRole('button', { name }).boundingBox();
+      expect(box?.height ?? 0, name).toBeGreaterThanOrEqual(44);
+    }
+    // The tabs are icons, so their targets are worth measuring too.
+    for (const name of ['Create', 'Colour', 'Advanced', 'Code']) {
+      const box = await page.getByRole('tab', { name, exact: true }).boundingBox();
       expect(box?.height ?? 0, name).toBeGreaterThanOrEqual(44);
     }
   });
@@ -175,7 +197,7 @@ test.describe('the Play workspace', () => {
     await expect.poll(() => runs(stub.requests)).toBeGreaterThan(1);
 
     // One press back, not both: two presses are two things somebody did.
-    await playPanel(page).getByRole('button', { name: /^Undo/ }).click();
+    await sessionActions(page).getByRole('button', { name: /^Undo/ }).click();
     expect(await valueOf(page, 'Scale')).toBe(from + 1);
   });
 
@@ -186,7 +208,7 @@ test.describe('the Play workspace', () => {
     const opened = { detail: await valueOf(page, 'Detail'), scale: await valueOf(page, 'Scale') };
     const drawnBefore = await artwork(page).getAttribute('aria-label');
 
-    await playPanel(page).getByRole('button', { name: 'Randomise', exact: true }).click();
+    await sessionActions(page).getByRole('button', { name: 'Randomise', exact: true }).click();
     await expect
       .poll(async () => `${String(await valueOf(page, 'Detail'))}:${String(await valueOf(page, 'Scale'))}`)
       .not.toBe(`${String(opened.detail)}:${String(opened.scale)}`);
@@ -194,7 +216,7 @@ test.describe('the Play workspace', () => {
     await expect.poll(() => runs(stub.requests)).toBe(2);
     const afterRandomise = runs(stub.requests);
 
-    await playPanel(page).getByRole('button', { name: /^Undo/ }).click();
+    await sessionActions(page).getByRole('button', { name: /^Undo/ }).click();
 
     // Back to the artwork the session opened with, from the history rather than
     // from the service.
@@ -210,7 +232,7 @@ test.describe('the Play workspace', () => {
     await openSession(page);
 
     const download = page.waitForEvent('download');
-    await playPanel(page).getByRole('button', { name: 'Save image' }).click();
+    await sessionActions(page).getByRole('button', { name: 'Save image' }).click();
     const path = await (await download).path();
 
     const { readFile } = await import('node:fs/promises');
@@ -227,7 +249,7 @@ test.describe('the Play workspace', () => {
     await openSession(page);
 
     const detail = await valueOf(page, 'Detail');
-    await playPanel(page).getByRole('button', { name: 'Share' }).click();
+    await sessionActions(page).getByRole('button', { name: 'Share' }).click();
 
     const link = await page.evaluate(() => navigator.clipboard.readText());
     expect(link).toContain('#/art/modular-bloom?s=');
@@ -245,9 +267,9 @@ test.describe('the Play workspace', () => {
     await openSession(page);
 
     /*
-     * A closed disclosure hides its contents, which is why this is worth asserting
-     * in a browser: nothing in it should be tabbable while it is shut, and all of
-     * it should be there when it is not.
+     * A hidden tab panel hides its contents, which is why this is worth asserting
+     * in a browser: nothing in it should be tabbable while another mode is on
+     * show, and all of it should be there the moment that mode is chosen.
      */
     await expect(page.getByRole('button', { name: /^Run/ })).toBeHidden();
     await expect(page.locator('.cm-content')).toBeHidden();
@@ -256,7 +278,10 @@ test.describe('the Play workspace', () => {
 
     await expect(page.getByRole('button', { name: /^Run/ })).toBeVisible();
     await expect(page.locator('.cm-content')).toBeVisible();
-    await expect(page.getByLabel('Modulus', { exact: true })).toBeVisible();
+
+    // The technical parameters are their own mode, one press further on.
+    await page.getByRole('tab', { name: 'Advanced', exact: true }).first().click();
+    await expect(page.locator('#editor-panel-advanced').getByLabel('Modulus', { exact: true })).toBeVisible();
   });
 
   test('stops offering Undo once the source is edited by hand', async ({ page }) => {
@@ -270,7 +295,7 @@ test.describe('the Play workspace', () => {
     await stubTryApl(page);
     await openSession(page);
 
-    const undo = playPanel(page).getByRole('button', { name: /^Undo/ });
+    const undo = sessionActions(page).getByRole('button', { name: /^Undo/ });
     await dragRight(page, slider(page, 'Detail'));
     await expect(undo).toBeEnabled();
 
@@ -285,7 +310,9 @@ test.describe('the Play workspace', () => {
     await expect(undo).toBeDisabled();
 
     // And a Play control afterwards starts a fresh sequence, which cannot reach
-    // back over the edit.
+    // back over the edit. Back to Create for it: a mode that is not on show
+    // cannot be typed into, which is the point of there being modes.
+    await page.getByRole('tab', { name: 'Create', exact: true }).first().click();
     const edited = await valueOf(page, 'Scale');
     await slider(page, 'Scale').focus();
     await page.keyboard.press('ArrowRight');
@@ -342,7 +369,7 @@ test.describe('the Play workspace', () => {
     await expect(artwork(page)).toBeVisible({ timeout: 30_000 });
 
     await dragRight(page, slider(page, 'Detail'));
-    const undo = playPanel(page).getByRole('button', { name: /^Undo/ });
+    const undo = sessionActions(page).getByRole('button', { name: /^Undo/ });
     await expect(undo).toBeEnabled();
 
     const url = page.url();
@@ -366,7 +393,7 @@ test.describe('the Play workspace', () => {
     await openSession(page);
 
     await dragRight(page, slider(page, 'Scale'));
-    const undo = playPanel(page).getByRole('button', { name: /^Undo/ });
+    const undo = sessionActions(page).getByRole('button', { name: /^Undo/ });
     await expect(undo).toBeEnabled();
 
     await editApl(page, 'modulus');
@@ -386,8 +413,8 @@ test.describe('the Play workspace', () => {
     await expect(playPanel(page)).toBeVisible();
     await expect(slider(page, 'Detail')).toBeVisible();
 
-    // The artwork still has the window: the panel floats over it rather than
-    // taking a share of it.
+    // The artwork still has the window: the panel is the drawer over it rather
+    // than a column taking a share of it.
     const canvas = await page.locator('canvas').first().boundingBox();
     const viewport = page.viewportSize() ?? { width: 0, height: 0 };
     expect(canvas?.width ?? 0).toBeGreaterThan(viewport.width * 0.9);
@@ -407,15 +434,19 @@ test.describe('the Play workspace', () => {
     await openSession(page);
     await page.getByRole('button', { name: 'Focus mode' }).click();
 
-    const drawer = await page.locator('#focus-drawer').boundingBox();
-    const panel = await playPanel(page).boundingBox();
-
-    expect(drawer?.width ?? 0).toBeGreaterThan(0);
-    expect(panel?.x ?? 0).toBeGreaterThanOrEqual((drawer?.x ?? 0) + (drawer?.width ?? 0));
+    /*
+     * The drawer *is* the panel now, rather than something the panel has to keep
+     * out of the way of. One set of editing modes serves the ordinary layout and
+     * Focus alike, so there is no second control surface to collide with — which
+     * is what this test used to have to check.
+     */
+    const drawer = page.locator('#focus-drawer');
+    await expect(drawer).toBeVisible();
+    await expect(drawer.locator('[data-session-panel]')).toHaveCount(1);
 
     // And every action in it is genuinely pressable where it now sits.
     for (const name of ['Randomise', 'Save image', 'Share']) {
-      await expect(playPanel(page).getByRole('button', { name })).toBeVisible();
+      await expect(sessionActions(page).getByRole('button', { name })).toBeVisible();
     }
     await expect(slider(page, 'Complexity')).toBeVisible();
   });
@@ -496,8 +527,8 @@ test.describe('the Play workspace', () => {
 
     await expect(playPanel(page)).toHaveCount(0);
     await expect(page.getByText('Press Run to draw this artwork.')).toBeVisible();
-    // No disclosure either: the full workspace is the workspace.
-    await expect(page.getByText('Code and full controls')).toHaveCount(0);
+    // No editing modes either: the full workspace is the workspace.
+    await expect(page.getByRole('tab', { name: 'Create' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /^Run/ })).toBeVisible();
     expect(stub.requests).toHaveLength(0);
 
@@ -558,13 +589,9 @@ test.describe('the Play workspace on a phone', () => {
   });
 });
 
-/** Opens the full workspace, wherever this layout keeps it. */
+/** Shows the editor, wherever this layout keeps it. */
 async function openDisclosure(page: Page): Promise<void> {
-  const summary = page.getByText('Code and full controls');
-  if ((await summary.count()) > 0) {
-    await summary.click();
-    return;
-  }
-  // The narrow layout keeps the code in a tab instead of a disclosure.
-  await page.getByRole('tab', { name: 'Code' }).click();
+  // A session's Code mode on a wide screen, the sheet's Code tab on a narrow
+  // one. Both are `role="tab"` and both are named Code, so one press serves.
+  await page.getByRole('tab', { name: 'Code' }).first().click();
 }
