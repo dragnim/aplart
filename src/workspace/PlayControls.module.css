@@ -27,10 +27,26 @@
  * colliding with each other; below that the three controls are better one above
  * the other than three cramped rows.
  */
+/*
+ * One control under the next, always.
+ *
+ * `auto-fit` used to pack them side by side wherever two would fit, which was
+ * fine while the panel was narrow and wrong the moment it took the width of the
+ * old workspace's column: three curated sliders became a two-column form, and a
+ * form is not what this surface is. They read as a sequence — how intricate, how
+ * large, how fine — and a sequence runs down the page.
+ */
 .controls {
   display: grid;
   gap: var(--space-4);
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  grid-template-columns: minmax(0, 1fr);
+  /*
+   * A measure for the sliders, not the column's full width. The column is
+   * deliberately substantial — the editor and the parameter lists need it — but a
+   * slider stretched across all of it is a long way to travel for eleven values,
+   * and its endpoint labels end up further apart than the words they belong to.
+   */
+  max-inline-size: 30rem;
 }
 
 .control {

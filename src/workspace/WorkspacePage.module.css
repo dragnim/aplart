@@ -282,6 +282,12 @@
   max-height: none;
   overflow: visible;
   padding-right: 0;
+  /*
+   * Starts where the artwork starts, and ends where its content ends. Stretching
+   * it to the row's height is what produced a column-shaped area of nothing
+   * beneath three sliders; the space under the controls belongs to the page.
+   */
+  align-self: start;
 }
 
 /*
