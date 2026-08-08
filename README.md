@@ -546,6 +546,8 @@ MIT — see [LICENSE](LICENSE).
 APL Art is an independent project. It writes and runs Dyalog APL, and depends on the TryAPL service and the
 APL387 font, both used with thanks.
 
+Interface icons: Hugeicons — used under licence. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 Interaction ideas for the Mandelbrot explorer were inspired by
 [Brian Becker's Mandelbrot explorer](https://bpbecker.github.io/Mandelbrot/). The implementation here is
 APL Art's own.
