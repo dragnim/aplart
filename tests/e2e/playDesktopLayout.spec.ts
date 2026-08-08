@@ -112,8 +112,23 @@ for (const size of SIZES) {
       // Room beneath it, rather than the square landing on the window's edge.
       expect(size.height - foot).toBeGreaterThanOrEqual(8);
 
-      // And the artwork still leads the row it is in.
-      expect(picture?.width ?? 0).toBeGreaterThan((box?.width ?? 0) * 1.5);
+      /*
+       * And the artwork still leads the row it is in.
+       *
+       * By outcome rather than by multiplier. This asked for one and a half
+       * times the panel's width, which was written when the panel was 384px and
+       * became a rule against the composition it was meant to protect: the
+       * workspace this layout deliberately echoes ran at about 1.2, and reading
+       * that as "not dominant" would be reading the number rather than the
+       * screen. Wider, larger, and first in the row is what dominance means.
+       */
+      const panelBox = box ?? { x: 0, width: 0, height: 0, y: 0 };
+      expect(picture?.width ?? 0).toBeGreaterThan(panelBox.width);
+      expect((picture?.width ?? 0) * (picture?.height ?? 0)).toBeGreaterThan(
+        panelBox.width * panelBox.height,
+      );
+      // Leading: the artwork starts the row, and the panel sits after it.
+      expect(panelBox.x).toBeGreaterThanOrEqual((picture?.x ?? 0) + (picture?.width ?? 0) - 1);
     });
 
     test('uses the width it has, without overflowing it', async ({ page }) => {

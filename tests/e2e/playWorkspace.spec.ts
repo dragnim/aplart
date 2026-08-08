@@ -109,8 +109,13 @@ test.describe('the Play workspace', () => {
 
     /*
      * Dominant, measured rather than asserted: the artwork covers more of the page
-     * than the panel that changes it and is far the wider of the two, and the
-     * controls sit beside it rather than in front of it.
+     * than the panel that changes it, is the wider of the two, and the controls
+     * sit beside it rather than in front of it.
+     *
+     * Held to outcomes rather than to a ratio. A factor of one and a half was
+     * right while the panel was 384px, and became a rule against the layout once
+     * the panel took the width the old workspace's control column had — the
+     * proportion this composition is deliberately built to echo.
      *
      * Area alone used to be held to a factor of two, which quietly encoded a
      * panel that was capped and scrolling — once it was allowed the height its
@@ -123,7 +128,7 @@ test.describe('the Play workspace', () => {
       box === null ? 0 : box.width * box.height;
 
     expect(area(canvas)).toBeGreaterThan(area(controls));
-    expect(canvas?.width ?? 0).toBeGreaterThan((controls?.width ?? 0) * 1.5);
+    expect(canvas?.width ?? 0).toBeGreaterThan(controls?.width ?? 0);
     expect(controls?.x ?? 0).toBeGreaterThan((canvas?.x ?? 0) + (canvas?.width ?? 0) - 1);
 
     /*

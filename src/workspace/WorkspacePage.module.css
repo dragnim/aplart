@@ -5,16 +5,39 @@
 }
 
 /*
- * A session takes the window, with a margin rather than a measure.
+ * A session is one composition, sized deliberately and centred.
  *
- * The rest of APL Art is read — a gallery, an About page, a workspace whose left
- * column is prose and controls — and a reading measure is right for all of it. A
- * session is used, and a picture that stops two-thirds of the way across a desk
- * to preserve a text column is the wrong trade.
+ * Not a reading measure — the artwork is looked at, not read — and not the whole
+ * window either. Stretching the shell to every pixel of a wide monitor left the
+ * artwork and its panel stranded in a field of nothing, which is the fault this
+ * measure fixes: the page is exactly as wide as the row it contains, so the
+ * title, the metadata and the five actions sit over the workspace rather than
+ * across the screen.
+ *
+ *   --play-panel    34.75rem — the width of the old workspace's control column,
+ *                   which is most of why that layout read as composed. Stable
+ *                   rather than growing with the window: this is the width the
+ *                   editor and the parameter lists want, not a way of using up
+ *                   spare screen. It contracts only where holding it would
+ *                   crowd the artwork, which is the narrow end of the desktop
+ *                   range — hence the `min` against what the window can spare.
+ *
+ *   --play-artwork  the smaller of what the height allows and what the width
+ *                   leaves. The 13rem allowance is measured: the artwork's top
+ *                   edge sits 187px down the window — 77 of global header, 84 of
+ *                   session toolbar and the line the action notice reserves so a
+ *                   message cannot shift the page — and the balance is the room
+ *                   beneath the square.
+ *
+ * In vw, dvh and rem, never percentages: these size both a grid track and a box
+ * within it, and a percentage would resolve against a different base in each.
  */
 .page[data-session='true'] {
-  max-width: none;
-  padding-inline: var(--space-6);
+  --play-panel: min(34.75rem, calc((100vw - 8rem) * 0.42));
+  --play-artwork: min(calc(100dvh - 13rem), calc(100vw - var(--play-panel) - 6rem));
+
+  max-width: calc(var(--play-artwork) + var(--play-panel) + var(--space-6));
+  padding-inline: 0;
 }
 
 .shareNotice {
@@ -175,39 +198,12 @@
    * cannot be moved by what is underneath it.
    */
   /*
-   * Fit the whole square.
+   * The tracks the page has already worked out.
    *
-   * The artwork is sized by the *height* it has, because that is the dimension
-   * that runs out first on every desktop shape — and a picture whose foot is
-   * below the fold while you edit it is a picture you are editing blind. It was
-   * four hundred pixels past the fold before this.
-   *
-   *   --play-panel    22rem at the narrowest desktop, growing to 30rem — but
-   *                   derived from the artwork's own size rather than from the
-   *                   window's width, because that is what decides whether the
-   *                   panel can afford to be wider. A panel sized to the width
-   *                   alone took 444px beside a 640px square, and the picture
-   *                   stopped leading the composition. Tied to the height the
-   *                   artwork gets, it grows only where there is a large picture
-   *                   to grow beside. The extra width is for the editor and the
-   *                   parameter lists; Create is deliberately airier, not wider.
-   *
-   *   --play-artwork  the smaller of what the height allows and what the width
-   *                   leaves once the panel, the gutter and the page's own
-   *                   margins are taken. The 14rem allowance is measured rather
-   *                   than assumed: the artwork's top edge sits 203px down the
-   *                   window — 77 of global header, 84 of session toolbar, the
-   *                   reserved line the action notice keeps so a message cannot
-   *                   shift the page, and the row's own offset — and the balance
-   *                   of the 224 is the breathing room under the square.
-   *
-   * In vw, dvh and rem, never percentages: these values size both a grid track
-   * and a box within it, and a percentage would resolve against a different
-   * base in each.
+   * Both are declared on the page rather than here, because the toolbar above
+   * has to be the same width as the row below it — one workspace, not a header
+   * that spans the screen over a composition that does not.
    */
-  --play-panel: clamp(22rem, calc((100dvh - 14rem) / 1.7), 30rem);
-  --play-artwork: min(calc(100dvh - 14rem), calc(100vw - var(--play-panel) - 6rem));
-
   margin-inline: auto;
   grid-template-columns: var(--play-artwork) var(--play-panel);
   justify-content: center;
@@ -244,8 +240,14 @@
    * Relative rather than sticky: it kills the stickiness the ordinary workspace
    * wants, and gives the navigation cluster laid over the artwork something to
    * be positioned against.
+   *
+   * `top` has to go with it. The base rule sets `top: var(--space-4)` for the
+   * sticky offset, which a static box ignores — but a relative one obeys, so the
+   * artwork sat sixteen pixels below the panel beside it and lost sixteen pixels
+   * of square to a value meant for a behaviour it no longer has.
    */
   position: relative;
+  top: auto;
   align-self: start;
   inline-size: 100%;
   aspect-ratio: 1;
