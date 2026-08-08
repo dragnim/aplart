@@ -10,15 +10,9 @@
 
 .run,
 .stop {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--tap-target);
-  padding: 0 var(--space-5);
-  border-radius: var(--radius-md);
+  composes: control from global;
   border: 1px solid transparent;
   font-weight: 650;
-  cursor: pointer;
   transition:
     background var(--motion-fast) var(--ease),
     transform var(--motion-fast) var(--ease);

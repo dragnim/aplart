@@ -115,6 +115,26 @@
   /* Minimum comfortable touch target */
   --tap-target: 44px;
 
+  /*
+   * Application controls.
+   *
+   * Every button in a session measured 44px tall with 16px text, because the
+   * touch target was the only size anything had — four different paddings and
+   * two type sizes over one height, which read as several generations of
+   * interface sharing a screen. These are the one rule instead: a compact
+   * desktop control, and a target that grows where a finger is doing the
+   * pressing rather than a pointer.
+   *
+   * `--tap-target` stays for what genuinely needs a large hit area whatever the
+   * device — a slider's thumb, a control in a phone sheet.
+   */
+  --control-height: 2rem;
+  --control-font-size: 0.8125rem;
+  --control-padding-x: 0.75rem;
+  --control-radius: 6px;
+  /* The glyph inside an icon-only button, which is smaller than its target. */
+  --control-icon: 1.125rem;
+
   --layout-max: 1440px;
 
   /* Height reserved for the Focus-mode overlay bar, so the drawer can start
@@ -127,5 +147,20 @@
     --motion-fast: 0ms;
     --motion-base: 0ms;
     --motion-slow: 0ms;
+  }
+}
+
+/*
+ * A finger, or a screen narrow enough to be held in one hand: the same
+ * typography, in a target big enough to hit.
+ *
+ * Both conditions, because neither alone is the question. A touchscreen laptop
+ * reports a coarse pointer at desk width, and a narrow window on a desktop is
+ * where this interface stacks into a sheet meant for thumbs.
+ */
+@media (pointer: coarse), (max-width: 60rem) {
+  :root {
+    --control-height: var(--tap-target);
+    --control-padding-x: 1rem;
   }
 }

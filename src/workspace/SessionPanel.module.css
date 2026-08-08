@@ -40,16 +40,12 @@
 }
 
 .tab {
+  composes: control from global;
   position: relative;
-  display: grid;
-  place-items: center;
-  min-block-size: var(--tap-target);
-  padding: var(--space-2);
+  padding: 0;
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
   background: none;
   color: var(--text-muted);
-  cursor: pointer;
   transition:
     background var(--motion-fast) var(--ease),
     color var(--motion-fast) var(--ease);

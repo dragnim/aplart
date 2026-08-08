@@ -369,28 +369,39 @@ test.describe('target sizes', () => {
  * Inline links inside prose are exempt from both and are excluded here;
  * standalone controls, including a disclosure's own summary, are not.
  */
+/**
+ * Every control large enough for the thing pointing at it.
+ *
+ * Two sizes rather than one, because the question is what is doing the pressing.
+ * A mouse is precise and a compact 32px control is comfortable under it; a finger
+ * is not, so a coarse pointer or a narrow window raises every control to 44. The
+ * interface asks the same question through a media query, and this asks it here
+ * so the assertion follows the same rule rather than a remembered number.
+ *
+ * WCAG 2.2 AA asks for 24×24. Both floors clear it; the larger one is this
+ * project's own standard for touch.
+ */
 async function assertComfortableTargets(page: Page): Promise<void> {
-  {
-    const undersized = await page.evaluate(() => {
-      const failures: string[] = [];
-      const elements = document.querySelectorAll(
-        'button, input[type="range"], select, summary, [role="tab"]',
-      );
+  const undersized = await page.evaluate(() => {
+    const touch = matchMedia('(pointer: coarse), (max-width: 60rem)').matches;
+    const floor = touch ? 44 : 32;
 
-      for (const element of elements) {
-        const box = element.getBoundingClientRect();
-        // Skip anything not currently rendered.
-        if (box.width === 0 && box.height === 0) continue;
-        if (box.height < 44 || box.width < 24) {
-          const label = element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '';
-          failures.push(
-            `${element.tagName.toLowerCase()} "${label.slice(0, 40)}" ${Math.round(box.width)}x${Math.round(box.height)}`,
-          );
-        }
+    const failures: string[] = [];
+    const elements = document.querySelectorAll('button, input[type="range"], select, summary, [role="tab"]');
+
+    for (const element of elements) {
+      const box = element.getBoundingClientRect();
+      // Skip anything not currently rendered.
+      if (box.width === 0 && box.height === 0) continue;
+      if (box.height < floor || box.width < 24) {
+        const label = element.getAttribute('aria-label') ?? element.textContent?.trim() ?? '';
+        failures.push(
+          `${element.tagName.toLowerCase()} "${label.slice(0, 40)}" ${Math.round(box.width)}x${Math.round(box.height)} < ${String(floor)}`,
+        );
       }
-      return failures;
-    });
+    }
+    return failures;
+  });
 
-    expect(undersized, `undersized controls:\n  ${undersized.join('\n  ')}`).toEqual([]);
-  }
+  expect(undersized, `undersized controls:\n  ${undersized.join('\n  ')}`).toEqual([]);
 }

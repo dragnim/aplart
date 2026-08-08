@@ -11,16 +11,16 @@
   gap: var(--space-2);
 }
 
+/*
+ * The shared control shape; importance comes from colour and weight below, not
+ * from making the primary action physically larger than its neighbours.
+ */
 .primary,
 .action {
-  min-height: var(--tap-target);
-  padding: 0 var(--space-4);
+  composes: control from global;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--text);
-  cursor: pointer;
-  font-weight: 600;
   transition:
     background var(--motion-fast) var(--ease),
     transform var(--motion-fast) var(--ease);

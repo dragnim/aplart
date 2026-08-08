@@ -5,10 +5,18 @@
  * both to 100% of this box lets one rule size all four, and keeps the tab's own
  * target size a decision of the tab rather than of the artwork.
  */
+/*
+ * The glyph, not the target.
+ *
+ * Each asset is drawn at 28 on a 24-unit viewBox; rendered at the icon token it
+ * sits inside a control-sized button with room around it. A target and the mark
+ * inside it are two different measurements, and tying them together is what made
+ * these buttons look like tooling.
+ */
 .icon {
   display: inline-flex;
-  inline-size: 1.5rem;
-  block-size: 1.5rem;
+  inline-size: var(--control-icon);
+  block-size: var(--control-icon);
   /* Nothing to select or drag: the button is the control, not the picture. */
   pointer-events: none;
 }

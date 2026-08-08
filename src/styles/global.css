@@ -86,6 +86,45 @@ a:hover {
   border-radius: var(--radius-sm);
 }
 
+/*
+ * The shape of an application control.
+ *
+ * One rule for the buttons that operate the workspace, rather than each
+ * component deciding again: height, type, padding and radius from the tokens,
+ * and nothing about colour — a primary action, a quiet action and a tab all
+ * share this and differ in their own stylesheets.
+ *
+ * A composable class rather than a `button` selector, because the site's other
+ * buttons — the gallery's cards, the home page's calls to action — are a
+ * different size on purpose and must not be dragged along.
+ */
+.control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-block-size: var(--control-height);
+  padding: 0 var(--control-padding-x);
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size);
+  font-weight: 600;
+  line-height: 1;
+  /* Labels stay on one line: a wrapped control is a control that changes size. */
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* Square, for a control whose whole content is one glyph. */
+.control-icon {
+  inline-size: var(--control-height);
+  padding: 0;
+}
+
+.control:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* Skip link — first tabbable element on every page. */
 .skip-link {
   position: absolute;

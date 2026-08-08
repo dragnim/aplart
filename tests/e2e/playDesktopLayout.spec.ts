@@ -91,20 +91,26 @@ for (const size of SIZES) {
       }
     });
 
-    test('opens on the artwork, and lets it run past the fold rather than shrink', async ({ page }) => {
+    test('shows the whole square, with room to breathe under it', async ({ page }) => {
       await openSession(page, size);
 
       const picture = await canvas(page).boundingBox();
       const box = await panel(page).boundingBox();
+      const foot = (picture?.y ?? 0) + (picture?.height ?? 0);
 
       /*
-       * Fully visible where it starts. Requiring the whole square above the fold
-       * is what held the composition to two-thirds of a wide window — a square
-       * that must clear the fold is sized by the screen's shortest side, whatever
-       * width is going spare.
+       * The whole artwork, in the window, without scrolling.
+       *
+       * It ran four hundred pixels past the fold while the width alone decided
+       * its size — which meant editing a picture whose foot you could not see.
+       * The height decides now, and this is the assertion that says so.
        */
       expect(picture?.y ?? 0).toBeGreaterThanOrEqual(0);
       expect(picture?.y ?? 0).toBeLessThan(size.height * 0.35);
+      expect(foot, `foot ${String(foot)} of ${String(size.height)}`).toBeLessThanOrEqual(size.height);
+
+      // Room beneath it, rather than the square landing on the window's edge.
+      expect(size.height - foot).toBeGreaterThanOrEqual(8);
 
       // And the artwork still leads the row it is in.
       expect(picture?.width ?? 0).toBeGreaterThan((box?.width ?? 0) * 1.5);
@@ -126,16 +132,53 @@ for (const size of SIZES) {
       );
 
       /*
-       * And the composition is not marooned in the middle of the window. The
-       * margins either side used to take a third of a 1920 screen; the session is
-       * laid out as an application now, so most of the width is the work.
+       * And the composition is not marooned in the middle of the window.
+       *
+       * Two thirds rather than the three quarters this once asked for: a square
+       * that fits a 16:9 window vertically cannot also fill it horizontally, and
+       * fitting the whole artwork is worth more than the last few per cent of
+       * width. The panel takes back part of the difference by growing with the
+       * artwork it sits beside.
        */
       const picture = await canvas(page).boundingBox();
       const box = await panel(page).boundingBox();
       const composition = (box?.x ?? 0) + (box?.width ?? 0) - (picture?.x ?? 0);
-      expect(composition / size.width).toBeGreaterThan(0.75);
+      expect(composition / size.width).toBeGreaterThan(0.65);
       // Not edge to edge either — the page keeps its margin.
       expect(composition).toBeLessThanOrEqual(size.width - 48);
+    });
+
+    test('gives its controls one size', async ({ page }) => {
+      await openSession(page, size);
+
+      /*
+       * Measured as a family rather than against a number: eighteen controls in
+       * a session once shared one height — the touch target — and diverged in
+       * type and padding, which is what made them look like several generations
+       * of interface at once. What matters is that they agree, not that they
+       * agree on 32px, so the assertion is about the spread.
+       */
+      const sizes = await page.evaluate(() => {
+        const groups = new Map<string, number>();
+        for (const element of document.querySelectorAll(
+          '[data-session-panel] button, [role="tab"], header ~ * button',
+        )) {
+          const rect = element.getBoundingClientRect();
+          if (rect.height === 0) continue;
+          const style = getComputedStyle(element);
+          // Sliders and other non-button controls are a different family.
+          if (element.tagName !== 'BUTTON' && element.getAttribute('role') !== 'tab') continue;
+          const key = `${String(Math.round(rect.height))}/${style.fontSize}/${style.borderRadius}`;
+          groups.set(key, (groups.get(key) ?? 0) + 1);
+        }
+        return [...groups.entries()].map(([key, count]) => `${key} ×${String(count)}`);
+      });
+
+      // One height, one type size, one radius across the session's buttons.
+      const heights = new Set(sizes.map((entry) => entry.split('/')[0]));
+      const fonts = new Set(sizes.map((entry) => entry.split('/')[1]));
+      expect([...heights], sizes.join('  ')).toHaveLength(1);
+      expect([...fonts], sizes.join('  ')).toHaveLength(1);
     });
 
     test('keeps the panel in the window, with its own content scrolling', async ({ page }) => {

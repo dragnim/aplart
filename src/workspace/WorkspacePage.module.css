@@ -175,20 +175,42 @@
    * cannot be moved by what is underneath it.
    */
   /*
-   * The composition is capped, not the artwork.
+   * Fit the whole square.
    *
-   * Eighty rem of picture, twenty-four of panel and two of gutter: past that a
-   * very large display gets margin rather than a still larger square. Below it
-   * the window decides, and the artwork takes whatever the panel does not.
+   * The artwork is sized by the *height* it has, because that is the dimension
+   * that runs out first on every desktop shape — and a picture whose foot is
+   * below the fold while you edit it is a picture you are editing blind. It was
+   * four hundred pixels past the fold before this.
    *
-   * `1fr` is safe here in a way it was not before, because the other track is
-   * bounded and the square below fills its track exactly. The dead gap this
-   * layout once had was a track sized to a fraction of the window with a square
-   * capped below it; there is no second number to disagree with now.
+   *   --play-panel    22rem at the narrowest desktop, growing to 30rem — but
+   *                   derived from the artwork's own size rather than from the
+   *                   window's width, because that is what decides whether the
+   *                   panel can afford to be wider. A panel sized to the width
+   *                   alone took 444px beside a 640px square, and the picture
+   *                   stopped leading the composition. Tied to the height the
+   *                   artwork gets, it grows only where there is a large picture
+   *                   to grow beside. The extra width is for the editor and the
+   *                   parameter lists; Create is deliberately airier, not wider.
+   *
+   *   --play-artwork  the smaller of what the height allows and what the width
+   *                   leaves once the panel, the gutter and the page's own
+   *                   margins are taken. The 14rem allowance is measured rather
+   *                   than assumed: the artwork's top edge sits 203px down the
+   *                   window — 77 of global header, 84 of session toolbar, the
+   *                   reserved line the action notice keeps so a message cannot
+   *                   shift the page, and the row's own offset — and the balance
+   *                   of the 224 is the breathing room under the square.
+   *
+   * In vw, dvh and rem, never percentages: these values size both a grid track
+   * and a box within it, and a percentage would resolve against a different
+   * base in each.
    */
-  max-inline-size: calc(80rem + 24rem + var(--space-6));
+  --play-panel: clamp(22rem, calc((100dvh - 14rem) / 1.7), 30rem);
+  --play-artwork: min(calc(100dvh - 14rem), calc(100vw - var(--play-panel) - 6rem));
+
   margin-inline: auto;
-  grid-template-columns: minmax(0, 1fr) minmax(22rem, 24rem);
+  grid-template-columns: var(--play-artwork) var(--play-panel);
+  justify-content: center;
   gap: var(--space-6);
   /*
    * Stretch, so the panel is as tall as the artwork and can divide that height
@@ -205,10 +227,10 @@
 /*
  * The square fills its track exactly.
  *
- * `100%` of a bounded track with `aspect-ratio: 1`, rather than a length written
- * out twice: the track and the picture cannot disagree when only one of them is
- * a number. A percentage *height* against an auto-height parent would resolve to
- * auto, which is how they came to disagree in the first place.
+ * `100%` of a track that is already the artwork's size, with `aspect-ratio: 1`:
+ * the track and the picture cannot disagree when only one of them is a number.
+ * A percentage *height* against an auto-height parent would resolve to auto,
+ * which is how they came to disagree in the first place.
  */
 .columns[data-play='true'] .artworkPanel {
   /*
@@ -360,12 +382,9 @@
 }
 
 .secondary {
-  min-height: var(--tap-target);
-  padding: 0 var(--space-4);
+  composes: control from global;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
   background: var(--surface);
-  cursor: pointer;
 }
 
 .secondary:hover {

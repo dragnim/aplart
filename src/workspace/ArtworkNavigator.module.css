@@ -28,15 +28,10 @@
 
 .toggle,
 .button {
-  min-block-size: var(--tap-target);
-  padding: 0 var(--space-3);
+  composes: control from global;
   border: 1px solid rgb(255 255 255 / 28%);
-  border-radius: var(--radius-md);
   background: rgb(23 23 23 / 78%);
   color: var(--text-on-dark);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  cursor: pointer;
   backdrop-filter: blur(6px);
 }
 
@@ -81,24 +76,25 @@
  */
 .pad {
   display: grid;
-  grid-template-columns: repeat(3, var(--tap-target));
-  grid-template-rows: repeat(3, var(--tap-target));
+  grid-template-columns: repeat(3, var(--control-height));
+  grid-template-rows: repeat(3, var(--control-height));
   gap: 2px;
 }
 
-.pad button {
-  display: grid;
-  place-items: center;
+/*
+ * A class rather than `.pad button`: the shared control shape is composed, and
+ * composition needs a class of its own to attach to.
+ */
+.padButton {
+  composes: control from global;
+  composes: control-icon from global;
   border: 1px solid rgb(255 255 255 / 28%);
-  border-radius: var(--radius-md);
   background: rgb(23 23 23 / 78%);
   color: var(--text-on-dark);
-  font-size: var(--text-sm);
-  cursor: pointer;
   backdrop-filter: blur(6px);
 }
 
-.pad button:hover {
+.padButton:hover {
   background: rgb(23 23 23 / 92%);
 }
 
@@ -129,15 +125,11 @@
 
 /* Square, so a symbol is centred rather than padded like a word. */
 .step {
-  inline-size: var(--tap-target);
-  min-block-size: var(--tap-target);
+  composes: control from global;
+  composes: control-icon from global;
   border: 1px solid rgb(255 255 255 / 28%);
-  border-radius: var(--radius-md);
   background: rgb(23 23 23 / 78%);
   color: var(--text-on-dark);
-  font-size: var(--text-base);
-  font-weight: 600;
-  cursor: pointer;
   backdrop-filter: blur(6px);
 }
 

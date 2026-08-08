@@ -68,7 +68,7 @@ export function ArtworkNavigator({ onPan, onZoom, onBack, backCount, available }
             <div className={styles.pad} role="group" aria-label="Move the view">
               <button
                 type="button"
-                className={styles.padUp}
+                className={`${styles.padButton} ${styles.padUp}`}
                 onClick={() => onPan(0, -STEP)}
                 aria-label="Pan up"
               >
@@ -76,7 +76,7 @@ export function ArtworkNavigator({ onPan, onZoom, onBack, backCount, available }
               </button>
               <button
                 type="button"
-                className={styles.padLeft}
+                className={`${styles.padButton} ${styles.padLeft}`}
                 onClick={() => onPan(-STEP, 0)}
                 aria-label="Pan left"
               >
@@ -84,7 +84,7 @@ export function ArtworkNavigator({ onPan, onZoom, onBack, backCount, available }
               </button>
               <button
                 type="button"
-                className={styles.padRight}
+                className={`${styles.padButton} ${styles.padRight}`}
                 onClick={() => onPan(STEP, 0)}
                 aria-label="Pan right"
               >
@@ -92,7 +92,7 @@ export function ArtworkNavigator({ onPan, onZoom, onBack, backCount, available }
               </button>
               <button
                 type="button"
-                className={styles.padDown}
+                className={`${styles.padButton} ${styles.padDown}`}
                 onClick={() => onPan(0, STEP)}
                 aria-label="Pan down"
               >

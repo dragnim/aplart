@@ -20,13 +20,9 @@
 
 .primary,
 .action {
-  min-height: var(--tap-target);
-  padding: 0 var(--space-4);
+  composes: control from global;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
   background: var(--surface);
-  cursor: pointer;
-  font-size: var(--text-sm);
 }
 
 /* Pause has to be the obvious control while anything is moving. */

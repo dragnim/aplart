@@ -144,19 +144,29 @@ test.describe('the Play workspace', () => {
     await stubTryApl(page);
     await openSession(page);
 
-    // 44 CSS pixels, the size this project uses everywhere else.
+    /*
+     * The floor the interface itself uses: 44 CSS pixels where a finger is doing
+     * the pressing, 32 under a mouse. A slider keeps the larger target either
+     * way — it is dragged rather than clicked, and a thin track is hard to catch
+     * with any pointer.
+     */
+    const touch = await page.evaluate(() => matchMedia('(pointer: coarse), (max-width: 60rem)').matches);
+    const floor = touch ? 44 : 32;
+
     for (const label of ['Complexity', 'Scale', 'Detail']) {
       const box = await slider(page, label).boundingBox();
       expect(box?.height ?? 0, label).toBeGreaterThanOrEqual(44);
     }
     for (const name of ['Randomise', 'Undo', 'Save image', 'Share']) {
       const box = await sessionActions(page).getByRole('button', { name }).boundingBox();
-      expect(box?.height ?? 0, name).toBeGreaterThanOrEqual(44);
+      expect(box?.height ?? 0, name).toBeGreaterThanOrEqual(floor);
     }
     // The tabs are icons, so their targets are worth measuring too.
-    for (const name of ['Create', 'Colour', 'Advanced', 'Code']) {
+    for (const name of ['Create', 'Colour', 'Animate', 'Advanced', 'Code']) {
       const box = await page.getByRole('tab', { name, exact: true }).boundingBox();
-      expect(box?.height ?? 0, name).toBeGreaterThanOrEqual(44);
+      expect(box?.height ?? 0, name).toBeGreaterThanOrEqual(floor);
+      // Square, so an icon-only control is not a sliver to aim at.
+      expect(box?.width ?? 0, name).toBeGreaterThanOrEqual(floor - 8);
     }
   });
 
