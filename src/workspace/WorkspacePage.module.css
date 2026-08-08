@@ -33,11 +33,20 @@
  * within it, and a percentage would resolve against a different base in each.
  */
 .page[data-session='true'] {
-  --play-panel: min(34.75rem, calc((100vw - 8rem) * 0.42));
-  --play-artwork: min(calc(100dvh - 13rem), calc(100vw - var(--play-panel) - 6rem));
-
-  max-width: calc(var(--play-artwork) + var(--play-panel) + var(--space-6));
-  padding-inline: 0;
+  /*
+   * How tall the square may be, and nothing else about the shell.
+   *
+   * The measure, the padding and the centring are the page's own — the same ones
+   * every other route uses — because shrink-wrapping the page to the artwork and
+   * the panel made the whole workspace slide about as its contents changed size.
+   * A workspace has a width; what sits inside it is what varies.
+   *
+   * The allowance is measured: the artwork's top edge sits 187px down the window
+   * — 77 of global header, 84 of session toolbar and the line the action notice
+   * reserves so a message cannot shift the page — and the balance of the 208 is
+   * the room beneath the square.
+   */
+  --play-artwork: calc(100dvh - 13rem);
 }
 
 .shareNotice {
@@ -198,15 +207,15 @@
    * cannot be moved by what is underneath it.
    */
   /*
-   * The tracks the page has already worked out.
+   * The ordinary workspace's grid, mirrored.
    *
-   * Both are declared on the page rather than here, because the toolbar above
-   * has to be the same width as the row below it — one workspace, not a header
-   * that spans the screen over a composition that does not.
+   * That layout gives its controls two fifths of the measure and its artwork the
+   * rest, and lets the square be height-limited inside its track — any width the
+   * picture cannot use stays inside the workspace instead of contracting it. The
+   * only change here is which side each is on: the artwork leads, and the panel
+   * of modes takes the two fifths the old control column had.
    */
-  margin-inline: auto;
-  grid-template-columns: var(--play-artwork) var(--play-panel);
-  justify-content: center;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 40%);
   gap: var(--space-6);
   /*
    * Stretch, so the panel is as tall as the artwork and can divide that height
@@ -249,7 +258,18 @@
   position: relative;
   top: auto;
   align-self: start;
+  /*
+   * As wide as its track allows, or as tall as the window allows, whichever is
+   * the smaller — the square then needs no arithmetic of its own.
+   *
+   * Held to the end of its track so that width the picture cannot use falls on
+   * the outside of the workspace, where it reads as margin, rather than between
+   * the artwork and the controls, where it would read as a hole. It is the same
+   * loose edge the ordinary workspace has, on the side the mirror puts it.
+   */
   inline-size: 100%;
+  max-inline-size: var(--play-artwork);
+  justify-self: end;
   aspect-ratio: 1;
   block-size: auto;
   max-height: none;
@@ -452,8 +472,27 @@
    * sizes the artwork with `inline-size` — which this rule did not override, so
    * entering Focus mode from a session left the picture clamped to its
    * side-by-side width with the rest of the screen empty.
+   *
+   * The ceiling has to come off with it. A session bounds the square by the
+   * window's height so the whole of it is visible beside the controls; carried
+   * into Focus mode that number is simply smaller than the window, and the
+   * picture sat in one corner of a black screen with a third of it unused.
    */
   inline-size: auto;
+  max-inline-size: none;
+  /*
+   * And the alignment with them, which is the one that actually bites.
+   *
+   * A session holds the square to the end of its track and the top of its row.
+   * Those are grid values, but they do not stop applying when the box becomes
+   * absolutely positioned: an abspos box with insets on both sides and any
+   * self-alignment other than `stretch` takes its content's size instead of the
+   * space between the insets. So Focus mode inherited a picture sized to the
+   * canvas it happened to be drawing, pinned to the top right of a black
+   * window, with a third of the screen unused beside it.
+   */
+  justify-self: stretch;
+  align-self: stretch;
 }
 
 .page[data-focus='true'] .artworkPanel > * {

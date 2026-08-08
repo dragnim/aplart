@@ -143,9 +143,12 @@
 /* ── The mode you are in ───────────────────────────────────────────────── */
 
 /*
- * The mode's own content, on the page's ground rather than on a surface of this
- * panel's making. What needs a card — the curated controls, the editor — brings
- * its own, exactly as the sections of the ordinary workspace's column do.
+ * The mode's own surface: one card for whichever mode is showing.
+ *
+ * Sized by its contents, not by the artwork. Removing the card altogether left
+ * Advanced's controls floating on the page with nothing holding them together;
+ * stretching it to the artwork's height left Create painting several hundred
+ * pixels of empty white. A card that ends where its content ends is neither.
  *
  * It scrolls only when the column has run out of window: with a content-sized
  * row and a ceiling on the panel, a short mode is short and a long one keeps its
@@ -154,8 +157,10 @@
 .content {
   min-block-size: 0;
   overflow-y: auto;
-  /* Room for a focus ring against the scrolling edge. */
-  padding: 2px;
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
 }
 
 .tabPanel:focus-visible {

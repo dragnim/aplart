@@ -6,13 +6,14 @@
  * ground, one filled button, and no motif of its own.
  */
 
+/*
+ * No surface of its own: the mode it sits in provides one, and a card inside a
+ * card is a border drawn twice around the same three sliders. It keeps its
+ * spacing, which is all it needed from that rule.
+ */
 .panel {
   display: grid;
   gap: var(--space-4);
-  padding: var(--space-4);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
 }
 
 .heading {
