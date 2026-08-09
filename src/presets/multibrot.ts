@@ -207,6 +207,15 @@ export const multibrot: ArtworkPreset = {
     { glyph: '⌽', name: 'Reverse', shortDescription: 'Turns a list back to front.' },
   ],
 
+  /*
+   * Retired from the gallery listing, not from the application.
+   *
+   * A line of arithmetic from Mandelbrot, and the gallery now leads with
+   * patterns somebody would use as a texture. The address still resolves, so a
+   * link anybody has already shared still opens the artwork it named.
+   */
+  listed: false,
+
   thumbnailPath: 'thumbnails/multibrot.png',
   fixturePath: 'tests/fixtures/multibrot.json',
   tags: ['fractal', 'iteration', 'complex plane'],

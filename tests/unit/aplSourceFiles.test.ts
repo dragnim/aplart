@@ -123,6 +123,16 @@ describe('the files themselves', () => {
 describe('the programs are unchanged by the move', () => {
   /** Preset id to the first twelve hex digits of the SHA-256 of its program. */
   const EXPECTED: Readonly<Record<string, { digest: string; characters: number; lines: number }>> = {
+    /*
+     * The tiling artworks, added when the gallery turned toward patterns people
+     * would actually use behind something. Each is periodic in cells by
+     * construction, which `tileArtworks.test.ts` holds them to — these entries
+     * are here so that a change to one of the programs has to be deliberate.
+     */
+    'basket-weave': { digest: 'e17ecb446e50', characters: 352, lines: 13 },
+    'quilt-stars': { digest: '520a3701e559', characters: 443, lines: 17 },
+    'maze-tiles': { digest: 'b204743e3675', characters: 514, lines: 18 },
+    'glow-grid': { digest: '9c78b72d51cf', characters: 662, lines: 21 },
     'modular-bloom': { digest: '7cbb36a27a3a', characters: 137, lines: 7 },
     'checker-shift': { digest: 'f6062cf76e13', characters: 136, lines: 7 },
     'wave-interference': { digest: 'f6257e4a3a63', characters: 440, lines: 17 },

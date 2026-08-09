@@ -213,6 +213,96 @@ function evaluate(expression: string): NumericMatrix | { readonly error: readonl
   }
 
   /*
+   * The tiling artworks.
+   *
+   * Answered here because "Start creating" draws from them: an artwork this stub
+   * cannot evaluate arrives as a VALUE ERROR, which would make the journey specs
+   * pass or fail depending on which one the seed happened to choose. Each
+   * follows its preset's own arithmetic rather than returning a fixed picture,
+   * so a control that changes the artwork changes what comes back.
+   *
+   * `mod` is APL's residue rather than JavaScript's remainder: the two disagree
+   * on negative numbers, and these patterns fold coordinates that go negative.
+   */
+  const mod = (value: number, by: number) => ((value % by) + by) % by;
+
+  const width = read('width');
+  const relief = read('relief');
+  if (size !== null && width !== null && width !== 0 && relief !== null) {
+    const rows: number[][] = [];
+    for (let r = 0; r < size; r += 1) {
+      const values: number[] = [];
+      for (let c = 0; c < size; c += 1) {
+        const over = mod(Math.floor(r / width) + Math.floor(c / width), 2);
+        const u = mod(c, width) / width;
+        const v = mod(r, width) / width;
+        const shade = 0.5 + 0.5 * Math.sin(Math.PI * 2 * (over * u + (1 - over) * v));
+        values.push(Math.floor(0.5 + 99 * shade ** (relief / 3)));
+      }
+      rows.push(values);
+    }
+    return fromNested(rows);
+  }
+
+  const block = read('block');
+  const rings = read('rings');
+  const shape = read('shape');
+  if (size !== null && block !== null && block !== 0 && rings !== null && shape !== null) {
+    const mix = shape / 6;
+    const rows: number[][] = [];
+    for (let r = 0; r < size; r += 1) {
+      const v = Math.abs(mod(r, block) / block - 0.5);
+      const values: number[] = [];
+      for (let c = 0; c < size; c += 1) {
+        const u = Math.abs(mod(c, block) / block - 0.5);
+        const star = Math.max(u, v) * (1 - mix) + (mix * (u + v)) / 2;
+        values.push(Math.floor(0.5 + 99 * mod(rings * 2 * star, 1)));
+      }
+      rows.push(values);
+    }
+    return fromNested(rows);
+  }
+
+  const cell = read('cell');
+  const weight = read('weight');
+  if (size !== null && cell !== null && cell !== 0 && seed !== null && weight !== null) {
+    const tiles = size / cell;
+    const rows: number[][] = [];
+    for (let r = 0; r < size; r += 1) {
+      const values: number[] = [];
+      for (let c = 0; c < size; c += 1) {
+        const h = mod(Math.floor(r / cell), tiles);
+        const k = mod(Math.floor(c / cell), tiles);
+        const hashed = 43_758.5453 * Math.sin(12.9898 * h + 78.233 * k + seed * 0.618_033_988_7);
+        const pick = mod(Math.floor(hashed), 2);
+        const d = pick === 1 ? mod(c - r, cell) : mod(c + r, cell);
+        const line = Math.min(cell, d, cell - d);
+        values.push(Math.floor(0.5 + 99 * Math.max(0, 1 - line / weight)));
+      }
+      rows.push(values);
+    }
+    return fromNested(rows);
+  }
+
+  const spacing = read('spacing');
+  const glow = read('glow');
+  if (size !== null && spacing !== null && spacing !== 0 && glow !== null) {
+    const rows: number[][] = [];
+    for (let r = 0; r < size; r += 1) {
+      const step = mod(Math.floor(r / spacing), 3) * (spacing / 3);
+      const v = mod(r, spacing) / spacing - 0.5;
+      const values: number[] = [];
+      for (let c = 0; c < size; c += 1) {
+        const u = mod(c + step, spacing) / spacing - 0.5;
+        const d = Math.sqrt(u * u + v * v);
+        values.push(Math.floor(0.5 + 99 * Math.max(0, 1 - 2 * d) ** (glow / 2)));
+      }
+      rows.push(values);
+    }
+    return fromNested(rows);
+  }
+
+  /*
    * Checker Shift.
    *
    *   repeat|(⍳size)∘.+offset×⍳size

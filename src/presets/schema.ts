@@ -172,6 +172,16 @@ export interface ArtworkPreset {
   readonly fixturePath: string;
   readonly featured?: boolean;
   /**
+   * Whether the gallery lists this artwork. Defaults to true.
+   *
+   * An unlisted piece is still a piece: its address resolves, it opens in the
+   * workspace, and a link somebody was sent still works. What it does not do is
+   * take up a card in a catalogue that is meant to lead with the patterns —
+   * which is the difference between retiring an artwork from the front of the
+   * gallery and deleting somebody's shared link.
+   */
+  readonly listed?: boolean;
+  /**
    * Set by the preset that opens when somebody chooses to start creating.
    *
    * Declares which existing parameters become creative controls, what they are

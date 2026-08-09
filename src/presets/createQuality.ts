@@ -82,6 +82,72 @@ export function curatedValuesAfter(
   return rule === undefined ? values : rule(values, variable);
 }
 
+/**
+ * The rule every tiling artwork shares: the grid must be a whole number of
+ * pattern periods across.
+ *
+ * These patterns repeat on a period measured in cells — a strap width, a block,
+ * a tile. Draw such a pattern on a grid that is not a whole number of periods
+ * wide and the artwork itself still looks right; it is only when the result is
+ * repeated that the join lands mid-period and a seam appears. Since a seamless
+ * repeat is the whole point of these pieces, Create keeps the grid on the grid.
+ *
+ * `size` names the grid control and `period` computes the repeat from the other
+ * values. Whichever of the two the person is holding, the other gives way: drag
+ * the grid and the pattern resizes to fit it, drag the pattern and the grid
+ * grows to the next whole number of it. Advanced still writes either freely.
+ */
+export function tilePeriodRule(options: {
+  readonly size: string;
+  readonly period: (values: CuratedValues) => number;
+  readonly sizeRange: { readonly min: number; readonly max: number };
+  readonly periodVariable: string;
+  readonly periodRange: { readonly min: number; readonly max: number; readonly step: number };
+}): CreateQualityRule {
+  return (values, holding) => {
+    const size = values.get(options.size);
+    if (typeof size !== 'number') return values;
+
+    const period = options.period(values);
+    if (!Number.isFinite(period) || period <= 0 || size % period === 0) return values;
+
+    const adjusted = new Map(values);
+
+    /*
+     * The grid is being dragged, so the pattern moves instead. Only the period
+     * control can move it, and only in its own steps — a strap width of 7 where
+     * the control offers even numbers would be a value the slider could never
+     * return to.
+     */
+    if (holding === options.size) {
+      const current = values.get(options.periodVariable);
+      if (typeof current !== 'number') return values;
+
+      const next = nearestAccepted(current, options.periodRange.min, options.periodRange.max, (candidate) => {
+        if ((candidate - options.periodRange.min) % options.periodRange.step !== 0) return false;
+        const trial = new Map(values);
+        trial.set(options.periodVariable, candidate);
+        const trialPeriod = options.period(trial);
+        return trialPeriod > 0 && size % trialPeriod === 0;
+      });
+
+      if (next !== null) adjusted.set(options.periodVariable, next);
+      return adjusted;
+    }
+
+    // Otherwise the grid gives way, to the nearest whole number of periods that
+    // is still a size this artwork offers.
+    const wanted = Math.round(size / period) * period;
+    const clamped = Math.min(
+      Math.max(wanted < period ? period : wanted, options.sizeRange.min),
+      options.sizeRange.max,
+    );
+    const fitted = Math.floor(clamped / period) * period;
+    adjusted.set(options.size, fitted >= period ? fitted : period);
+    return adjusted;
+  };
+}
+
 /** The greatest common divisor, for the rules that care about shared factors. */
 export function gcd(a: number, b: number): number {
   let [x, y] = [Math.abs(Math.round(a)), Math.abs(Math.round(b))];

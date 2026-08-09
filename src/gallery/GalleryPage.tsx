@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { hrefForPlay } from '@/app/router';
-import { presets, starterFor } from '@/presets/presets';
+import { listedPresets, starterFor } from '@/presets/presets';
 import { randomSeed } from '@/workspace/randomise';
 import { ArtworkCard } from './ArtworkCard';
 import { GalleryFilters } from './GalleryFilters';
@@ -32,12 +32,12 @@ export function GalleryPage() {
   const counts = useMemo(() => {
     const result = {} as Record<FilterId, number>;
     for (const { id } of FILTERS) {
-      result[id] = presets.filter((preset) => matchesFilter(preset, id)).length;
+      result[id] = listedPresets.filter((preset) => matchesFilter(preset, id)).length;
     }
     return result;
   }, []);
 
-  const visible = useMemo(() => presets.filter((preset) => matchesFilter(preset, filter)), [filter]);
+  const visible = useMemo(() => listedPresets.filter((preset) => matchesFilter(preset, filter)), [filter]);
 
   return (
     <div className={styles.page}>
@@ -74,12 +74,12 @@ export function GalleryPage() {
           Artworks
         </h2>
 
-        {presets.length > 0 && <GalleryFilters active={filter} counts={counts} onChange={setFilter} />}
+        {listedPresets.length > 0 && <GalleryFilters active={filter} counts={counts} onChange={setFilter} />}
 
         <div className={styles.grid}>
           {visible.length === 0 ? (
             <p className={styles.empty}>
-              {presets.length === 0
+              {listedPresets.length === 0
                 ? 'The first artworks are still being written. Check back shortly.'
                 : 'No artworks match that filter yet.'}
             </p>

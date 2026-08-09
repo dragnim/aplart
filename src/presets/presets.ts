@@ -7,35 +7,54 @@
  * preset fails the build long before it can reach a visitor.
  */
 
+import { basketWeave } from './basket-weave';
 import { burningShip } from './burning-ship';
 import { cellularEcho } from './cellular-echo';
 import { checkerShift } from './checker-shift';
+import { glowGrid } from './glow-grid';
 import { juliaSet } from './julia-set';
 import { mandelbrotField } from './mandelbrot-field';
+import { mazeTiles } from './maze-tiles';
 import { modularBloom } from './modular-bloom';
 import { multibrot } from './multibrot';
+import { quiltStars } from './quilt-stars';
 import { sierpinskiArray } from './sierpinski-array';
 import { tricorn } from './tricorn';
 import { truchetGrid } from './truchet-grid';
 import { waveInterference } from './wave-interference';
 import { validatePreset, type ArtworkPreset, type PresetValidationIssue } from './schema';
 
-// Presets are registered here as they are authored. Each lives in its own
-// module so that its APL, parameters and prose stay together.
-//
-// Gallery order, roughly easiest first, so a visitor scrolling down meets the
-// gentle pieces before the fractals.
-//
-// Julia sits after Mandelbrot despite being the easier of the two to read. Its
-// description is written in terms of Mandelbrot's — the whole point of it is the
-// two lines that differ — so meeting it second is what makes the comparison
-// available. Burning Ship follows for the same reason: its one difference from
-// Mandelbrot only means anything once Mandelbrot has been seen.
+/*
+ * Presets are registered here as they are authored. Each lives in its own
+ * module so that its APL, parameters and prose stay together.
+ *
+ * The order is the gallery's, and it leads with the patterns.
+ *
+ * That is a change of emphasis rather than of taste. The question this
+ * collection is now judged by is whether somebody would put a piece behind
+ * something of their own — as a background, a texture, a tile — and the answers
+ * are the seamless patterns. They come first, in rough order of how immediately
+ * they read: a weave, a quilt, a maze, a lattice, then the arithmetic patterns
+ * that started the gallery.
+ *
+ * The fractals follow. They are the best things here to *explore*, which is a
+ * different pleasure and a later one; a visitor who wants to wander a plane will
+ * scroll for it, and one who wants a texture should not have to.
+ *
+ * Julia sits after Mandelbrot despite being the easier of the two to read. Its
+ * description is written in terms of Mandelbrot's — the whole point of it is the
+ * two lines that differ — so meeting it second is what makes the comparison
+ * available. Burning Ship follows for the same reason.
+ */
 const authored: readonly ArtworkPreset[] = [
+  basketWeave,
+  quiltStars,
+  mazeTiles,
+  glowGrid,
   modularBloom,
+  truchetGrid,
   checkerShift,
   waveInterference,
-  truchetGrid,
   sierpinskiArray,
   cellularEcho,
   mandelbrotField,
@@ -63,7 +82,25 @@ if (issues.length > 0) {
   }
 }
 
+/**
+ * Every artwork that loaded, listed or not.
+ *
+ * This is what an address resolves against, so an unlisted piece still opens and
+ * a link somebody was sent still works.
+ */
 export const presets: readonly ArtworkPreset[] = valid;
+
+/**
+ * The artworks the gallery shows.
+ *
+ * Tricorn and Multibrot are not among them. Both are a line of arithmetic away
+ * from Mandelbrot, and the gallery has stopped being a survey of the family —
+ * Multibrot in particular is the longest and hardest program here for a
+ * difference most people would not name. They are retired from the front rather
+ * than deleted: their addresses still work, so nothing anybody has shared is
+ * broken by the decision.
+ */
+export const listedPresets: readonly ArtworkPreset[] = valid.filter((preset) => preset.listed !== false);
 
 /** Problems found while loading; surfaced by `npm run validate:presets`. */
 export const presetIssues: readonly PresetValidationIssue[] = issues;
@@ -91,10 +128,14 @@ export function featuredPreset(): ArtworkPreset | undefined {
  * Order is fixed, so the seed below means the same thing tomorrow.
  */
 export const START_CREATING_POOL: readonly string[] = [
+  'basket-weave',
+  'quilt-stars',
+  'maze-tiles',
+  'glow-grid',
   'modular-bloom',
+  'truchet-grid',
   'checker-shift',
   'wave-interference',
-  'truchet-grid',
 ];
 
 /**

@@ -62,7 +62,7 @@ const firstControl = base.controls[0] as InstantPlayControl;
 const firstRecipe = base.recipes[0] as InstantPlayRecipe;
 
 describe('the presets with curated controls', () => {
-  it('are the four pattern families Start creating draws from', () => {
+  it('are the patterns, and only the patterns', () => {
     /*
      * It was Modular Bloom alone, and that was also what decided which artworks
      * had a workspace worth using — curated controls and the tabbed workspace
@@ -77,8 +77,21 @@ describe('the presets with curated controls', () => {
     const opted = presets.filter((preset) => preset.instantPlay !== undefined);
 
     expect(opted.map((preset) => preset.id).sort()).toEqual(
-      ['checker-shift', 'modular-bloom', 'truchet-grid', 'wave-interference'].sort(),
+      [
+        'basket-weave',
+        'checker-shift',
+        'glow-grid',
+        'maze-tiles',
+        'modular-bloom',
+        'quilt-stars',
+        'truchet-grid',
+        'wave-interference',
+      ].sort(),
     );
+
+    // And none of them is a fractal, which is the shape of the decision rather
+    // than a list that happens to be true today.
+    for (const preset of opted) expect(preset.category, preset.id).not.toBe('fractal');
   });
 
   it('every one of them validates, so none can open an empty Create tab', () => {

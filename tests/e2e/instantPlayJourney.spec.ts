@@ -57,7 +57,7 @@ test.describe('the Instant Play journey', () => {
     await expect(
       page.getByRole('heading', {
         level: 1,
-        name: /Modular Bloom|Checker Shift|Wave Interference|Truchet Grid/,
+        name: /Basket Weave|Quilt Stars|Maze Tiles|Glow Grid|Modular Bloom|Truchet Grid|Checker Shift|Wave Interference/,
       }),
     ).toBeVisible();
     await expect(artwork(page)).toBeVisible({ timeout: 30_000 });

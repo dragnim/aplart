@@ -17,7 +17,10 @@ function runStatus(page: Page) {
 
 async function openModularBloom(page: Page) {
   await page.goto('./');
-  await page.getByRole('link', { name: /^Open/ }).first().click();
+  // By name rather than by position. The gallery leads with the patterns now,
+  // so the first card is a weave — and every assertion below is about this
+  // artwork's own program and parameters.
+  await page.getByRole('link', { name: /^Open Modular Bloom/ }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Modular Bloom' })).toBeVisible();
 }
 
@@ -266,7 +269,14 @@ test.describe('keyboard and screen reader use', () => {
 
     await page.keyboard.press('Enter');
 
-    await expect(page.getByRole('heading', { level: 1, name: 'Modular Bloom' })).toBeVisible();
+    /*
+     * Whichever artwork the keyboard actually reached, rather than a named one.
+     * The gallery leads with the patterns now, so the first card is no longer
+     * Modular Bloom — and what this journey is about is that Tab and Enter open
+     * the card they landed on, not which card that is.
+     */
+    const opened = focused.replace(/^Open\s*/u, '');
+    await expect(page.getByRole('heading', { level: 1, name: opened })).toBeVisible();
     await runAndWait(page);
     await expect(page.getByRole('img', { name: /grid/ })).toBeVisible();
   });

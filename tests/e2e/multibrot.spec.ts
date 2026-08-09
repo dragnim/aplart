@@ -44,19 +44,22 @@ async function canvasDigest(page: Page): Promise<string> {
 test.describe('Multibrot', () => {
   test.use({ viewport: WIDE });
 
-  test('is in the gallery with a thumbnail, and the card opens the artwork', async ({ page }) => {
+  test('is retired from the gallery, and still opens from its own address', async ({ page }) => {
+    /*
+     * This used to assert Multibrot had a card. It does not any more: the
+     * gallery leads with patterns somebody would use as a texture, and this is
+     * one line of arithmetic away from Mandelbrot in the longest program here.
+     *
+     * Retired rather than deleted, which is the part worth testing — anybody
+     * who has already shared a link to it must still find the artwork.
+     */
     await stubTryApl(page);
     await page.goto('./#/');
 
-    await expect(page.getByRole('heading', { name: 'Multibrot', exact: true })).toBeVisible();
-    await expect(page.getByText(/Replace the square with another integer power/)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Multibrot', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Open Multibrot' })).toHaveCount(0);
 
-    const thumbnail = page.locator('img[src*="multibrot"]').first();
-    await thumbnail.scrollIntoViewIfNeeded();
-    await expect(thumbnail).toBeVisible();
-    expect(await thumbnail.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
-
-    await page.getByRole('link', { name: 'Open Multibrot' }).click();
+    await page.goto('./#/art/multibrot');
     await expect(page.getByRole('heading', { level: 1, name: 'Multibrot' })).toBeVisible();
     expect(page.url()).toContain('#/art/multibrot');
     await expect(await editorOn(page)).toContainText('power←3');

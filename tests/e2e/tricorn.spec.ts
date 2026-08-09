@@ -40,19 +40,22 @@ test.describe('Tricorn', () => {
    * itself advertises, so an artwork that never reached the gallery would not fail
    * them.
    */
-  test('is in the gallery with a thumbnail, and the card opens the artwork', async ({ page }) => {
+  test('is retired from the gallery, and still opens from its own address', async ({ page }) => {
+    /*
+     * This used to assert Tricorn had a card. It does not any more: the gallery
+     * leads with patterns somebody would use as a texture, and this is one sign
+     * away from Mandelbrot.
+     *
+     * Retired rather than deleted, which is the part worth testing — anybody who
+     * has already shared a link to it must still find the artwork.
+     */
     await stubTryApl(page);
     await page.goto('./#/');
 
-    await expect(page.getByRole('heading', { name: 'Tricorn', exact: true })).toBeVisible();
-    await expect(page.getByText(/Reversing the sign of the imaginary update/)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Tricorn', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Open Tricorn' })).toHaveCount(0);
 
-    const thumbnail = page.locator('img[src*="tricorn"]').first();
-    await thumbnail.scrollIntoViewIfNeeded();
-    await expect(thumbnail).toBeVisible();
-    expect(await thumbnail.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
-
-    await page.getByRole('link', { name: 'Open Tricorn' }).click();
+    await page.goto('./#/art/tricorn');
     await expect(page.getByRole('heading', { level: 1, name: 'Tricorn' })).toBeVisible();
     expect(page.url()).toContain('#/art/tricorn');
     await expect(await editorOn(page)).toContainText('ci-2×zr×zi');

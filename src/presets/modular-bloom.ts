@@ -279,7 +279,6 @@ export const modularBloom: ArtworkPreset = {
 
   thumbnailPath: 'thumbnails/modular-bloom.png',
   fixturePath: 'tests/fixtures/modular-bloom.json',
-  featured: true,
   tags: ['multiplication', 'modular arithmetic', 'symmetry'],
 
   tryChangingThis: [

@@ -175,12 +175,12 @@ test.describe('a Start creating session', () => {
 
     await startAction(page).click();
 
-    // One of the four artworks the seed may choose, rather than always Modular
-    // Bloom: the pool is what Start creating draws from now.
+    // One of the artworks the seed may choose, rather than always Modular
+    // Bloom: the pool of patterns is what Start creating draws from now.
     await expect(
       page.getByRole('heading', {
         level: 1,
-        name: /Modular Bloom|Checker Shift|Wave Interference|Truchet Grid/,
+        name: /Basket Weave|Quilt Stars|Maze Tiles|Glow Grid|Modular Bloom|Truchet Grid|Checker Shift|Wave Interference/,
       }),
     ).toBeVisible();
     await waitForArtwork(page);
