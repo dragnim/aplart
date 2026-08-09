@@ -15,9 +15,19 @@
   overscroll-behavior: none;
 }
 
+/*
+ * Centred, at whatever size the world is being shown at.
+ *
+ * `margin: auto` against insets of zero is what centres an element of known
+ * size in its container both ways. The world keeps its own proportions, so a
+ * window that no longer matches them letterboxes — and the page behind takes the
+ * world's background colour, so the letterbox reads as space rather than as a
+ * black bar somebody forgot about.
+ */
 .canvas {
   position: absolute;
   inset: 0;
+  margin: auto;
   display: block;
   /*
    * Crisp cells. The canvas is drawn at device resolution and cells are whole
@@ -63,8 +73,57 @@
   pointer-events: none;
 }
 
+/* `display: flex` above would otherwise defeat the `hidden` attribute. */
+.bar[hidden] {
+  display: none;
+}
+
 .bar > * {
   pointer-events: auto;
+}
+
+/*
+ * The only thing left when the interface is hidden.
+ *
+ * Small, dim and in the corner: enough that somebody who has forgotten about H
+ * can find their way back, little enough that it is not part of the picture. It
+ * comes up to full strength on hover or focus, so it is never a guess.
+ */
+.restore {
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline-end: var(--space-2);
+  z-index: 2;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  padding: 0;
+
+  border: 1px solid rgb(247 247 247 / 12%);
+  border-radius: var(--radius-sm);
+  background: rgb(4 5 10 / 30%);
+  color: rgb(247 247 247 / 34%);
+  font-size: var(--text-sm);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    opacity var(--motion-base) var(--ease),
+    color var(--motion-base) var(--ease);
+}
+
+.restore:hover,
+.restore:focus-visible {
+  background: rgb(4 5 10 / 72%);
+  border-color: rgb(247 247 247 / 34%);
+  color: #f7f7f7;
+}
+
+.restore:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .home {

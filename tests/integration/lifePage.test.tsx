@@ -24,6 +24,10 @@ let reducedMotion = false;
 
 beforeEach(() => {
   reducedMotion = false;
+  // The resize tests below move the window, and a world is sized from it — so
+  // every test starts from the same one rather than from whatever ran last.
+  window.innerWidth = 1024;
+  window.innerHeight = 768;
   vi.stubGlobal('matchMedia', (query: string) => ({
     matches: query.includes('prefers-reduced-motion') ? reducedMotion : true,
     media: query,
@@ -55,6 +59,14 @@ describe('opening the page', () => {
     expect(screen.getByRole('img')).toHaveAccessibleName(
       /Conway's Game of Life on a \d+ by \d+ toroidal grid/u,
     );
+  });
+
+  it('offers Steady by default, and names the fastest speed Godspeed You!', () => {
+    render(<LifePage />);
+
+    const speed = screen.getByLabelText('Speed');
+    expect(speed).toHaveValue('steady');
+    expect(within(speed).getByRole('option', { name: 'Godspeed You!' })).toBeInTheDocument();
   });
 
   it('opens in Sunset, with the other palettes still on offer', () => {
@@ -159,6 +171,108 @@ describe('the controls', () => {
 
     await user.click(screen.getByRole('button', { name: 'Reset' }));
     expect(readout().alive).toBe(opening);
+  });
+});
+
+describe('resizing the window', () => {
+  /** The grid the canvas says it is, which is the world's own shape. */
+  function shape(): string {
+    const label = screen.getByRole('img').getAttribute('aria-label') ?? '';
+    return /on a (\d+ by \d+) toroidal grid/u.exec(label)?.[1] ?? '';
+  }
+
+  const resizeTo = (width: number, height: number) => {
+    window.innerWidth = width;
+    window.innerHeight = height;
+    fireEvent(window, new Event('resize'));
+  };
+
+  it('leaves the running world exactly as it was', async () => {
+    const user = userEvent.setup();
+    render(<LifePage />);
+
+    await user.click(screen.getByRole('button', { name: 'Pause' }));
+    for (let step = 0; step < 40; step += 1) fireEvent.keyDown(window, { key: '.' });
+
+    const before = { shape: shape(), ...readout() };
+    expect(before.alive).toBeGreaterThan(5);
+
+    /*
+     * The point of the whole model. Dragging a corner used to reshape the grid,
+     * which deleted every cell outside the new rectangle and changed the torus
+     * those cells were living on — a window doing arithmetic on a universe.
+     */
+    resizeTo(640, 480);
+    expect(shape()).toBe(before.shape);
+    expect(readout()).toEqual({ generation: before.generation, alive: before.alive });
+
+    resizeTo(2560, 1440);
+    expect(shape()).toBe(before.shape);
+    expect(readout()).toEqual({ generation: before.generation, alive: before.alive });
+  });
+
+  it('gives a new run the size of the window it is started in', async () => {
+    const user = userEvent.setup();
+    render(<LifePage />);
+    const opening = shape();
+
+    // A resize alone changes nothing...
+    resizeTo(2560, 1440);
+    expect(shape()).toBe(opening);
+
+    // ...but the next run is entitled to fit the window it begins in.
+    await user.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(shape()).not.toBe(opening);
+    expect(readout()).toEqual({ generation: 0, alive: 5 });
+  });
+});
+
+describe('hiding the interface', () => {
+  it('takes the whole interface away and leaves one way back', async () => {
+    const user = userEvent.setup();
+    render(<LifePage />);
+
+    await user.click(screen.getByRole('button', { name: 'Hide controls' }));
+
+    expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'View APL' })).toBeNull();
+    // `hidden: true` because a hidden bar is gone from the accessibility tree
+    // too, which is the point — this is asserting it is still in the document.
+    expect(screen.getByRole('banner', { hidden: true })).not.toBeVisible();
+
+    // Small, but present, named, and reachable by keyboard.
+    const back = screen.getByRole('button', { name: 'Show controls' });
+    await user.click(back);
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+  });
+
+  it('toggles on H, and leaves the world entirely alone', async () => {
+    const user = userEvent.setup();
+    render(<LifePage />);
+
+    await user.click(screen.getByRole('button', { name: 'Pause' }));
+    fireEvent.keyDown(window, { key: '.' });
+    const before = readout();
+
+    fireEvent.keyDown(window, { key: 'h' });
+    expect(screen.queryByRole('button', { name: 'Play' })).toBeNull();
+    // Hiding the chrome is not a simulation event: no step, no reset, no pause.
+    expect(readout()).toEqual(before);
+
+    fireEvent.keyDown(window, { key: 'h' });
+    // Still paused, so still offering Play — the interface came back as it was.
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+    expect(readout()).toEqual(before);
+  });
+
+  it('brings the interface back on Escape, for somebody who has lost it', () => {
+    render(<LifePage />);
+
+    fireEvent.keyDown(window, { key: 'h' });
+    expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
   });
 });
 

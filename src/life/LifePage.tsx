@@ -20,7 +20,7 @@ import { usePublishAccentPalette } from '@/theme/accentContext';
 import { MAX_AGE, population } from './lifeEngine';
 import { LIFE_APL } from './lifeSource';
 import { LifeCodePanel } from './LifeCodePanel';
-import { SPEEDS, useLifeSimulation, type SpeedId } from './useLifeSimulation';
+import { SPEEDS, useLifeSimulation, type SpeedId, type WorldSize } from './useLifeSimulation';
 import styles from './LifePage.module.css';
 
 /**
@@ -38,18 +38,42 @@ import styles from './LifePage.module.css';
  */
 const CELL = 14;
 
-/** The gap between cells, so a crowd reads as cells rather than as a wash. */
-const GUTTER = 2;
-
 /** Palettes worth putting a living world in. */
 const LIFE_PALETTES = ['sunset', 'ember', 'neon', 'poolrooms', 'heat', 'forest', 'blueprint'] as const;
 
-/** The grid a viewport of this size holds. */
-function gridFor(width: number, height: number): { columns: number; rows: number } {
+/**
+ * How big a world to *start* in a window this size.
+ *
+ * Consulted when a run begins and never again. Once a world exists its
+ * dimensions are its own — see `useLifeSimulation`.
+ */
+function worldSizeFor(width: number, height: number): WorldSize {
   return {
-    columns: Math.max(20, Math.floor(width / CELL)),
-    rows: Math.max(20, Math.floor(height / CELL)),
+    width: Math.max(20, Math.floor(width / CELL)),
+    height: Math.max(20, Math.floor(height / CELL)),
   };
+}
+
+/**
+ * How large to draw a cell of this world, in this window.
+ *
+ * The whole world, always, fitted to the shorter axis and centred — so a resize
+ * scales the picture rather than cropping it, and no cell can be pushed off the
+ * screen by dragging a corner. Whole pixels, because a fractional cell size puts
+ * a soft edge on every square in a grid of several thousand.
+ *
+ * The cost is a letterbox when the window's proportions no longer match the
+ * world's. That is the honest thing to show: the world has not changed shape,
+ * the window has.
+ */
+function scaleFor(world: WorldSize, width: number, height: number): number {
+  return Math.max(1, Math.floor(Math.min(width / world.width, height / world.height)));
+}
+
+/** The gap between cells, so a crowd reads as cells rather than as a wash. */
+function gutterFor(scale: number): number {
+  if (scale >= 8) return 2;
+  return scale >= 4 ? 1 : 0;
 }
 
 export function LifePage() {
@@ -60,32 +84,29 @@ export function LifePage() {
     height: typeof window === 'undefined' ? 800 : window.innerHeight,
   }));
 
-  const grid = useMemo(() => gridFor(viewport.width, viewport.height), [viewport]);
+  /* The size a *new* world should be, here and now. Not the size of this one. */
+  const startingSize = useMemo(() => worldSizeFor(viewport.width, viewport.height), [viewport]);
 
   const simulation = useLifeSimulation({
-    width: grid.columns,
-    height: grid.rows,
+    width: startingSize.width,
+    height: startingSize.height,
     startPaused: reducedMotion,
   });
 
   const [paletteId, setPaletteId] = useState<string>('sunset');
   const [showCode, setShowCode] = useState(false);
+  const [showInterface, setShowInterface] = useState(true);
   const palette = useMemo(() => getPalette(paletteId), [paletteId]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { resize } = simulation;
 
-  /* ── The window, and the world that has to fit it ───────────────────────── */
+  /* ── The window, which decides only how the world is shown ───────────────── */
 
   useEffect(() => {
     const onResize = () => setViewport({ width: window.innerWidth, height: window.innerHeight });
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
-
-  useEffect(() => {
-    resize(grid.columns, grid.rows);
-  }, [grid.columns, grid.rows, resize]);
 
   /* ── The interface's own colours follow the world's ──────────────────────── */
 
@@ -103,13 +124,16 @@ export function LifePage() {
 
   const { world } = simulation;
 
+  const scale = useMemo(() => scaleFor(world, viewport.width, viewport.height), [world, viewport]);
+  const gutter = gutterFor(scale);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas === null) return;
 
     const ratio = Math.min(2, window.devicePixelRatio || 1);
-    const width = grid.columns * CELL;
-    const height = grid.rows * CELL;
+    const width = world.width * scale;
+    const height = world.height * scale;
 
     if (canvas.width !== width * ratio || canvas.height !== height * ratio) {
       canvas.width = width * ratio;
@@ -144,7 +168,7 @@ export function LifePage() {
         const age = Math.min(MAX_AGE, world.ages[index] as number);
         const shade = Math.max(dimmest, brightest - age);
         const colour = ramp[shade] as string;
-        buckets.get(colour)?.rect(x * CELL, y * CELL, CELL - GUTTER, CELL - GUTTER);
+        buckets.get(colour)?.rect(x * scale, y * scale, scale - gutter, scale - gutter);
       }
     }
 
@@ -154,7 +178,7 @@ export function LifePage() {
       context.fillStyle = colour;
       context.fill(path);
     }
-  }, [world, grid.columns, grid.rows, palette]);
+  }, [world, scale, gutter, palette]);
 
   /* ── Drawing on the world ────────────────────────────────────────────────── */
 
@@ -165,12 +189,12 @@ export function LifePage() {
       const canvas = canvasRef.current;
       if (canvas === null) return null;
       const box = canvas.getBoundingClientRect();
-      const x = Math.floor(((event.clientX - box.left) / box.width) * grid.columns);
-      const y = Math.floor(((event.clientY - box.top) / box.height) * grid.rows);
-      if (x < 0 || y < 0 || x >= grid.columns || y >= grid.rows) return null;
+      const x = Math.floor(((event.clientX - box.left) / box.width) * world.width);
+      const y = Math.floor(((event.clientY - box.top) / box.height) * world.height);
+      if (x < 0 || y < 0 || x >= world.width || y >= world.height) return null;
       return { x, y };
     },
-    [grid.columns, grid.rows],
+    [world.width, world.height],
   );
 
   const onPointerDown = useCallback(
@@ -239,7 +263,26 @@ export function LifePage() {
         stepOnce();
         return;
       }
-      if (event.key === 'Escape' && showCode) setShowCode(false);
+      /*
+       * H for the chrome. Purely a matter of what is drawn over the world — it
+       * never touches the simulation, so it can be pressed at any point in a run
+       * without costing a generation.
+       */
+      if (event.key === 'h' || event.key === 'H') {
+        event.preventDefault();
+        setShowInterface((shown) => {
+          // Getting out of the way means the drawer as well as the bar.
+          if (shown) setShowCode(false);
+          return !shown;
+        });
+        return;
+      }
+      if (event.key === 'Escape') {
+        if (showCode) setShowCode(false);
+        // A hidden interface with the keyboard forgotten is a page with no way
+        // out, so Escape brings it back whatever else it was going to do.
+        else setShowInterface(true);
+      }
     };
 
     window.addEventListener('keydown', onKeyDown);
@@ -250,16 +293,22 @@ export function LifePage() {
 
   const alive = population(world);
   const description =
-    `Conway's Game of Life on a ${String(grid.columns)} by ${String(grid.rows)} toroidal grid. ` +
+    `Conway's Game of Life on a ${String(world.width)} by ${String(world.height)} toroidal grid. ` +
     `Generation ${String(world.generation)}, ${String(alive)} living cells. ` +
     `${simulation.running ? 'Running' : 'Paused'}.`;
 
   return (
-    <div className={styles.page} data-running={simulation.running ? 'true' : undefined}>
+    <div
+      className={styles.page}
+      data-running={simulation.running ? 'true' : undefined}
+      // The letterbox takes the world's own background, so a window whose
+      // proportions no longer match the world's does not show as a black bar.
+      style={{ background: palette.background ?? '#04050a' }}
+    >
       <canvas
         ref={canvasRef}
         className={styles.canvas}
-        style={{ width: `${String(grid.columns * CELL)}px`, height: `${String(grid.rows * CELL)}px` }}
+        style={{ width: `${String(world.width * scale)}px`, height: `${String(world.height * scale)}px` }}
         role="img"
         aria-label={description}
         onPointerDown={onPointerDown}
@@ -274,7 +323,26 @@ export function LifePage() {
         {simulation.running ? 'Running' : 'Paused'}. Generation {world.generation}, {alive} living cells.
       </p>
 
-      <header className={styles.bar}>
+      {/*
+       * The way back, when there is nothing else on screen.
+       *
+       * Deliberately almost nothing: a small square in the corner that brightens
+       * when the pointer finds it. It stays in the tab order and keeps its name,
+       * so a hidden interface is quiet rather than lost.
+       */}
+      {showInterface ? null : (
+        <button
+          type="button"
+          className={styles.restore}
+          onClick={() => setShowInterface(true)}
+          aria-keyshortcuts="H"
+        >
+          <span className="visually-hidden">Show controls</span>
+          <span aria-hidden="true">☰</span>
+        </button>
+      )}
+
+      <header className={styles.bar} hidden={!showInterface}>
         <a className={styles.home} href="#/">
           ← APL Art
         </a>
@@ -303,10 +371,15 @@ export function LifePage() {
           >
             Step
           </button>
-          <button type="button" className={styles.action} onClick={simulation.randomise}>
+          {/*
+           * Both start a new run, and a new run is the one moment a world's
+           * dimensions are decided — so they are told how big the window is now
+           * rather than inheriting the shape of the world they replace.
+           */}
+          <button type="button" className={styles.action} onClick={() => simulation.randomise(startingSize)}>
             Randomise
           </button>
-          <button type="button" className={styles.action} onClick={simulation.reset}>
+          <button type="button" className={styles.action} onClick={() => simulation.reset(startingSize)}>
             Reset
           </button>
           <button type="button" className={styles.action} onClick={simulation.emptyOut}>
@@ -342,6 +415,18 @@ export function LifePage() {
               ))}
             </select>
           </label>
+
+          <button
+            type="button"
+            className={styles.action}
+            onClick={() => {
+              setShowCode(false);
+              setShowInterface(false);
+            }}
+            aria-keyshortcuts="H"
+          >
+            Hide controls
+          </button>
 
           <button
             type="button"

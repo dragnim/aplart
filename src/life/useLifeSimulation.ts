@@ -5,6 +5,17 @@
  * advances at the speed somebody chose. Tying the two together would mean the
  * simulation ran faster on a 120Hz screen than a 60Hz one, which is a strange
  * thing for a mathematical object to do.
+ *
+ * ## The window is not the world
+ *
+ * A world's dimensions are fixed for the whole of its run. There is no resize
+ * here on purpose: this used to reshape the grid to fit the window, which meant
+ * dragging a corner deleted cells from a universe already in progress and
+ * changed the torus underneath it. The window decides how a world is *shown* —
+ * see `LifePage` — and nothing else.
+ *
+ * A new run is a different matter. `reset` and `randomise` take the size they
+ * should be, so the world you start now suits the window you are starting it in.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -25,10 +36,16 @@ export const SPEEDS = [
   { id: 'slow', label: 'Slow', perSecond: 4 },
   { id: 'steady', label: 'Steady', perSecond: 12 },
   { id: 'quick', label: 'Quick', perSecond: 24 },
-  { id: 'headlong', label: 'Headlong', perSecond: 48 },
+  { id: 'godspeed', label: 'Godspeed You!', perSecond: 48 },
 ] as const;
 
 export type SpeedId = (typeof SPEEDS)[number]['id'];
+
+/** The shape of a world, decided when a run begins and not after. */
+export interface WorldSize {
+  readonly width: number;
+  readonly height: number;
+}
 
 export interface LifeSimulation {
   readonly world: LifeWorld;
@@ -38,40 +55,14 @@ export interface LifeSimulation {
   readonly pause: () => void;
   readonly toggle: () => void;
   readonly stepOnce: () => void;
-  readonly randomise: () => void;
-  readonly reset: () => void;
+  /** Starts a new run, at a size suited to the window it is starting in. */
+  readonly randomise: (size: WorldSize) => void;
+  /** Starts a new run from the seed, likewise. */
+  readonly reset: (size: WorldSize) => void;
+  /** Empties the world somebody is working in, keeping its dimensions. */
   readonly emptyOut: () => void;
   readonly setSpeed: (speed: SpeedId) => void;
   readonly paint: (x: number, y: number, alive: boolean) => void;
-  readonly resize: (width: number, height: number) => void;
-}
-
-/**
- * Carries what is on screen into a differently shaped world.
- *
- * A resize should not wipe what somebody has been watching, so the overlapping
- * region is copied and any new space arrives empty. Nothing clever: the world is
- * a rectangle, and this is the part of it that still exists.
- */
-function reshape(world: LifeWorld, width: number, height: number): LifeWorld {
-  const next: LifeWorld = {
-    width,
-    height,
-    cells: new Uint8Array(width * height),
-    ages: new Uint16Array(width * height),
-    generation: world.generation,
-  };
-
-  const columns = Math.min(width, world.width);
-  const rows = Math.min(height, world.height);
-  for (let y = 0; y < rows; y += 1) {
-    for (let x = 0; x < columns; x += 1) {
-      next.cells[y * width + x] = world.cells[y * world.width + x] as number;
-      next.ages[y * width + x] = world.ages[y * world.width + x] as number;
-    }
-  }
-
-  return next;
 }
 
 export function useLifeSimulation(options: {
@@ -135,12 +126,18 @@ export function useLifeSimulation(options: {
   const toggle = useCallback(() => setRunning((on) => !on), []);
   const stepOnce = useCallback(() => setWorld((current) => step(current)), []);
 
-  const randomise = useCallback(() => {
-    setWorld((current) => randomField(current.width, current.height, Math.random));
+  /*
+   * The two ways a run begins, and the only two places a world's dimensions are
+   * decided. Both take the size from the caller rather than from the world they
+   * replace, so a new run fits the window it is started in — while an existing
+   * one keeps the shape it was born with, whatever happens to the window.
+   */
+  const randomise = useCallback((size: WorldSize) => {
+    setWorld(randomField(size.width, size.height, Math.random));
   }, []);
 
-  const reset = useCallback(() => {
-    setWorld((current) => openingSeed(current.width, current.height));
+  const reset = useCallback((size: WorldSize) => {
+    setWorld(openingSeed(size.width, size.height));
   }, []);
 
   const emptyOut = useCallback(() => {
@@ -149,24 +146,6 @@ export function useLifeSimulation(options: {
 
   const paint = useCallback((x: number, y: number, alive: boolean) => {
     setWorld((current) => setCell(current, x, y, alive));
-  }, []);
-
-  const resize = useCallback((width: number, height: number) => {
-    setWorld((current) => {
-      if (current.width === width && current.height === height) return current;
-
-      /*
-       * A world that has not started yet is re-seeded rather than carried over.
-       *
-       * Reshaping keeps cells where they were, which is right for a world
-       * somebody has been watching and wrong for the opening: the seed is placed
-       * in the middle of the field, and the first measurement of the window
-       * happens a frame after the first render. Carried across, five cells would
-       * open a little off centre for ever.
-       */
-      if (current.generation === 0) return openingSeed(width, height);
-      return reshape(current, width, height);
-    });
   }, []);
 
   return {
@@ -182,6 +161,5 @@ export function useLifeSimulation(options: {
     emptyOut,
     setSpeed,
     paint,
-    resize,
   };
 }
