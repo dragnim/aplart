@@ -13,7 +13,7 @@ import { fromNested } from '@/matrix/matrixTypes';
 import { modularBloom } from '@/presets/modular-bloom';
 import { CUSTOM_PALETTE_ID } from '@/renderer/customPalette';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
-import { paletteChoice, pressRunWith } from '../helpers/workspaceModes';
+import { paletteChoice, selectedPalette, showMode } from '../helpers/workspaceModes';
 
 const CANVAS = { left: 0, top: 0, width: 400, height: 400 };
 
@@ -59,7 +59,7 @@ async function openAndRun(sharedState: string | null = null) {
   service.register('default', labelled(8, 8));
   render(<WorkspacePage presetId={modularBloom.id} sharedState={sharedState} service={service} />);
 
-  await pressRunWith(user);
+  // The workspace draws itself on arrival, so there is nothing to press.
   await waitFor(() => expect(screen.getByRole('img', { name: /grid/ })).toBeInTheDocument());
   return { user, service };
 }
@@ -267,6 +267,47 @@ describe('randomise', () => {
     const { user } = await openAndRun();
     await chooseCustom(user);
     expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+  });
+});
+
+describe('Random palette', () => {
+  it('moves to another ramp without recalculating anything', async () => {
+    /*
+     * For somebody who likes the pattern and wants it in other colours. A palette
+     * is a way of drawing a matrix that has already been computed, so this must
+     * cost the service nothing at all.
+     */
+    const { user, service } = await openAndRun();
+    const before = selectedPalette();
+    const runs = service.executionCount;
+
+    await user.click(within(showMode('Colour')).getByRole('button', { name: 'Random palette' }));
+
+    expect(selectedPalette()).not.toBe(before);
+    expect(service.executionCount).toBe(runs);
+  });
+
+  it('never answers with the palette already in use', async () => {
+    // A button that can return what you already have looks broken about one time
+    // in nine, and nobody presses it twice to find out whether it worked.
+    const { user } = await openAndRun();
+
+    for (let press = 0; press < 12; press += 1) {
+      const before = selectedPalette();
+      await user.click(within(showMode('Colour')).getByRole('button', { name: 'Random palette' }));
+      expect(selectedPalette()).not.toBe(before);
+    }
+  });
+
+  it('is one step back', async () => {
+    const { user } = await openAndRun();
+    const before = selectedPalette();
+
+    await user.click(within(showMode('Colour')).getByRole('button', { name: 'Random palette' }));
+    expect(selectedPalette()).not.toBe(before);
+
+    await user.click(screen.getByRole('button', { name: /^Undo/ }));
+    expect(selectedPalette()).toBe(before);
   });
 });
 

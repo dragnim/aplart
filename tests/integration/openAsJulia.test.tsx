@@ -481,24 +481,33 @@ describe('what Julia does with the handoff', () => {
     ['a payload with an infinite constant', TOKEN, { realC: Number.POSITIVE_INFINITY }],
     ['a payload with a missing constant', TOKEN, { imagC: undefined }],
     ['a payload whose constant is text', TOKEN, { realC: '-0.55' }],
-  ])('opens ordinary Julia for %s, without running anything', async (_name, token, overrides) => {
-    /*
-     * Session storage can be edited by hand, so a payload is untrusted input in
-     * the way a shared link is. Anything that is not exactly a handoff for this
-     * artwork must leave the preset alone: a half-applied constant would be a
-     * Julia set nobody chose.
-     */
-    if (overrides !== undefined) storePayload(valid(overrides));
-    const { service } = openJulia(token);
+  ])(
+    'opens ordinary Julia for %s, drawing the preset and not the payload',
+    async (_name, token, overrides) => {
+      /*
+       * Session storage can be edited by hand, so a payload is untrusted input in
+       * the way a shared link is. Anything that is not exactly a handoff for this
+       * artwork must leave the preset alone: a half-applied constant would be a
+       * Julia set nobody chose.
+       */
+      if (overrides !== undefined) storePayload(valid(overrides));
+      const { service } = openJulia(token);
 
-    expect(source()).toContain('realC←¯0.8');
-    expect(source()).toContain('imagC←0.156');
-    expect(screen.getByText('Original')).toBeInTheDocument();
+      expect(source()).toContain('realC←¯0.8');
+      expect(source()).toContain('imagC←0.156');
+      expect(screen.getByText('Original')).toBeInTheDocument();
 
-    // Nothing ran: an artwork nobody asked for must not reach the service.
-    await new Promise((resolve) => setTimeout(resolve, 80));
-    expect(service.received).toHaveLength(0);
-  });
+      /*
+       * The artwork draws itself, because opening one is a request to see it. What
+       * this guards is *which* artwork: the preset's own constants went to the
+       * service, so nothing from the rejected payload reached it.
+       */
+      await waitFor(() => expect(runCount(service.received)).toBe(1));
+      const sent = service.received.join('\n');
+      expect(sent).toContain('realC←¯0.8');
+      expect(sent).toContain('imagC←0.156');
+    },
+  );
 
   it('shares the constant and never the token', async () => {
     storePayload(valid());

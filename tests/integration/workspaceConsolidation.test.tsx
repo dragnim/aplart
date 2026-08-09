@@ -187,8 +187,12 @@ describe('where the actions live', () => {
     expect(screen.getAllByRole('button', { name: 'Share' })).toHaveLength(1);
   });
 
-  it('puts Run and Copy APL together in Code, where the program is', () => {
+  it('puts Run and Copy APL together in Code, where the program is', async () => {
     open(mandelbrotField.id);
+
+    // Waited out: the workspace draws itself on arrival, and Run stands down for
+    // Stop while a run is in flight.
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull());
 
     const code = within(showMode('Code'));
     expect(code.getByRole('button', { name: /^Run/ })).toBeInTheDocument();

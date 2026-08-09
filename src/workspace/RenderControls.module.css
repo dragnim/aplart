@@ -23,6 +23,27 @@
   gap: var(--space-2);
 }
 
+/*
+ * Quieter than the ramps it sits under, because it is an alternative to
+ * choosing rather than one of the choices — an outlined control beneath a grid
+ * of filled ones, held to the start so it does not read as a row of its own.
+ */
+.randomPalette {
+  composes: control from global;
+  justify-self: start;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  transition:
+    background var(--motion-fast) var(--ease),
+    border-color var(--motion-fast) var(--ease);
+}
+
+.randomPalette:hover {
+  background: var(--surface-sunken);
+  border-color: var(--ui-accent-border, var(--border-strong));
+}
+
 .palette {
   display: grid;
   gap: var(--space-1);

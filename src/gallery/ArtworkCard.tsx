@@ -6,18 +6,24 @@ import styles from './ArtworkCard.module.css';
 
 interface Props {
   readonly preset: ArtworkPreset;
-  /** The featured piece is shown larger and loads eagerly. */
-  readonly featured?: boolean;
+  /**
+   * Whether to fetch the thumbnail immediately rather than when it scrolls near.
+   *
+   * A position, not a status. The card that opens the gallery is above the fold
+   * on every screen, and deferring it is what makes the page appear to load in
+   * two stages. It changes nothing that is drawn.
+   */
+  readonly eager?: boolean;
 }
 
-export function ArtworkCard({ preset, featured = false }: Props) {
+export function ArtworkCard({ preset, eager = false }: Props) {
   // The expression that runs, not the editor contents: comments and blank
   // lines are a larger number and a less true one.
   const characters = aplCharacterCount(preset.code);
   const titleId = `artwork-${preset.id}-title`;
 
   return (
-    <article className={styles.card} data-featured={featured ? 'true' : undefined} aria-labelledby={titleId}>
+    <article className={styles.card} aria-labelledby={titleId}>
       <a className={styles.thumbnailLink} href={hrefForArtwork(preset.id)} tabIndex={-1} aria-hidden="true">
         <img
           className={styles.thumbnail}
@@ -25,7 +31,7 @@ export function ArtworkCard({ preset, featured = false }: Props) {
           alt=""
           width={512}
           height={512}
-          loading={featured ? 'eager' : 'lazy'}
+          loading={eager ? 'eager' : 'lazy'}
           decoding="async"
         />
       </a>

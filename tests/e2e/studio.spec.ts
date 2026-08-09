@@ -87,15 +87,18 @@ const WIDE = { width: 1440, height: 950 };
 test.describe('the artwork journey', () => {
   test.use({ viewport: WIDE });
 
-  test('opens a preset from the gallery and draws it', async ({ page }) => {
+  test('opens a preset from the gallery and draws it, unasked', async ({ page }) => {
     await stubTryApl(page);
     await openModularBloom(page);
 
-    await expect(page.getByText('Press Run to draw this artwork.')).toBeVisible();
-    await runAndWait(page);
-
+    /*
+     * Nothing is pressed. Following a card is the request for the artwork, and
+     * the workspace used to arrive at a black rectangle reading "Press Run to
+     * draw this artwork" — which read as a broken page rather than an invitation.
+     */
     await expect(runStatus(page)).toHaveText(/Finished in/);
     await expect(page.getByRole('img', { name: /grid/ })).toBeVisible();
+    await expect(page.getByText('Press Run to draw this artwork.')).toHaveCount(0);
   });
 
   test('a parameter change rewrites the code and changes the artwork', async ({ page }) => {
@@ -214,9 +217,7 @@ test.describe('sharing and export', () => {
     await expect(await editorOn(page)).toContainText('modulus←5');
     await expect(await paletteChoice(page, /Neon/)).toHaveAttribute('aria-checked', 'true');
 
-    // Shared code is never run until the visitor asks.
-    await expect(page.getByText('Press Run to draw this artwork.')).toBeVisible();
-    await runAndWait(page);
+    // And it draws what was sent, without asking to be asked a second time.
     await expect(page.getByRole('img', { name: /24 by 24 grid/ })).toBeVisible();
   });
 
@@ -458,7 +459,9 @@ test.describe('remembering work between visits', () => {
     await stubTryApl(page);
     await openModularBloom(page);
     await setCode(page, 'size←24\nmodulus←5\nmultiplier←1\nmodulus|multiplier×∘.×⍨⍳size');
-    await expect(page.getByText('Edited')).toBeVisible();
+    // The badge, exactly. Now that the workspace runs on arrival, the status
+    // region beneath it also says "Edited. Run to update the artwork."
+    await expect(page.getByText('Edited', { exact: true })).toBeVisible();
 
     await page.goto('./#/help');
     await page.getByRole('button', { name: 'Clear local data' }).click();

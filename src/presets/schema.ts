@@ -170,7 +170,6 @@ export interface ArtworkPreset {
   readonly primitives: readonly PrimitiveReference[];
   readonly thumbnailPath: string;
   readonly fixturePath: string;
-  readonly featured?: boolean;
   /**
    * Whether the gallery lists this artwork. Defaults to true.
    *

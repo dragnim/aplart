@@ -64,9 +64,16 @@ describe('the workspace', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('We could not find that');
   });
 
-  it('starts with nothing drawn and invites a run', () => {
+  it('draws the artwork on arrival, without being asked twice', async () => {
+    /*
+     * Opening an artwork *is* the request for it. The workspace used to arrive at
+     * a black rectangle reading "Press Run to draw this artwork", which read as a
+     * broken page rather than as an invitation.
+     */
     renderWorkspace();
-    expect(screen.getByText('Press Run to draw this artwork.')).toBeInTheDocument();
+
+    expect(await screen.findByRole('img')).toHaveAccessibleName(/8 by 8 grid/);
+    expect(screen.queryByText('Press Run to draw this artwork.')).toBeNull();
   });
 
   it('draws the artwork when Run is pressed', async () => {
@@ -238,7 +245,7 @@ describe('the workspace', () => {
   });
 
   describe('shared links', () => {
-    it('says the artwork was shared and waits rather than running it', async () => {
+    it('says the artwork was shared, and draws what was sent', async () => {
       const { encodeShareState } = await import('@/sharing/encodeShareState');
       const encoded = encodeShareState({
         v: 1,
@@ -253,8 +260,13 @@ describe('the workspace', () => {
       render(<WorkspacePage presetId={modularBloom.id} sharedState={encoded} service={service} />);
 
       expect(await screen.findByText(/shared with you/)).toBeInTheDocument();
-      // Nothing is executed until the visitor asks for it.
-      expect(service.executionCount).toBe(0);
+      /*
+       * Following a link is a request to see what was sent. The notice still
+       * explains where the artwork came from — it no longer asks for a second
+       * press before showing it.
+       */
+      await waitFor(() => expect(service.executionCount).toBe(1));
+      expect(service.received.join('\n')).toContain('size←16');
       expect(screen.getByLabelText('Size')).toHaveValue('16');
       expect(screen.getByLabelText('Modulus')).toHaveValue('3');
     });

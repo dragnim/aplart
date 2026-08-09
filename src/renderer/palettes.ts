@@ -137,3 +137,29 @@ export function getPalette(id: string): Palette {
 export function paletteExists(id: string): boolean {
   return byId.has(canonicalPaletteId(id));
 }
+
+/**
+ * Another palette, chosen at random and never the one already in use.
+ *
+ * Excluding the current choice is the whole point: a Random palette that can
+ * answer "the one you already have" looks broken about one time in nine, and
+ * nobody presses it twice to find out whether it worked.
+ *
+ * The generator is supplied so the caller decides how reproducible this is —
+ * Randomise passes a stream seeded from the seed it records, so the palette is
+ * part of what that seed reproduces.
+ */
+export function randomPaletteId(
+  current: string,
+  random: () => number,
+  /** The ids this artwork offers, when it offers only some of them. */
+  allowed?: readonly string[],
+): string {
+  const canonical = canonicalPaletteId(current);
+  const offered = allowed === undefined ? palettes : palettes.filter((one) => allowed.includes(one.id));
+  const others = offered.filter((palette) => palette.id !== canonical);
+  if (others.length === 0) return canonical;
+
+  const chosen = others[Math.floor(random() * others.length)] ?? others[0];
+  return chosen === undefined ? canonical : chosen.id;
+}

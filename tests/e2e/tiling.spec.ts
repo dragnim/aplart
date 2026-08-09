@@ -148,13 +148,25 @@ test.describe('repeating the artwork', () => {
     const left = box.width / 2 - size / 2;
     const top = box.height / 2 - size / 2;
 
-    await canvas.click({ position: { x: left + size * 0.15, y: top + size * 0.15 } });
+    /*
+     * Exactly one copy apart, by construction.
+     *
+     * The two points used to be 0.15 and 0.65 of the width — half the artwork
+     * apart in principle, and a rounding error apart in practice as soon as the
+     * square's pixel size changed. A whole number of pixels for the copy, and the
+     * second click cannot land in a different cell of it than the first.
+     */
+    const copy = Math.round(size / 2);
+    const firstX = Math.round(left + size * 0.15);
+    const firstY = Math.round(top + size * 0.15);
+
+    await canvas.click({ position: { x: firstX, y: firstY } });
     const first = await page
       .locator('[role="status"]')
       .filter({ hasText: /Row \d+, column/ })
       .innerText();
 
-    await canvas.click({ position: { x: left + size * 0.65, y: top + size * 0.15 } });
+    await canvas.click({ position: { x: firstX + copy, y: firstY } });
     const second = await page
       .locator('[role="status"]')
       .filter({ hasText: /Row \d+, column/ })

@@ -200,7 +200,25 @@
    * only change here is which side each is on: the artwork leads, and the panel
    * of modes takes the two fifths the old control column had.
    */
-  grid-template-columns: minmax(0, 1fr) minmax(0, 40%);
+  /*
+   * The artwork's track is the artwork's size; the panel has what is left.
+   *
+   * It was `1fr` for the artwork and two fifths for the panel, which looked
+   * right until the window was wide relative to its height. `--play-artwork` is
+   * a *height* allowance, so on a short window the square stopped growing while
+   * its track went on widening — and the square, held to the end of that track,
+   * slid away from the page's own left margin. Measured at 1440x800: 211px of
+   * nothing between the margin and the artwork, with the title above it still
+   * starting at the margin. That gap was the reported right-hand bias.
+   *
+   * Sizing the track to the picture removes the slack rather than moving it: the
+   * artwork's left edge lands on the page margin under its own title, the panel
+   * runs to the right margin under the actions, and there is no third place for
+   * width to collect. Sixty per cent is the ceiling for the narrow end of the
+   * range, where the height allowance is generous and the width is not — without
+   * it the square would take the whole measure and leave the controls a sliver.
+   */
+  grid-template-columns: min(var(--play-artwork), 60%) minmax(0, 1fr);
   gap: var(--space-6);
   /*
    * Stretch, so the panel is as tall as the artwork and can divide that height
@@ -244,17 +262,18 @@
   top: auto;
   align-self: start;
   /*
-   * As wide as its track allows, or as tall as the window allows, whichever is
-   * the smaller — the square then needs no arithmetic of its own.
+   * The track is already the artwork's size, so the square simply fills it.
    *
-   * Held to the end of its track so that width the picture cannot use falls on
-   * the outside of the workspace, where it reads as margin, rather than between
-   * the artwork and the controls, where it would read as a hole. It is the same
-   * loose edge the ordinary workspace has, on the side the mirror puts it.
+   * This used to be held to the end of its track, on the reasoning that width
+   * the picture could not use should fall outside the workspace as margin rather
+   * than between the artwork and the controls as a hole. Both readings were
+   * wrong for a mirrored layout: the artwork leads here, so "outside" was the
+   * page's own left margin — the one edge everything else on the page lines up
+   * with. There is now no unused width in the track to place anywhere.
    */
   inline-size: 100%;
   max-inline-size: var(--play-artwork);
-  justify-self: end;
+  justify-self: stretch;
   aspect-ratio: 1;
   block-size: auto;
   max-height: none;

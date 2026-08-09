@@ -45,6 +45,13 @@ import { validatePreset, type ArtworkPreset, type PresetValidationIssue } from '
  * description is written in terms of Mandelbrot's — the whole point of it is the
  * two lines that differ — so meeting it second is what makes the comparison
  * available. Burning Ship follows for the same reason.
+ *
+ * This list is now the only thing that says which artwork leads. Basket Weave is
+ * first because it answers the collection's question fastest, and being first is
+ * all that emphasis amounts to: a preset could once set `featured: true` and be
+ * drawn as a double-width card with its picture beside its text, which made the
+ * first row read as a banner rather than as a catalogue. Every card is the same
+ * card, and the order does the work.
  */
 const authored: readonly ArtworkPreset[] = [
   basketWeave,
@@ -109,10 +116,6 @@ const byId = new Map(valid.map((preset) => [preset.id, preset]));
 
 export function getPreset(id: string): ArtworkPreset | undefined {
   return byId.get(id);
-}
-
-export function featuredPreset(): ArtworkPreset | undefined {
-  return valid.find((preset) => preset.featured === true) ?? valid[0];
 }
 
 /**

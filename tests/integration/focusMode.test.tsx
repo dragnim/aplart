@@ -173,8 +173,9 @@ describe('Focus mode on a wide screen', () => {
       expect(screen.getByText('Edited')).toBeInTheDocument();
 
       await pressRunWith(user);
-      await waitFor(() => expect(service.received.length).toBeGreaterThan(0));
-      expect(service.received[0]).toContain('modulus←16');
+      // The last run, not the first: the first is the one the workspace made for
+      // itself on arrival, before anybody had edited anything.
+      await waitFor(() => expect(service.received.at(-1)).toContain('modulus←16'));
     });
   });
 

@@ -159,11 +159,12 @@ describe('pasting Julia’s program into another artwork', () => {
   });
 
   it('says nothing of the sort for an artwork that came back in one request', async () => {
-    const user = userEvent.setup();
     const service = limitedService(tall(8));
     render(<WorkspacePage presetId={modularBloom.id} sharedState={null} service={service} />);
 
-    await runAndFinish(user);
+    // The opening run is the one under test: a small artwork comes back whole, in
+    // a single request, so there is nothing to warn about.
+    await waitFor(() => expect(screen.getByText(/Finished in/)).toBeInTheDocument());
 
     expect(service.executionCount).toBe(1);
     expect(screen.queryByText(/run several times/)).not.toBeInTheDocument();

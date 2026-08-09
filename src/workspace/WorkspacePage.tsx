@@ -51,7 +51,8 @@ import { TryChangingThis } from './TryChangingThis';
 import { randomiseParameters } from './randomise';
 import { readPlaySeed, startCreating } from './startCreating';
 import { generateInstantPlayVariation } from './instantPlayVariation';
-import { randomSeed } from './randomise';
+import { randomSeed, seededRandom } from './randomise';
+import { randomPaletteId } from '@/renderer/palettes';
 import { playLabelFor } from '@/presets/instantPlay';
 import { curatedValuesAfter } from '@/presets/createQuality';
 import { AnimationControls } from './AnimationControls';
@@ -282,42 +283,51 @@ function Workspace({
     [runCode],
   );
 
-  /*
-   * A handoff runs itself, exactly once.
+  /**
+   * The code this workspace opened on, whichever door it came through.
    *
-   * Pressing "Open as Julia set" is a request to see that set, so waiting for a
-   * second press would be asking the same question twice. A shared link is
-   * deliberately different and still waits: following somebody else's link is
-   * not the same as asking for a calculation.
-   *
-   * Guarded by a ref rather than by the dependency list, because `run` is
-   * recreated when the code changes and this must not fire again for it.
+   * Captured at the first render and never updated: this is what "on entry"
+   * means, and it must not follow the editor afterwards.
    */
-  const handoffRun = useRef(false);
-  useEffect(() => {
-    if (handedOff === null || handoffRun.current) return;
-    handoffRun.current = true;
-    run();
-  }, [handedOff, run]);
+  const openingCode = useRef(state.code);
 
   /*
-   * A Start creating session draws itself, exactly once, and for the same reason
-   * a handoff does: the press was the request. Arriving at code and a blank frame
-   * would make "Start creating" the slowest way into the application rather than
-   * the quickest.
+   * Every workspace draws itself, exactly once, on arrival.
    *
-   * Once per workspace, not once per render — the component is keyed on the seed,
-   * so a different session is a different workspace with its own ref, and this one
-   * cannot fire again however the code is edited afterwards.
+   * This used to be true of two entry paths and false of three. A handoff ran
+   * because pressing "Open as Julia set" was the request, and a Start creating
+   * session ran for the same reason — but opening a piece from the gallery,
+   * following a shared link, and reloading a saved project all arrived at a black
+   * rectangle reading "Press Run to draw this artwork". Three of the five ways
+   * into the application, including the two a stranger is most likely to use.
+   *
+   * The distinction it was drawing — that following somebody's link is not the
+   * same as asking for a calculation — is not one a visitor makes. They asked for
+   * an artwork; the address was the request. Waiting to be asked a second time
+   * only made the application look broken.
+   *
+   * This does not touch the rule that matters. Run still means "execute the APL I
+   * have edited", and a direct edit still waits for it. What changed is that the
+   * state the workspace *opens in* is drawn rather than described.
+   *
+   * Guarded by a ref rather than by the dependency list, because `drawPlay` is
+   * recreated when the code changes and this must not fire again for it. Once per
+   * workspace, not once per render — the component is keyed on the preset, the
+   * link, the handoff and the seed, so a different opening is a different
+   * workspace with its own ref.
    */
-  const startedRun = useRef(false);
+  const openingRun = useRef(false);
   useEffect(() => {
-    if (session === null || startedRun.current) return;
-    startedRun.current = true;
-    // Through the same door the controls use, so what a session has already asked
-    // for is one fact rather than two.
-    drawPlay(session.code);
-  }, [session, drawPlay]);
+    if (openingRun.current) return;
+    // A link that could not be decoded has no code to draw; the notice explains
+    // itself and the workspace holds the preset, waiting to be asked.
+    if (shared !== null && !shared.ok) return;
+
+    openingRun.current = true;
+    // Through the same door the controls use, so what has already been asked for
+    // is one fact rather than two.
+    drawPlay(openingCode.current);
+  }, [shared, drawPlay]);
 
   const editorHandle = useRef<AplEditorHandle>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -332,6 +342,9 @@ function Workspace({
    * is the one least worth offering again.
    */
   const playRecipe = useRef<string | undefined>(session?.recipeId);
+
+  /** Numbers each Randomise, so its two commits pair up and successive ones do not. */
+  const randomiseGesture = useRef(0);
 
   /*
    * The curated controls this artwork offers, if anybody has curated any.
@@ -598,13 +611,11 @@ function Workspace({
     [publishAccentPalette],
   );
 
-  // Shared code is never run on arrival; the visitor is told what they have
-  // been given and presses Run themselves.
   const shareNotice =
     shared === null
       ? null
       : shared.ok
-        ? 'This artwork was shared with you. Press Run to draw it.'
+        ? 'This artwork was shared with you.'
         : `This shared link could not be opened: ${shared.reason}.`;
 
   /**
@@ -1063,10 +1074,65 @@ function Workspace({
 
     const chosen = variation ?? randomiseParameters(preset.parameters);
 
+    /*
+     * A different artwork, not the same one rearranged.
+     *
+     * Randomise used to change the numbers and leave the colours, so a dozen
+     * presses produced a dozen pictures that all looked like relations. Colour is
+     * most of what an artwork looks like from across a room, and somebody asking
+     * for a new one means a new one.
+     *
+     * Seeded from the seed that is recorded and shared, so the colours are part
+     * of what that seed reproduces rather than a separate roll of the dice. A
+     * fresh stream rather than the variation's own, which has already been drawn
+     * from and would tie the palette to how many parameters the preset happens to
+     * have.
+     */
+    const palette = randomPaletteId(
+      state.renderOptions.paletteId,
+      seededRandom(chosen.seed ^ 0x5eed),
+      preset.availablePaletteIds,
+    );
+
+    /*
+     * One gesture, so one step back.
+     *
+     * The source and the palette are committed separately — they are different
+     * kinds of change and the reducer keeps them apart — but they are one thing
+     * somebody did. Sharing an identity makes the second commit join the first's
+     * history entry instead of adding its own, so Undo returns the artwork *and*
+     * its colours in a single press. The counter keeps consecutive presses
+     * distinct, which is what stops a whole afternoon of Randomise collapsing
+     * into one entry.
+     */
+    randomiseGesture.current += 1;
+    const gesture = `randomise:${String(randomiseGesture.current)}`;
+
     const next = setParameterValues(state.code, chosen.values);
-    commitCode(next, { label: 'Randomise', seed: chosen.seed });
+    commitCode(next, { label: 'Randomise', seed: chosen.seed, coalesce: gesture });
+    commitRenderOptions({ paletteId: palette }, { label: 'Randomise', coalesce: gesture });
     drawPlay(next);
-  }, [preset, createConfig, state.code, commitCode, drawPlay]);
+  }, [
+    preset,
+    createConfig,
+    state.code,
+    state.renderOptions.paletteId,
+    commitCode,
+    commitRenderOptions,
+    drawPlay,
+  ]);
+
+  /**
+   * Another colour treatment, and nothing else.
+   *
+   * For somebody who likes the pattern they have. Nothing is recalculated —
+   * a palette is a way of drawing a matrix that has already been computed — so
+   * this is instant and costs the execution service nothing.
+   */
+  const handleRandomPalette = useCallback(() => {
+    const palette = randomPaletteId(state.renderOptions.paletteId, Math.random, preset.availablePaletteIds);
+    commitRenderOptions({ paletteId: palette }, { label: 'Random palette' });
+  }, [state.renderOptions.paletteId, preset.availablePaletteIds, commitRenderOptions]);
 
   /**
    * A step of a Play gesture: the value is written, the artwork waits.
@@ -1281,6 +1347,7 @@ function Workspace({
         options={state.renderOptions}
         availablePaletteIds={preset.availablePaletteIds}
         onChange={handleRenderChange}
+        onRandomPalette={handleRandomPalette}
         animation={animation}
         onAnimationChange={setAnimation}
         onAnimationReset={resetAnimation}

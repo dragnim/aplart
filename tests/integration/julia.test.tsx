@@ -69,7 +69,8 @@ async function openAndRun(sharedState: string | null = null) {
   service.register('default', counts());
   render(<WorkspacePage presetId={juliaSet.id} sharedState={sharedState} service={service} />);
 
-  await pressRunWith(user);
+  // The workspace draws itself on arrival now, so there is nothing to press: the
+  // baseline these tests measure from is the opening run.
   await waitFor(() => expect(screen.getByRole('img', { name: /grid/ })).toBeInTheDocument());
   /*
    * Waited out, not merely painted. This preset declares high-resolution output,

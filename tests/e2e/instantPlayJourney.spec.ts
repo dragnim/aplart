@@ -162,12 +162,12 @@ test.describe('the Instant Play journey', () => {
       await page.goto(link);
       await expect(page.getByText(/shared with you/)).toBeVisible();
       /*
-       * A share is somebody else's creation, so it waits to be run rather than
-       * drawing itself. It arrives in the same workspace as everything else —
-       * the curated controls belong to the artwork, and a link is not entitled
-       * to withhold them — which is the part of this that changed.
+       * A share is somebody else's creation, and following the link is a request
+       * to see it — so it draws itself, in the same workspace as everything else.
+       * The curated controls belong to the artwork, and a link is not entitled to
+       * withhold them.
        */
-      await expect(page.getByText('Press Run to draw this artwork.')).toBeVisible();
+      await expect(artwork(page)).toBeVisible({ timeout: 30_000 });
       await expect(playPanel(page)).toBeVisible();
       await expect(await editorOn(page)).toBeVisible();
 

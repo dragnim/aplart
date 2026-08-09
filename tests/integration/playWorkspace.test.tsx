@@ -22,7 +22,7 @@ import { decodeShareState } from '@/sharing/decodeShareState';
 import { generateInstantPlayVariation } from '@/workspace/instantPlayVariation';
 import { startCreating } from '@/workspace/startCreating';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
-import { colour } from '../helpers/workspaceModes';
+import { colour, selectedPalette } from '../helpers/workspaceModes';
 
 beforeAll(() => {
   vi.stubGlobal(
@@ -359,11 +359,12 @@ describe('opening the same artwork without a seed', () => {
     expect(screen.getByRole('tab', { selected: true })).toHaveAttribute('aria-label', 'Create');
   });
 
-  it('shows the preset’s own code, not a variation of it, and waits to be run', () => {
+  it('shows the preset’s own code, not a variation of it', () => {
     openPlay(null);
 
+    // Without a seed there is no session, so the code is the preset's. It still
+    // draws itself on arrival, as every workspace does.
     expect(source()).toBe(asRendered(modularBloom.code));
-    expect(screen.getByText('Press Run to draw this artwork.')).toBeInTheDocument();
   });
 
   it('and a seed that is not a seed is the same as no seed at all', () => {
@@ -510,6 +511,46 @@ describe('Randomise, on the Play surface', () => {
     // Exactly the generator's answer, written into the source that was showing.
     expect(source()).toBe(asRendered(setParameterValues(started?.code ?? '', expected?.values ?? new Map())));
     await waitFor(() => expect(runs(service.received)).toBe(before + 1));
+    vi.restoreAllMocks();
+  });
+
+  it('recolours as well as reshapes, because a new artwork is a new artwork', async () => {
+    /*
+     * Randomise used to change the numbers and leave the palette, so a dozen
+     * presses produced a dozen pictures that all looked like relations. Colour is
+     * most of what an artwork looks like from across a room.
+     */
+    const user = userEvent.setup();
+    openPlay();
+    await drawn();
+
+    const before = selectedPalette();
+    withFixedSeed(0.4242);
+    await user.click(within(sessionActions()).getByRole('button', { name: 'Randomise' }));
+
+    expect(selectedPalette()).not.toBe(before);
+    vi.restoreAllMocks();
+  });
+
+  it('takes the shape and the colour back together, in one press', async () => {
+    // Two commits, one thing somebody did. Undo must not need pressing twice.
+    const user = userEvent.setup();
+    openPlay(String(SEED), serviceTellingArtworksApart());
+    await drawn();
+
+    const openedCode = source();
+    const openedPalette = selectedPalette();
+
+    withFixedSeed(0.77);
+    await user.click(within(sessionActions()).getByRole('button', { name: 'Randomise' }));
+    await waitFor(() => expect(source()).not.toBe(openedCode));
+    expect(selectedPalette()).not.toBe(openedPalette);
+    await drawn();
+
+    await user.click(within(sessionActions()).getByRole('button', { name: /^Undo/ }));
+
+    expect(source()).toBe(openedCode);
+    expect(selectedPalette()).toBe(openedPalette);
     vi.restoreAllMocks();
   });
 

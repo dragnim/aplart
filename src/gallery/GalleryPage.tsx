@@ -84,14 +84,10 @@ export function GalleryPage() {
                 : 'No artworks match that filter yet.'}
             </p>
           ) : (
-            visible.map((preset) => (
-              <ArtworkCard
-                key={preset.id}
-                preset={preset}
-                // Only feature a piece in the unfiltered view; inside a filter
-                // the emphasis would be arbitrary.
-                featured={filter === 'all' && preset.featured === true}
-              />
+            visible.map((preset, index) => (
+              // Every card is the same card. The first one fetches its thumbnail
+              // straight away because it is the one already on screen.
+              <ArtworkCard key={preset.id} preset={preset} eager={index === 0} />
             ))
           )}
         </div>

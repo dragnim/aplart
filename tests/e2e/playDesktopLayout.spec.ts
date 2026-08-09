@@ -114,22 +114,41 @@ for (const size of SIZES) {
       expect(size.height - foot).toBeGreaterThanOrEqual(8);
 
       /*
-       * And the artwork still leads the row it is in.
+       * And the artwork leads the row, at the largest size the window allows.
        *
-       * By outcome rather than by multiplier. This asked for one and a half
-       * times the panel's width, which was written when the panel was 384px and
-       * became a rule against the composition it was meant to protect: the
-       * workspace this layout deliberately echoes ran at about 1.2, and reading
-       * that as "not dominant" would be reading the number rather than the
-       * screen. Wider, larger, and first in the row is what dominance means.
+       * This used to require the artwork to be wider than the panel. That cannot
+       * be held to on a window that is wide relative to its height, and insisting
+       * on it is what produced the fault it was written to prevent: the square is
+       * capped by the height, so keeping the panel narrower than it meant leaving
+       * the difference lying somewhere — and it lay against the page's left
+       * margin, sliding the whole composition right, away from the title above
+       * it. Measured at 1440x800: 211px of nothing.
+       *
+       * What is worth holding to is that the artwork starts the row at the page's
+       * own margin, that it is as large as the height permits, and that no width
+       * is left unused. The panel takes the balance and reads as roomy rather
+       * than as a hole.
        */
       const panelBox = box ?? { x: 0, width: 0, height: 0, y: 0 };
-      expect(picture?.width ?? 0).toBeGreaterThan(panelBox.width);
-      expect((picture?.width ?? 0) * (picture?.height ?? 0)).toBeGreaterThan(
-        panelBox.width * panelBox.height,
-      );
+
       // Leading: the artwork starts the row, and the panel sits after it.
       expect(panelBox.x).toBeGreaterThanOrEqual((picture?.x ?? 0) + (picture?.width ?? 0) - 1);
+
+      /*
+       * And the composition lines up with the page's own margins.
+       *
+       * The title is the reference because it is what the eye compares the
+       * artwork against: they sit one above the other, and the artwork drifting
+       * right of it is exactly what the bias looked like.
+       */
+      const title = await page.getByRole('heading', { level: 1 }).boundingBox();
+      expect(Math.round((picture?.x ?? 0) - (title?.x ?? 0))).toBeLessThanOrEqual(1);
+
+      // The other edge likewise: the panel finishes where the page's actions do.
+      const actions = await page.getByRole('button', { name: 'Export' }).boundingBox();
+      const panelRight = panelBox.x + panelBox.width;
+      const actionsRight = (actions?.x ?? 0) + (actions?.width ?? 0);
+      expect(Math.abs(panelRight - actionsRight)).toBeLessThanOrEqual(1);
     });
 
     test('uses the width it has, without overflowing it', async ({ page }) => {

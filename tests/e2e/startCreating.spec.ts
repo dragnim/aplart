@@ -152,18 +152,19 @@ test.describe('the two ways into the gallery', () => {
     await page.getByRole('link', { name: /^Open Modular Bloom/ }).click();
 
     /*
-     * The preset's own program, nothing run until asked, and no seed in the
-     * address: opening a card is what it always was.
+     * The preset's own program, drawn as it stands, and no seed in the address:
+     * opening a card is what it always was. It draws itself now, as every
+     * workspace does — what a card must not do is vary the artwork.
      *
      * Named exactly, because this is the card for this artwork. The pool of four
      * belongs to Start creating, where the seed chooses — a card does not choose
      * anything, and accepting any of four here would be asserting nothing.
      */
     await expect(page.getByRole('heading', { level: 1, name: 'Modular Bloom' })).toBeVisible();
-    await expect(page.getByText('Press Run to draw this artwork.')).toBeVisible();
     expect(page.url()).not.toContain('play=');
-    expect(stub.requests).toHaveLength(0);
 
+    await expect(page.getByRole('img', { name: /grid/ })).toBeVisible();
+    expect(stub.requests.join('\n')).toContain('size←64');
     expect(await sourceOn(page)).toContain('size←64');
   });
 });

@@ -343,23 +343,30 @@ describe('when a link carries both a shared artwork and a seed', () => {
 
     expect(source()).toContain('modulus←13');
     expect(source()).not.toBe(asRendered(started?.code ?? ''));
-    // And it behaves as a shared link throughout: announced as one, and waiting
-    // to be run rather than drawing itself.
+    // And it behaves as a shared link throughout: announced as one, and what is
+    // drawn is the creation that was sent rather than a variation of the seed.
     expect(screen.getByText(/shared with you/)).toBeInTheDocument();
-    await new Promise((resolve) => setTimeout(resolve, 60));
-    expect(service.executionCount).toBe(0);
+    await waitFor(() => expect(service.executionCount).toBe(1));
+    expect(service.received.join('\n')).toContain('modulus←13');
   });
 });
 
 describe('a play seed that is not one', () => {
-  it('opens the ordinary artwork instead, and draws nothing on its own', async () => {
+  it('opens the ordinary artwork instead, and draws that rather than a variation', async () => {
     const { service } = openWith('not-a-seed');
 
     expect(source()).toBe(asRendered(modularBloom.code));
-    expect(screen.getByText('Press Run to draw this artwork.')).toBeInTheDocument();
 
-    await new Promise((resolve) => setTimeout(resolve, 80));
-    expect(service.executionCount).toBe(0);
+    /*
+     * The artwork draws itself, as every workspace now does. What a nonsense seed
+     * must not do is produce a variation: the preset's own source is what reaches
+     * the service.
+     */
+    await waitFor(() => expect(service.executionCount).toBe(1));
+    // The preset's own value, taken from the preset rather than written out here,
+    // so this keeps meaning "unvaried" if the preset is ever retuned.
+    const untouched = /modulus←\d+/u.exec(modularBloom.code)?.[0] ?? '';
+    expect(service.received.join('\n')).toContain(untouched);
   });
 });
 

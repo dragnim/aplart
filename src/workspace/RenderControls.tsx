@@ -30,6 +30,8 @@ interface Props {
   readonly options: RenderOptions;
   readonly availablePaletteIds?: readonly string[] | undefined;
   readonly onChange: (options: Partial<RenderOptions>) => void;
+  /** Offered only where there is a workspace history for it to be a step in. */
+  readonly onRandomPalette?: (() => void) | undefined;
   readonly animation: AnimationSettings;
   readonly onAnimationChange: (settings: AnimationSettings) => void;
   readonly onAnimationReset: () => void;
@@ -63,6 +65,7 @@ export function RenderControls({
   options,
   availablePaletteIds,
   onChange,
+  onRandomPalette,
   animation,
   onAnimationChange,
   onAnimationReset,
@@ -145,6 +148,18 @@ export function RenderControls({
               <span className={styles.paletteName}>Custom</span>
             </button>
           </div>
+
+          {/*
+           * For somebody who likes the pattern they have and only wants it in
+           * other colours. It sits under the ramps because those are what it
+           * chooses between, and it is the one control here that does not name
+           * what it will produce — which is the whole of its appeal.
+           */}
+          {onRandomPalette !== undefined && (
+            <button type="button" className={styles.randomPalette} onClick={onRandomPalette}>
+              Random palette
+            </button>
+          )}
 
           {custom && (
             <PaletteEditor

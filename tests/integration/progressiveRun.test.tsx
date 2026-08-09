@@ -37,7 +37,7 @@ import { mandelbrotField } from '@/presets/mandelbrot-field';
  */
 const CEILING = numberAssignedTo(mandelbrotField.code, 'iterations') ?? 0;
 import { WorkspacePage } from '@/workspace/WorkspacePage';
-import { advanced, codeEditor, paletteChoice, pressRun, pressRunWith } from '../helpers/workspaceModes';
+import { advanced, codeEditor, paletteChoice, pressRun } from '../helpers/workspaceModes';
 import type * as CanvasRenderer from '@/renderer/CanvasRenderer';
 
 type CanvasRendererModule = typeof CanvasRenderer;
@@ -240,8 +240,11 @@ async function start(matrix = counts(CEILING)) {
   const user = userEvent.setup();
   const service = new HeldService(matrix);
   render(<WorkspacePage presetId={mandelbrotField.id} sharedState={null} service={service} />);
-  await pressRunWith(user);
-  // The probe, which reports the shape and no data.
+  /*
+   * Nothing to press: the workspace runs on arrival, and that opening run is the
+   * one these tests drive through the gate. It reaches the service in exactly the
+   * same shape a pressed one does — the probe first, then the bands.
+   */
   await waitFor(() => expect(service.pending).toBeGreaterThan(0));
   const before = drawCalls.length;
   await service.release();
@@ -520,12 +523,11 @@ describe('a delivery while the artwork is repeated', () => {
   });
 
   it('shows a first delivery as one copy, never repeated', async () => {
-    const user = userEvent.setup();
     const service = new HeldService(counts(CEILING));
     render(<WorkspacePage presetId={mandelbrotField.id} sharedState={null} service={service} />);
 
-    // Repeat chosen before anything has been drawn at all.
-    await pressRunWith(user);
+    // Repeat chosen before anything has been drawn at all. The opening run is
+    // already on its way; these tests drive it rather than pressing for another.
     await waitFor(() => expect(service.pending).toBeGreaterThan(0));
     await service.release();
     await paintedSince(0);
@@ -547,7 +549,7 @@ describe('exporting while a run is in flight', () => {
     const service = new HeldService(counts(CEILING));
     render(<WorkspacePage presetId={mandelbrotField.id} sharedState={null} service={service} />);
 
-    await pressRunWith(user);
+    // The opening run, driven through the gate.
     await waitFor(() => expect(service.pending).toBeGreaterThan(0));
     await service.release();
     await paintedSince(0);

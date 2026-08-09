@@ -288,9 +288,8 @@ test.describe('the Play workspace', () => {
      */
     await page.goto(link);
     await expect(page.getByText(/shared with you/)).toBeVisible();
-    // Waiting, not drawn: the link carries somebody's work rather than a request
-    // for a new artwork, so the visitor decides when to run it.
-    await expect(page.getByText('Press Run to draw this artwork.')).toBeVisible();
+    // Drawn, not waiting: following the link is the request. What the link
+    // carries is somebody's work, and that is what appears.
     await expect(editorLocator(page)).toContainText(`size←${String(detail)}`);
   });
 
@@ -582,18 +581,17 @@ test.describe('the Play workspace', () => {
      * seeded session. The two are separate now — curated controls are a property
      * of the artwork, and the workspace is the workspace — so what a card gets
      * you is the same interface holding the preset's own program rather than a
-     * variation of it, and nothing run until you ask.
+     * variation of it.
      */
     const stub = await stubTryApl(page);
     await page.goto('./#/art/modular-bloom');
 
     await expect(playPanel(page)).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Create', exact: true })).toBeVisible();
-    await expect(page.getByText('Press Run to draw this artwork.')).toBeVisible();
-    expect(stub.requests).toHaveLength(0);
 
-    // The preset as it ships, not a curated variation of it.
+    // The preset as it ships, drawn as it stands — not a curated variation of it.
     await expect(editorLocator(page)).toContainText('modulus←17');
+    await expect.poll(() => stub.requests.join('\n')).toContain('modulus←17');
   });
 
   test('leaves Create out of an artwork that has no curated controls', async ({ page }) => {

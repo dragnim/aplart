@@ -139,15 +139,6 @@ export const basketWeave: ArtworkPreset = {
 
   thumbnailPath: 'thumbnails/basket-weave.png',
   fixturePath: 'tests/fixtures/basket-weave.json',
-  /*
-   * The card the gallery leads with.
-   *
-   * The emphasis moved here from Modular Bloom when the collection turned
-   * toward patterns people would use behind something of their own: this is the
-   * one that answers that question fastest, and a featured card sitting halfway
-   * down the grid is emphasis nobody reads as emphasis.
-   */
-  featured: true,
 
   tags: ['weave', 'textile', 'seamless', 'tileable'],
 

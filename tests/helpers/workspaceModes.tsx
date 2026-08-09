@@ -99,6 +99,19 @@ export function paletteChoice(name: string | RegExp): HTMLElement {
 }
 
 /**
+ * Which palette the Colour mode is showing as chosen.
+ *
+ * The accessible name of the checked radio, so a test can say "not the one it
+ * was" without naming either — which is what a random choice can be held to.
+ */
+export function selectedPalette(): string {
+  const chosen = within(showMode('Colour'))
+    .getAllByRole('radio')
+    .find((option) => option.getAttribute('aria-checked') === 'true');
+  return chosen?.textContent ?? '';
+}
+
+/**
  * A control from Advanced: the raw parameters, orientation, display, tiling and
  * the cell reader. Everything, in other words, that is about the exact numbers
  * rather than about the artwork's character.
