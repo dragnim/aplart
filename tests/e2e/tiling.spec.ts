@@ -9,6 +9,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { choice, advanced, pressRun } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -23,15 +24,11 @@ function runStatus(page: Page) {
  * "Repeat" is inside "Mirror repeat", and "50%" inside "150%". Going through
  * one helper means the exactness cannot be forgotten on the next control added.
  */
-function radio(page: Page, name: string) {
-  return page.getByRole('radio', { name, exact: true });
-}
-
 async function openAndRun(page: Page) {
   await stubTryApl(page);
   await page.goto('./#/art/truchet-grid');
   await expect(page.getByRole('heading', { level: 1, name: 'Truchet Grid' })).toBeVisible();
-  await page.getByRole('button', { name: /^Run/ }).click();
+  await pressRun(page);
   await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 }
 
@@ -84,15 +81,15 @@ test.describe('repeating the artwork', () => {
   test('fills the artwork with copies and leaves no gap between them', async ({ page }) => {
     const stub = await stubTryApl(page);
     await page.goto('./#/art/truchet-grid');
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 
     const singleEmpty = await backgroundColumns(page);
     const sent = stub.requests.length;
 
     for (const count of ['2 by 2', '3 by 3', '5 by 5']) {
-      await radio(page, 'Repeat').click();
-      await radio(page, count).click();
+      await (await choice(page, 'Repeat')).click();
+      await (await choice(page, count)).click();
       await page.waitForTimeout(300);
 
       /*
@@ -123,10 +120,10 @@ test.describe('repeating the artwork', () => {
     await expect(drawer).toHaveAttribute('data-drawer', 'open');
 
     // The drawer scrolls, and Tiling sits well below its fold.
-    const repeat = radio(page, 'Repeat');
+    const repeat = await choice(page, 'Repeat');
     await repeat.scrollIntoViewIfNeeded();
     await repeat.click();
-    const count = radio(page, '3 by 3');
+    const count = await choice(page, '3 by 3');
     await count.scrollIntoViewIfNeeded();
     await count.click();
     await page.waitForTimeout(300);
@@ -137,8 +134,8 @@ test.describe('repeating the artwork', () => {
 
   test('reads the same cell from any copy, and keeps it through a change of count', async ({ page }) => {
     await openAndRun(page);
-    await radio(page, 'Repeat').click();
-    await radio(page, '2 by 2').click();
+    await (await choice(page, 'Repeat')).click();
+    await (await choice(page, '2 by 2')).click();
     await page.waitForTimeout(300);
 
     const canvas = page.locator('canvas').first();
@@ -174,8 +171,8 @@ test.describe('repeating the artwork', () => {
     // round trip itself is covered without a browser in the integration tests.
     test.skip(browserName === 'webkit', 'WebKit does not support clipboard permissions.');
     await openAndRun(page);
-    await radio(page, 'Repeat').click();
-    await radio(page, '5 by 5').click();
+    await (await choice(page, 'Repeat')).click();
+    await (await choice(page, '5 by 5')).click();
 
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.getByRole('button', { name: 'Share' }).click();
@@ -190,8 +187,8 @@ test.describe('repeating the artwork', () => {
     await expect(opened.getByText(/shared with you/)).toBeVisible({ timeout: 15_000 });
 
     // Restored as a repeat, and not into Focus mode.
-    await expect(radio(opened, 'Repeat')).toHaveAttribute('aria-checked', 'true');
-    await expect(radio(opened, '5 by 5')).toHaveAttribute('aria-checked', 'true');
+    await expect(await choice(opened, 'Repeat')).toHaveAttribute('aria-checked', 'true');
+    await expect(await choice(opened, '5 by 5')).toHaveAttribute('aria-checked', 'true');
     await expect(opened.getByRole('button', { name: 'Focus mode' })).toBeVisible();
   });
 });
@@ -202,17 +199,17 @@ test.describe('mirroring the repeat', () => {
   test('leaves no gap, at every count and scale', async ({ page }) => {
     const stub = await stubTryApl(page);
     await page.goto('./#/art/truchet-grid');
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 
     const singleEmpty = await backgroundColumns(page);
     const sent = stub.requests.length;
 
-    await radio(page, 'Mirror repeat').click();
+    await (await choice(page, 'Mirror repeat')).click();
     for (const count of ['2 by 2', '3 by 3', '5 by 5']) {
-      await radio(page, count).click();
+      await (await choice(page, count)).click();
       for (const scale of ['50%', '100%', '200%']) {
-        await radio(page, scale).click();
+        await (await choice(page, scale)).click();
         await page.waitForTimeout(250);
         expect(await backgroundColumns(page), `${count} at ${scale}`).toBeLessThanOrEqual(singleEmpty);
       }
@@ -224,8 +221,8 @@ test.describe('mirroring the repeat', () => {
 
   test('reads one source cell from all four reflections', async ({ page }) => {
     await openAndRun(page);
-    await radio(page, 'Mirror repeat').click();
-    await radio(page, '2 by 2').click();
+    await (await choice(page, 'Mirror repeat')).click();
+    await (await choice(page, '2 by 2')).click();
     await page.waitForTimeout(300);
 
     const canvas = page.locator('canvas').first();
@@ -282,7 +279,7 @@ test.describe('mirroring the repeat', () => {
       await page.getByRole('button', { name: 'Controls' }).click();
     }
 
-    const mirror = radio(page, 'Mirror repeat');
+    const mirror = await choice(page, 'Mirror repeat');
     await mirror.scrollIntoViewIfNeeded();
     await mirror.click();
     await page.waitForTimeout(300);
@@ -368,7 +365,7 @@ test.describe('the value reading', () => {
 
     // The cell is still chosen and still marked: the control that gives it up
     // is offered, and the reading still names the same cell when asked again.
-    await expect(page.getByRole('button', { name: 'Clear selection' })).toBeEnabled();
+    await expect((await advanced(page)).getByRole('button', { name: 'Clear selection' })).toBeEnabled();
 
     // And the corner it was covering can now be pressed.
     await canvas.click({ position: underneath });
@@ -382,7 +379,7 @@ test.describe('the value reading', () => {
     // Clearing removes the reading and the marker together.
     await page.getByRole('button', { name: 'Clear', exact: true }).click();
     await expect(page.locator('[data-corner]')).toBeHidden();
-    await expect(page.getByRole('button', { name: 'Clear selection' })).toBeDisabled();
+    await expect((await advanced(page)).getByRole('button', { name: 'Clear selection' })).toBeDisabled();
   });
 
   test('hiding the reading keeps the selection; clearing it does not', async ({ page }) => {
@@ -401,7 +398,7 @@ test.describe('the value reading', () => {
 
     // The cell is still chosen: the keyboard control that gives it up is still
     // offered, which it is not when nothing is selected.
-    const clear = page.getByRole('button', { name: 'Clear selection' });
+    const clear = (await advanced(page)).getByRole('button', { name: 'Clear selection' });
     await expect(clear).toBeEnabled();
 
     await clear.click();

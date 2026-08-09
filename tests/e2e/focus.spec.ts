@@ -10,6 +10,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { editorOn, pressRun } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 const PHONE = { width: 390, height: 844 };
@@ -24,7 +25,7 @@ async function open(page: Page, presetId: string, title: string) {
 }
 
 async function runAndWait(page: Page) {
-  await page.getByRole('button', { name: /^Run/ }).click();
+  await pressRun(page);
   await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 20_000 });
 }
 
@@ -228,16 +229,16 @@ test.describe('Focus mode', () => {
     await stubTryApl(page);
     await open(page, 'modular-bloom', 'Modular Bloom');
 
-    await page.locator('.cm-content').fill('size←12\nmodulus←5\nmultiplier←1\nmodulus|multiplier×∘.×⍨⍳size');
+    await (await editorOn(page)).fill('size←12\nmodulus←5\nmultiplier←1\nmodulus|multiplier×∘.×⍨⍳size');
     await page.getByRole('button', { name: 'Focus mode' }).click();
 
     // Same editor, so the edit is still there and undo still knows about it.
-    await expect(page.locator('.cm-content')).toContainText('modulus←5');
+    await expect(await editorOn(page)).toContainText('modulus←5');
     await runAndWait(page);
     await expect(page.getByRole('img', { name: /12 by 12 grid/ })).toBeVisible();
 
     await page.getByRole('button', { name: 'Exit focus' }).click();
-    await expect(page.locator('.cm-content')).toContainText('modulus←5');
+    await expect(await editorOn(page)).toContainText('modulus←5');
     await expect(page.getByRole('img', { name: /12 by 12 grid/ })).toBeVisible();
   });
 });

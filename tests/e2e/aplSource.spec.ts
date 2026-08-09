@@ -10,6 +10,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { showMode } from './workspaceModes';
 
 /**
  * The narrow layout puts the editor behind a tab; the wide one shows it.
@@ -65,6 +66,8 @@ test.describe('artwork source in a production build', () => {
      * about CodeMirror; the clipboard is the editor's own document, and it is
      * also the exact text a visitor would paste into an interpreter.
      */
+    // Copy APL sits with the code it copies, in the Code mode.
+    await showMode(page, 'Code');
     await page.getByRole('button', { name: 'Copy APL' }).click();
     const copied = await page.evaluate(() => navigator.clipboard.readText());
 

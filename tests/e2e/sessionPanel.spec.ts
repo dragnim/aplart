@@ -15,6 +15,15 @@
 import { expect, test, type Page } from '@playwright/test';
 import { ADAPTIVE_MARKER } from '@/execution/adaptiveProbe';
 import { stubTryApl, type StubHandle } from './stubTryApl';
+import {
+  artworkActions,
+  editorLocator,
+  editorOn,
+  paletteChoice,
+  pressRun,
+  runButton,
+  showMode,
+} from './workspaceModes';
 
 const SEED = 20_260_805;
 
@@ -92,16 +101,26 @@ test.describe('the four editing modes', () => {
     await expect(page.getByRole('region', { name: 'Make it yours' })).toBeVisible();
 
     await tab(page, 'Colour').click();
-    await expect(page.getByRole('radio', { name: 'Ember', exact: true })).toBeVisible();
-    await expect(page.getByRole('checkbox', { name: /Invert palette/ })).toBeVisible();
+    await expect(await paletteChoice(page, 'Ember')).toBeVisible();
+    await expect(
+      (await showMode(page, 'Colour')).getByRole('checkbox', { name: /Invert palette/ }),
+    ).toBeVisible();
 
     await tab(page, 'Advanced').click();
     await expect(advancedPanel(page).getByLabel('Modulus')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Reset parameters' })).toBeVisible();
+    /*
+     * And no Reset parameters of its own. Advanced used to carry one beside a
+     * Randomise, both duplicating the row beneath every mode — and not even
+     * doing the same thing, since that Randomise drew from the raw ranges while
+     * this one draws from the curated recipes. The artwork's verbs live with the
+     * artwork.
+     */
+    await expect(page.getByRole('button', { name: 'Reset parameters' })).toHaveCount(0);
+    await expect(artworkActions(page).getByRole('button', { name: 'Reset' })).toBeVisible();
 
     await tab(page, 'Code').click();
-    await expect(page.locator('.cm-content')).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Run/ })).toBeVisible();
+    await expect(await editorOn(page)).toBeVisible();
+    await expect(await runButton(page)).toBeVisible();
     // One editor, whatever the mode: a second would be a second undo history.
     await expect(page.locator('.cm-editor')).toHaveCount(1);
   });
@@ -115,13 +134,20 @@ test.describe('the four editing modes', () => {
      * right, though, and burying it under the colour swatches made it a footnote
      * to choosing them.
      */
-    await tab(page, 'Colour').click();
-    await expect(page.getByRole('button', { name: /Animate palette/ })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Reset animation' })).toHaveCount(0);
+    /*
+     * Scoped to Colour, not fetched from Animate. The point is that these are
+     * absent from the palette mode, so a helper that opened Animate to look for
+     * them would be answering a different question — and always answering yes.
+     */
+    const colour = await showMode(page, 'Colour');
+    await expect(colour.getByRole('button', { name: /Animate palette/ })).toHaveCount(0);
+    await expect(colour.getByRole('button', { name: 'Reset animation' })).toHaveCount(0);
 
     await tab(page, 'Animate').click();
     await expect(page.getByRole('button', { name: /Animate palette/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Reset animation' })).toBeVisible();
+    await expect(
+      (await showMode(page, 'Animate')).getByRole('button', { name: 'Reset animation' }),
+    ).toBeVisible();
     await expect(page.getByLabel('Movement')).toBeVisible();
     await expect(page.getByLabel(/^Speed/)).toBeVisible();
   });
@@ -181,7 +207,7 @@ test.describe('controls change the artwork', () => {
     const before = runs(stub.requests);
 
     const label = await artwork(page).getAttribute('aria-label');
-    await page.getByRole('radio', { name: 'Mono', exact: true }).click();
+    await (await paletteChoice(page, 'Mono')).click();
 
     await expect(artwork(page)).not.toHaveAttribute('aria-label', label ?? '');
     await expect(artwork(page)).toHaveAttribute('aria-label', /Mono/);
@@ -204,7 +230,7 @@ test.describe('controls change the artwork', () => {
     const before = runs(stub.requests);
     const drawn = await artwork(page).getAttribute('aria-label');
 
-    await page.locator('.cm-content').click();
+    await (await editorOn(page)).click();
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.type('modulus←9\nsize←24\nmodulus|∘.×⍨⍳size');
     await page.waitForTimeout(500);
@@ -213,7 +239,7 @@ test.describe('controls change the artwork', () => {
     expect(runs(stub.requests)).toBe(before);
     await expect(artwork(page)).toHaveAttribute('aria-label', drawn ?? '');
 
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect.poll(() => runs(stub.requests), { timeout: 30_000 }).toBeGreaterThan(before);
     await expect(page.getByText(/Finished in/)).toBeVisible({ timeout: 30_000 });
   });
@@ -294,7 +320,9 @@ test.describe('changing mode changes nothing but the mode', () => {
     // The Code mode, the line selected, the caret in the editor — and the artwork
     // still beside it, unchanged and un-run.
     await expect(tab(page, 'Code')).toHaveAttribute('aria-selected', 'true');
-    await expect(page.locator('.cm-content')).toBeFocused();
+    // A passive locator: "Edit the APL" has already selected the mode, and
+    // pressing the tab again to look would move focus off the editor.
+    await expect(editorLocator(page)).toBeFocused();
     // The value itself is selected, ready to be typed over — which is what makes
     // this an invitation to edit rather than a tour of the program.
     const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '');

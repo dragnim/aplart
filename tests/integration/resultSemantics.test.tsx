@@ -30,6 +30,7 @@ import { mandelbrotField } from '@/presets/mandelbrot-field';
  */
 const CEILING = numberAssignedTo(mandelbrotField.code, 'iterations') ?? 0;
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { advanced, artworkAction, codeEditor, pressRunWith } from '../helpers/workspaceModes';
 import type * as CanvasRenderer from '@/renderer/CanvasRenderer';
 
 type CanvasRendererModule = typeof CanvasRenderer;
@@ -128,14 +129,14 @@ function announced(): string {
 }
 
 async function inspect(user: ReturnType<typeof userEvent.setup>, row: number, column: number) {
-  fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: String(row) } });
-  fireEvent.change(screen.getByLabelText(/^Column/), { target: { value: String(column) } });
-  await user.click(screen.getByRole('button', { name: /^Inspect$/ }));
+  fireEvent.change(advanced().getByLabelText(/^Row/), { target: { value: String(row) } });
+  fireEvent.change(advanced().getByLabelText(/^Column/), { target: { value: String(column) } });
+  await user.click(advanced().getByRole('button', { name: /^Inspect$/ }));
   return announced();
 }
 
 async function runAndWait(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: /^Run/ }));
+  await pressRunWith(user);
   await waitFor(() => expect(screen.getByRole('button', { name: /^Run/ })).toBeEnabled());
 }
 
@@ -174,9 +175,7 @@ async function openAndRun(options: { readonly at60?: NumericMatrix | 'oversized'
 /** Raises the iteration ceiling in the editor, without running. */
 function editTo60() {
   fireEvent.change(screen.getByLabelText('Maximum iterations'), { target: { value: '60' } });
-  return waitFor(() =>
-    expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toContain('iterations←60'),
-  );
+  return waitFor(() => expect(codeEditor().textContent).toContain('iterations←60'));
 }
 
 describe('a successful run at 28', () => {
@@ -299,9 +298,7 @@ describe('dragging after an unrun edit', () => {
      * value; 160 of 200 across 0.002…2 is a span of about 0.5.
      */
     fireEvent.change(screen.getByLabelText('Span'), { target: { value: '160' } });
-    await waitFor(() =>
-      expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toContain('zoom←0.502'),
-    );
+    await waitFor(() => expect(codeEditor().textContent).toContain('zoom←0.502'));
 
     // The right-hand half of the artwork, which under a span of 1.4 is centred
     // near -0.6 + 0.7 = 0.1 and half as wide: span 0.7.
@@ -310,41 +307,42 @@ describe('dragging after an unrun edit', () => {
     fireEvent.pointerMove(canvas, { clientX: 400, clientY: 300, pointerId: 1 });
     fireEvent.pointerUp(canvas, { clientX: 400, clientY: 300, pointerId: 1 });
 
-    await waitFor(() =>
-      expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toContain('zoom←0.7'),
-    );
+    await waitFor(() => expect(codeEditor().textContent).toContain('zoom←0.7'));
 
     /*
      * Read through the unrun 0.5 the same drag would have produced a span of
      * 0.25 and a centre a quarter of the way through a view nobody was looking
      * at — the pointer landing somewhere other than where it was put.
      */
-    expect(screen.getByRole('textbox', { name: /APL/i }).textContent).not.toContain('zoom←0.251');
+    expect(codeEditor().textContent).not.toContain('zoom←0.251');
     expect(await inspect(user, 1, 1)).toContain('Row 1, column 1');
   });
 });
 
 describe('resetting the artwork', () => {
-  it('does not reinterpret the result that is still on screen', async () => {
+  it('moves the result and its meaning together', async () => {
+    /*
+     * This used to assert the opposite half of the same invariant: Reset wrote
+     * the preset's code without running it, so the artwork on screen stayed the
+     * 60-iteration one and went on being read at 60. That was right, and it was
+     * also the fault — the sliders said one thing and the picture another until
+     * somebody found Run.
+     *
+     * Reset draws now. So the invariant is tested at the other end: once the
+     * reset run lands, the result *and* the ceiling it is read against are the
+     * preset's. What must never happen is the pairing coming apart — a new
+     * matrix read against the old maximum, or the reverse.
+     */
     const { user } = await openAndRun({ at60: counts(60) });
     await editTo60();
     await runAndWait(user);
     await waitFor(() => expect(paintedCeiling()).toBe(60));
 
-    await user.click(screen.getByRole('button', { name: 'Reset' }));
-    await user.click(await screen.findByRole('button', { name: 'Reset everything' }));
-    await waitFor(() =>
-      expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toContain(
-        `iterations←${String(CEILING)}`,
-      ),
-    );
+    await user.click(artworkAction('Reset'));
 
-    /*
-     * Reset puts the code back; it does not run it. The artwork on screen is
-     * still the 60-iteration result, so it is still read at 60. There is no
-     * separate range to go stale — the range is part of the result.
-     */
-    expect(paintedCeiling()).toBe(60);
-    expect(await inspect(user, 3, 3)).toContain('reached the maximum of 60 iterations');
+    await waitFor(() => expect(codeEditor().textContent).toContain(`iterations←${String(CEILING)}`));
+    await waitFor(() => expect(paintedCeiling()).toBe(CEILING));
+
+    expect(await inspect(user, 3, 3)).toContain(`reached the maximum of ${String(CEILING)} iterations`);
   });
 });

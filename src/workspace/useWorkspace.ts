@@ -79,6 +79,13 @@ export interface Workspace {
   readonly runCode: (source: string) => void;
   readonly inspectCell: (cell: SourceCell | null) => void;
   readonly stop: () => void;
+  /**
+   * Back to the preset, recorded so that Undo can return to what was there.
+   *
+   * Does not run: the caller knows whether this surface draws what a control
+   * writes, and passes the preset's own source to `runCode` if it does.
+   */
+  readonly reset: () => void;
   readonly restore: (state: WorkspaceState) => void;
 }
 
@@ -264,6 +271,18 @@ export function useWorkspace({ preset, service, initialState }: UseWorkspaceOpti
     dispatch({ type: 'renderOptionsCommitted', options, ...commit });
   }, []);
 
+  /*
+   * Any run in flight is disowned first, exactly as `undo` does and for the same
+   * reason: the artwork about to be drawn is the preset's, and a request already
+   * on its way would otherwise land on top of it.
+   */
+  const reset = useCallback(() => {
+    runToken.current += 1;
+    abortController.current?.abort();
+    executionService.cancel();
+    dispatch({ type: 'reset' });
+  }, [executionService]);
+
   const restore = useCallback((restored: WorkspaceState) => {
     dispatch({ type: 'restored', state: restored });
   }, []);
@@ -278,6 +297,7 @@ export function useWorkspace({ preset, service, initialState }: UseWorkspaceOpti
     run,
     runCode,
     stop,
+    reset,
     restore,
     inspectCell,
   };

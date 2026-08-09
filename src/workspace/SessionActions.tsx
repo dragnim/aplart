@@ -1,14 +1,19 @@
 /**
  * What you can do to the artwork, whichever way you are editing it.
  *
- * These four belong to the session rather than to any one editing mode: saving a
- * picture is not a Create idea, and Undo is least useful in the tab you happen to
- * be looking at. They sat inside the Create controls while Create was the only
- * panel; now that there are four, they sit beneath all of them and stay put as
+ * These three belong to the artwork rather than to any one editing mode, and
+ * they are the three that change it: make it something else, take that back, or
+ * put it back to the preset's own. They sit beneath every mode and stay put as
  * the tab changes.
  *
- * Run is deliberately absent. It means "run this source", which is a Code idea,
- * and putting it here would suggest the other tabs need pressing too — they do
+ * What is deliberately not here. Share and Export act on the artwork as an
+ * *output* and live in the toolbar above, where they belong to the piece rather
+ * than to the editing of it; offering them in both places made two of the four
+ * controls here duplicates of controls already on screen. Save image is gone
+ * outright — it wrote a 1024px PNG through the same function Export calls, with
+ * none of the size, caption or composition choices, so it was Export with the
+ * choices taken away. And Run is a Code idea: it means "run this source", and
+ * putting it here would suggest the other modes need pressing too, which they do
  * not, because a control applies itself.
  */
 
@@ -19,13 +24,12 @@ interface Props {
   readonly onUndo: () => void;
   /** What Undo would take back, or null when there is nothing behind you. */
   readonly undoLabel: string | null;
-  readonly onSaveImage: () => void;
-  readonly onShare: () => void;
-  /** False before the first artwork exists, when there is nothing to save. */
-  readonly canSave: boolean;
+  readonly onReset: () => void;
+  /** False when the artwork is already the preset's own, in source and appearance. */
+  readonly canReset: boolean;
 }
 
-export function SessionActions({ onRandomise, onUndo, undoLabel, onSaveImage, onShare, canSave }: Props) {
+export function SessionActions({ onRandomise, onUndo, undoLabel, onReset, canReset }: Props) {
   return (
     <div className={styles.actions} aria-label="Artwork actions" role="group">
       <button type="button" className={styles.primary} onClick={onRandomise}>
@@ -45,11 +49,13 @@ export function SessionActions({ onRandomise, onUndo, undoLabel, onSaveImage, on
       >
         Undo
       </button>
-      <button type="button" className={styles.action} onClick={onSaveImage} disabled={!canSave}>
-        Save image
-      </button>
-      <button type="button" className={styles.action} onClick={onShare}>
-        Share
+      {/*
+        No confirmation. It used to ask, because it could not be taken back;
+        it is now one entry in the same history as everything else, so asking
+        would be a dialog guarding an action with an Undo button beside it.
+      */}
+      <button type="button" className={styles.action} onClick={onReset} disabled={!canReset}>
+        Reset
       </button>
     </div>
   );

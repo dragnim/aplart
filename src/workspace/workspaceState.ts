@@ -242,6 +242,16 @@ export type WorkspaceAction =
     }
   | { readonly type: 'runFailed'; readonly error: WorkspaceError }
   | { readonly type: 'runCancelled' }
+  /**
+   * Back to the artwork as the preset ships it — source, appearance and all.
+   *
+   * An action of its own rather than a commit followed by an appearance change,
+   * because it is one thing somebody did and has to be one step to take back. It
+   * also drops the seed, which neither of those can: after a reset the artwork is
+   * the preset's own, so a share link claiming it came from a variation would be
+   * describing something that is no longer on screen.
+   */
+  | { readonly type: 'reset' }
   | { readonly type: 'restored'; readonly state: WorkspaceState };
 
 /**
@@ -255,7 +265,7 @@ export type WorkspaceAction =
  * are plain JSON: primitives, arrays of them, and objects of them. That is the
  * whole domain this walks.
  */
-function sameRenderOptions(before: RenderOptions, after: RenderOptions): boolean {
+export function sameRenderOptions(before: RenderOptions, after: RenderOptions): boolean {
   const same = (a: unknown, b: unknown): boolean => {
     if (Object.is(a, b)) return true;
     if (Array.isArray(a) && Array.isArray(b)) {
@@ -453,6 +463,44 @@ export function workspaceReducer(
         ...state,
         renderOptions: options,
         past: sameGesture ? state.past : [...state.past, snapshot].slice(-HISTORY_LIMIT),
+      };
+    }
+
+    case 'reset': {
+      const renderOptions = defaultRenderOptions(preset.defaultPaletteId);
+
+      // Already the preset's own, in source and in appearance alike, so there is
+      // nothing to take back and nothing to record.
+      if (
+        state.code === preset.code &&
+        state.seed === undefined &&
+        sameRenderOptions(state.renderOptions, renderOptions)
+      ) {
+        return state;
+      }
+
+      const snapshot: WorkspaceSnapshot = {
+        code: state.code,
+        seed: state.seed,
+        renderOptions: state.renderOptions,
+        result: state.result,
+        warnings: state.warnings,
+        lastRunAt: state.lastRunAt,
+        lastDurationMs: state.lastDurationMs,
+        lastRequestCount: state.lastRequestCount,
+        label: 'Reset',
+        // Never part of a gesture: a reset is one press, and the press is over.
+        coalesce: undefined,
+      };
+
+      return {
+        ...state,
+        code: preset.code,
+        seed: undefined,
+        renderOptions,
+        modified: false,
+        status: state.status === 'running' ? 'running' : 'edited',
+        past: [...state.past, snapshot].slice(-HISTORY_LIMIT),
       };
     }
 

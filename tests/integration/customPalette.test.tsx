@@ -13,6 +13,7 @@ import { fromNested } from '@/matrix/matrixTypes';
 import { modularBloom } from '@/presets/modular-bloom';
 import { CUSTOM_PALETTE_ID } from '@/renderer/customPalette';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { paletteChoice, pressRunWith } from '../helpers/workspaceModes';
 
 const CANVAS = { left: 0, top: 0, width: 400, height: 400 };
 
@@ -58,13 +59,13 @@ async function openAndRun(sharedState: string | null = null) {
   service.register('default', labelled(8, 8));
   render(<WorkspacePage presetId={modularBloom.id} sharedState={sharedState} service={service} />);
 
-  await user.click(screen.getByRole('button', { name: /^Run/ }));
+  await pressRunWith(user);
   await waitFor(() => expect(screen.getByRole('img', { name: /grid/ })).toBeInTheDocument());
   return { user, service };
 }
 
 async function chooseCustom(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('radio', { name: /Custom/ }));
+  await user.click(paletteChoice(/Custom/));
   await screen.findByRole('img', { name: /Gradient of/ });
 }
 
@@ -333,7 +334,7 @@ describe('keeping a custom palette', () => {
     await screen.findByText(/shared with you/);
 
     // No stops, no trouble: the named ramp, exactly as before.
-    expect(screen.getByRole('radio', { name: /Neon/ })).toHaveAttribute('aria-checked', 'true');
+    expect(paletteChoice(/Neon/)).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('img', { name: /grid/ })).toHaveAccessibleName(/Neon palette/);
   });
 

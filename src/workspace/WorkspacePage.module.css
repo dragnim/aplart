@@ -136,33 +136,18 @@
 }
 
 /*
- * The three headings that structure the controls column — Code controls,
- * Appearance, Inspect — and the only headings that carry the motif.
+ * The headings that structure a mode — Code controls, Appearance, Read a value.
  *
- * Quieter than the artwork title's block in both size and colour: the border
- * token rather than the solid, and two thirds the size. That ordering is the
- * point. The wordmark is the signature, the title's block is its echo, and these
- * are wayfinding — a mark for where a section begins, especially on a phone,
- * where this column is long and everything else in it is a label.
- *
- * Not on the group legends beneath them, nor on the primitive reference, nor on
- * the Focus-mode drawer: repeating it at every level would turn a hierarchy into
- * a texture. Bound to the first word by a margin, as the title's is, so it cannot
- * be left on a line of its own.
+ * They used to carry a small coloured square, an echo of the wordmark's, as a
+ * mark for where a section began. It was wayfinding for a layout that no longer
+ * exists: one long column on a phone, where every section ran into the next and
+ * nothing else was a heading. A mode is a short panel with a title at the top of
+ * it, and the square had stopped standing for anything — which is exactly how it
+ * read, as a coloured artefact beside a word.
  */
 .sectionHeading {
   font-size: var(--text-lg);
   margin-bottom: var(--space-1);
-}
-
-.sectionHeading::before {
-  content: '';
-  display: inline-block;
-  width: 0.3em;
-  height: 0.3em;
-  margin-right: 0.45em;
-  vertical-align: 0.1em;
-  background: var(--ui-accent-border);
 }
 
 .sectionNote {

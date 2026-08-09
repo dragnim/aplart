@@ -21,6 +21,7 @@ import { fromNested, type NumericMatrix } from '@/matrix/matrixTypes';
 import { juliaSet } from '@/presets/julia-set';
 import { modularBloom } from '@/presets/modular-bloom';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { codeEditor, pressRunWith } from '../helpers/workspaceModes';
 
 beforeEach(() => {
   localStorage.clear();
@@ -69,7 +70,7 @@ function limitedService(matrix = tall()) {
   return service;
 }
 
-const editor = () => screen.getByRole('textbox', { name: /APL/i });
+const editor = () => codeEditor();
 
 /**
  * Opens an artwork whose code is somebody else's program.
@@ -94,7 +95,7 @@ function openWithForeignSource(presetId: string, code: string, service: MockAplE
 }
 
 async function runAndFinish(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: /^Run/ }));
+  await pressRunWith(user);
   await waitFor(() => expect(screen.getByText(/Finished in/)).toBeInTheDocument(), { timeout: 5000 });
 }
 
@@ -198,7 +199,7 @@ describe('a refusal', () => {
     const service = limitedService(tall(300));
     render(<WorkspacePage presetId={modularBloom.id} sharedState={null} service={service} />);
 
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
     const alert = await screen.findByRole('alert');
 
     /*
@@ -229,7 +230,7 @@ describe('a refusal', () => {
     const service = limitedService(tall(300));
     render(<WorkspacePage presetId={modularBloom.id} sharedState={null} service={service} />);
 
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
     await screen.findByRole('alert');
 
     /*

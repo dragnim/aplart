@@ -17,6 +17,7 @@ import { fromNested } from '@/matrix/matrixTypes';
 import { modularBloom } from '@/presets/modular-bloom';
 import { truchetGrid } from '@/presets/truchet-grid';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { advanced, codeEditor, pressRunWith } from '../helpers/workspaceModes';
 
 const CANVAS = { left: 0, top: 0, width: 400, height: 400 };
 
@@ -68,15 +69,21 @@ async function open(preset = truchetGrid.id) {
 }
 
 async function run(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: /^Run/ }));
+  await pressRunWith(user);
   await waitFor(() => expect(screen.getByRole('img', { name: /grid/ })).toBeInTheDocument());
 }
 
 async function setClasses(value: number) {
-  fireEvent.change(screen.getByLabelText('Tile shapes'), { target: { value: String(value) } });
-  await waitFor(() =>
-    expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toContain(`classes←${String(value)}`),
-  );
+  /*
+   * Advanced's control, not Create's.
+   *
+   * Truchet now offers a curated "Tile shapes" as well as the raw parameter of
+   * the same name, and they are two views of one assignment. The edge claim is a
+   * statement about the exact class count, so it is the exact control this test
+   * drives — and naming the mode is what stops the query matching both.
+   */
+  fireEvent.change(advanced().getByLabelText('Tile shapes'), { target: { value: String(value) } });
+  await waitFor(() => expect(codeEditor().textContent).toContain(`classes←${String(value)}`));
 }
 
 const claim = () => screen.queryByText(/Seamless by construction|Edge continuity is not guaranteed/);
@@ -148,13 +155,13 @@ describe('the claim about repeated edges', () => {
 
   it('adds no seamless control and leaves the APL alone', async () => {
     const { user } = await open();
-    const code = screen.getByRole('textbox', { name: /APL/i }).textContent;
+    const code = codeEditor().textContent;
     await run(user);
 
     // The meaningful choice is already in the code as `classes`. Nothing here
     // adds a switch, and nothing here writes to the artwork.
     expect(screen.queryByLabelText(/seamless/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toBe(code);
+    expect(codeEditor().textContent).toBe(code);
   });
 
   it('says nothing at all for a preset that has not proved anything', async () => {

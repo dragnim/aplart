@@ -79,29 +79,27 @@ describe('the artwork title', () => {
 describe('the workspace section headings', () => {
   const workspace = read('workspace', 'WorkspacePage.module.css');
 
-  it('carry the motif in its quieter form, and no accent on the words', () => {
+  it('carry no motif and no accent at all', () => {
+    /*
+     * They used to carry a small square in the accent's border tone, a third
+     * rank of the wordmark's motif below the title's own block. It was
+     * wayfinding for a layout that no longer exists — one long column on a phone
+     * where every section ran into the next — and in a short tabbed panel with a
+     * title at the top of it, the square had stopped standing for anything.
+     *
+     * Asserted as an absence, so the marker cannot quietly return: what makes
+     * this hierarchy work is that only two things carry the motif.
+     */
     expect(block(workspace, '.sectionHeading')).not.toContain('--ui-accent');
-    expect(block(workspace, '.sectionHeading::before')).toContain('background: var(--ui-accent-border)');
+    expect(workspace).not.toContain('.sectionHeading::before');
   });
 
-  it('are subordinate to the artwork title, in size and in colour', () => {
-    /*
-     * The hierarchy, asserted rather than described: the wordmark is the
-     * signature, the title's block echoes it, and these are quieter again. A
-     * change that made them equal — or louder — has to fail here.
-     */
-    const emWidth = (css: string, selector: string) => {
-      const match = /width:\s*([\d.]+)em/u.exec(block(css, selector));
-      expect(match, `${selector} has no em width`).not.toBeNull();
-      return Number.parseFloat((match as RegExpExecArray)[1] as string);
-    };
-
+  it('leave the artwork title as the only heading below the wordmark that carries it', () => {
     const toolbar = read('workspace', 'WorkspaceToolbar.module.css');
-    expect(emWidth(workspace, '.sectionHeading::before')).toBeLessThan(emWidth(toolbar, '.title::before'));
 
-    // The solid is the strongest accent; the border is a step down from it.
+    // The solid is the strongest accent, and the title's block is now the one
+    // place in the workspace that uses it.
     expect(block(toolbar, '.title::before')).toContain('--ui-accent-solid');
-    expect(block(workspace, '.sectionHeading::before')).toContain('--ui-accent-border');
   });
 
   it('stop there: nothing below them, and nothing in Focus mode', () => {

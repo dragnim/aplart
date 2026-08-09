@@ -8,6 +8,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { pressRun } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -73,7 +74,7 @@ test.describe('a banded run arriving', () => {
     await page.goto('./#/art/mandelbrot-field');
     await expect(page.getByRole('heading', { level: 1, name: 'Mandelbrot Field' })).toBeVisible();
 
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
 
     // Part-way through, a good share of the canvas is hatched.
     await expect.poll(() => hatchFraction(page), { timeout: 20_000 }).toBeGreaterThan(0.05);
@@ -99,12 +100,12 @@ test.describe('a banded run arriving', () => {
      */
     await stubTryApl(page, { delayMs: 1200 });
     await page.goto('./#/art/mandelbrot-field');
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 60_000 });
     await expectWhole(page);
 
     // A second run, stopped as soon as it can be.
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     const stop = page.getByRole('button', { name: 'Stop' });
     await stop.click();
 

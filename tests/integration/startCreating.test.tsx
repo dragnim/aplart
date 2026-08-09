@@ -16,6 +16,7 @@ import { GalleryPage } from '@/gallery/GalleryPage';
 import { MockAplExecutionService } from '@/execution/MockAplExecutionService';
 import { fromNested } from '@/matrix/matrixTypes';
 import { modularBloom } from '@/presets/modular-bloom';
+import { START_CREATING_POOL, starterFor, startCreatingPool } from '@/presets/presets';
 import { numberAssignedTo } from '@/editor/parameterBinding';
 import { parseRoute } from '@/app/router';
 import { decodeShareState } from '@/sharing/decodeShareState';
@@ -26,6 +27,7 @@ import { defaultRenderOptions } from '@/renderer/renderOptions';
 import { localProjects, projectIdFor } from '@/workspace/useLocalProject';
 import { readPlaySeed, startCreating } from '@/workspace/startCreating';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { colour } from '../helpers/workspaceModes';
 
 beforeAll(() => {
   vi.stubGlobal(
@@ -106,12 +108,59 @@ describe('the gallery hero', () => {
     expect(actions.map((link) => link.textContent)).toEqual(['Start creating', 'Browse the gallery']);
   });
 
-  it('points Start creating at the starter artwork, with a seed', () => {
+  it('points Start creating at one of the curated artworks, with a seed', () => {
+    /*
+     * The pool rather than one artwork. Start creating opened Modular Bloom every
+     * time only because it was the sole preset with curated controls; now the
+     * seed chooses the artwork as well as the variation within it, from a list
+     * chosen for being the strongest first impression.
+     */
     render(<GalleryPage />);
 
     const route = parseRoute(startHref());
-    expect(route).toMatchObject({ name: 'artwork', presetId: modularBloom.id });
+    expect(route.name).toBe('artwork');
+    expect(START_CREATING_POOL).toContain(route.name === 'artwork' ? route.presetId : '');
     expect(readPlaySeed(route.name === 'artwork' ? route.play : null)).not.toBeNull();
+  });
+
+  it('reaches every artwork in the pool, and never one outside it', () => {
+    /*
+     * Driven through the selector rather than by re-rendering the gallery, which
+     * would need as many mounts as it took to see all four. What matters is that
+     * the mapping is total and closed: every seed lands somewhere in the pool,
+     * and every member of the pool is reachable.
+     */
+    const reached = new Set<string>();
+    for (let seed = 0; seed < 64; seed += 1) {
+      const preset = starterFor(seed);
+      expect(preset, `seed ${String(seed)}`).toBeDefined();
+      expect(START_CREATING_POOL).toContain(preset?.id);
+      if (preset !== undefined) reached.add(preset.id);
+    }
+
+    expect([...reached].sort()).toEqual([...START_CREATING_POOL].sort());
+  });
+
+  it('gives the same seed the same artwork every time', () => {
+    for (const seed of [0, 1, 7, 4242, 20_260_805]) {
+      expect(starterFor(seed)?.id, `seed ${String(seed)}`).toBe(starterFor(seed)?.id);
+      expect(starterFor(seed)?.id).toBe(starterFor(seed)?.id);
+    }
+
+    // And a seed's variation is decided by the same number, so one seed is one
+    // artwork at one set of values.
+    const preset = starterFor(SEED);
+    expect(preset).toBeDefined();
+    if (preset !== undefined) {
+      expect(startCreating(preset, SEED)?.code).toBe(startCreating(preset, SEED)?.code);
+    }
+  });
+
+  it('offers only artworks that actually have curated controls', () => {
+    for (const preset of startCreatingPool()) {
+      expect(preset.instantPlay, preset.id).toBeDefined();
+    }
+    expect(startCreatingPool()).toHaveLength(START_CREATING_POOL.length);
   });
 
   it('sends Browse the gallery to the artworks, not to another page', () => {
@@ -226,7 +275,7 @@ describe('arriving from Start creating', () => {
      * offers this control one press away rather than in a column of its own.
      */
     fireEvent.click(screen.getByRole('tab', { name: 'Colour' }));
-    const invert = screen.getByRole('checkbox', { name: /Invert palette/ });
+    const invert = colour().getByRole('checkbox', { name: /Invert palette/ });
     await user.click(invert);
     await user.click(invert);
 

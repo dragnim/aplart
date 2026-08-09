@@ -18,6 +18,7 @@ import { juliaSet } from '@/presets/julia-set';
 import { encodeShareState } from '@/sharing/encodeShareState';
 import { LocalProjectRepository } from '@/storage/LocalProjectRepository';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { advanced, codeEditor, paletteChoice, pressRunWith } from '../helpers/workspaceModes';
 
 const CANVAS = { left: 0, top: 0, width: 400, height: 400 };
 const CEILING = 48;
@@ -68,7 +69,7 @@ async function openAndRun(sharedState: string | null = null) {
   service.register('default', counts());
   render(<WorkspacePage presetId={juliaSet.id} sharedState={sharedState} service={service} />);
 
-  await user.click(screen.getByRole('button', { name: /^Run/ }));
+  await pressRunWith(user);
   await waitFor(() => expect(screen.getByRole('img', { name: /grid/ })).toBeInTheDocument());
   /*
    * Waited out, not merely painted. This preset declares high-resolution output,
@@ -79,7 +80,7 @@ async function openAndRun(sharedState: string | null = null) {
   return { user, service };
 }
 
-const editor = () => screen.getByRole('textbox', { name: /APL/i });
+const editor = () => codeEditor();
 const source = () => editor().textContent ?? '';
 const canvas = () => screen.getByRole('img', { name: /grid/ });
 
@@ -142,7 +143,7 @@ describe('moving the constant', () => {
     expect(source()).toContain('realC←¯0.75');
     expect(runCount(service.received)).toBe(before);
 
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
     await waitFor(() => expect(runCount(service.received)).toBe(before + 1));
 
     // One run, and no second one of its own accord.
@@ -159,7 +160,7 @@ describe('moving the constant', () => {
     expect(source()).toContain('imagC←¯0.2');
     expect(source()).not.toContain('imagC←-0.2');
 
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
     await waitFor(() => expect(screen.getByText(/Finished in/)).toBeInTheDocument());
   });
 });
@@ -206,9 +207,9 @@ describe('changing only how it is drawn', () => {
     const before = service.executionCount;
     const code = source();
 
-    await user.click(screen.getByRole('radio', { name: /Abyss/ }));
-    await user.click(screen.getByRole('radio', { name: 'Smooth' }));
-    await user.click(screen.getByRole('radio', { name: 'Mirror repeat' }));
+    await user.click(paletteChoice(/Abyss/));
+    await user.click(advanced().getByRole('radio', { name: 'Smooth' }));
+    await user.click(advanced().getByRole('radio', { name: 'Mirror repeat' }));
     fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'bands' } });
 
     expect(service.executionCount).toBe(before);
@@ -259,9 +260,9 @@ describe('what a cell means', () => {
     const { user } = await openAndRun();
 
     // The diagonal holds the ceiling; row 2, column 2 is on it.
-    fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: '2' } });
-    fireEvent.change(screen.getByLabelText(/^Column/), { target: { value: '2' } });
-    await user.click(screen.getByRole('button', { name: /^Inspect$/ }));
+    fireEvent.change(advanced().getByLabelText(/^Row/), { target: { value: '2' } });
+    fireEvent.change(advanced().getByLabelText(/^Column/), { target: { value: '2' } });
+    await user.click(advanced().getByRole('button', { name: /^Inspect$/ }));
 
     const wording = await screen.findByText(
       `This point did not escape within ${String(CEILING)} iterations.`,

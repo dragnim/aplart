@@ -37,6 +37,7 @@ import { mandelbrotField } from '@/presets/mandelbrot-field';
  */
 const CEILING = numberAssignedTo(mandelbrotField.code, 'iterations') ?? 0;
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { advanced, codeEditor, paletteChoice, pressRun, pressRunWith } from '../helpers/workspaceModes';
 import type * as CanvasRenderer from '@/renderer/CanvasRenderer';
 
 type CanvasRendererModule = typeof CanvasRenderer;
@@ -239,7 +240,7 @@ async function start(matrix = counts(CEILING)) {
   const user = userEvent.setup();
   const service = new HeldService(matrix);
   render(<WorkspacePage presetId={mandelbrotField.id} sharedState={null} service={service} />);
-  await user.click(screen.getByRole('button', { name: /^Run/ }));
+  await pressRunWith(user);
   // The probe, which reports the shape and no data.
   await waitFor(() => expect(service.pending).toBeGreaterThan(0));
   const before = drawCalls.length;
@@ -362,9 +363,7 @@ describe('editing while the bands arrive', () => {
     await releaseBands(service, 2);
 
     fireEvent.change(screen.getByLabelText('Maximum iterations'), { target: { value: '60' } });
-    await waitFor(() =>
-      expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toContain('iterations←60'),
-    );
+    await waitFor(() => expect(codeEditor().textContent).toContain('iterations←60'));
 
     // The run is not interrupted by typing, and not restarted by it either.
     const requestsAtEdit = service.executionCount;
@@ -384,12 +383,10 @@ describe('editing while the bands arrive', () => {
     // The scenario in full: edit the ceiling, then change two presentation
     // settings while the rest of the artwork is still being fetched.
     fireEvent.change(screen.getByLabelText('Maximum iterations'), { target: { value: '60' } });
-    await waitFor(() =>
-      expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toContain('iterations←60'),
-    );
+    await waitFor(() => expect(codeEditor().textContent).toContain('iterations←60'));
 
     fireEvent.change(screen.getByLabelText('Mode'), { target: { value: 'insideOutside' } });
-    fireEvent.click(screen.getByRole('radio', { name: /Neon/ }));
+    fireEvent.click(paletteChoice(/Neon/));
 
     /*
      * Both are presentation, so both repaint what is already there — and both
@@ -404,10 +401,10 @@ describe('editing while the bands arrive', () => {
 
     // And the finished result is still the CEILING-iteration run.
     expect(lastPaint()?.escape?.range.max).toBe(CEILING);
-    expect(screen.getByLabelText(/^Row/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: '3' } });
-    fireEvent.change(screen.getByLabelText(/^Column/), { target: { value: '3' } });
-    fireEvent.click(screen.getByRole('button', { name: /^Inspect$/ }));
+    expect(advanced().getByLabelText(/^Row/)).toBeInTheDocument();
+    fireEvent.change(advanced().getByLabelText(/^Row/), { target: { value: '3' } });
+    fireEvent.change(advanced().getByLabelText(/^Column/), { target: { value: '3' } });
+    fireEvent.click(advanced().getByRole('button', { name: /^Inspect$/ }));
     expect(announced()).toContain(`reached the maximum of ${String(CEILING)} iterations`);
   });
 });
@@ -422,10 +419,8 @@ describe('when a banded run does not finish', () => {
     // A second run that dies partway through.
     service.answerWith(counts(60));
     fireEvent.change(screen.getByLabelText('Maximum iterations'), { target: { value: '60' } });
-    await waitFor(() =>
-      expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toContain('iterations←60'),
-    );
-    fireEvent.click(screen.getByRole('button', { name: /^Run/ }));
+    await waitFor(() => expect(codeEditor().textContent).toContain('iterations←60'));
+    pressRun();
     await releaseBands(service, 3);
     expect(paintedCells()).toBeLessThan(complete);
 
@@ -442,7 +437,7 @@ describe('when a banded run does not finish', () => {
     const { service } = await start();
     await finish(service);
 
-    fireEvent.click(screen.getByRole('button', { name: /^Run/ }));
+    pressRun();
     service.failNextRequest();
     await releaseBands(service, 1);
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
@@ -452,9 +447,7 @@ describe('when a banded run does not finish', () => {
     expect(screen.queryByRole('button', { name: 'Try that run again' })).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Maximum iterations'), { target: { value: '60' } });
-    await waitFor(() =>
-      expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toContain('iterations←60'),
-    );
+    await waitFor(() => expect(codeEditor().textContent).toContain('iterations←60'));
 
     // Now they differ, so the choice is real.
     const retry = screen.getByRole('button', { name: 'Try that run again' });
@@ -465,7 +458,7 @@ describe('when a banded run does not finish', () => {
 
     // The retried run was the CEILING one, whatever the editor says now.
     expect(lastPaint()?.escape?.range.max).toBe(CEILING);
-    expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toContain('iterations←60');
+    expect(codeEditor().textContent).toContain('iterations←60');
   });
 });
 
@@ -475,7 +468,7 @@ describe('what a delivery is kept out of', () => {
     await finish(service);
 
     // A second run, deliberately left part-way.
-    fireEvent.click(screen.getByRole('button', { name: /^Run/ }));
+    pressRun();
     await releaseBands(service, 2);
     expect(paintedCells()).toBeLessThan(SIZE * SIZE);
 
@@ -506,12 +499,12 @@ describe('a delivery while the artwork is repeated', () => {
     const { service, user } = await start();
     await finish(service);
 
-    await user.click(screen.getByRole('radio', { name: 'Repeat' }));
+    await user.click(advanced().getByRole('radio', { name: 'Repeat' }));
     const complete = paintedCells();
     expect(complete).toBe(SIZE * SIZE);
 
     // A second run, left part-way.
-    fireEvent.click(screen.getByRole('button', { name: /^Run/ }));
+    pressRun();
     await releaseBands(service, 3);
 
     /*
@@ -532,7 +525,7 @@ describe('a delivery while the artwork is repeated', () => {
     render(<WorkspacePage presetId={mandelbrotField.id} sharedState={null} service={service} />);
 
     // Repeat chosen before anything has been drawn at all.
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
     await waitFor(() => expect(service.pending).toBeGreaterThan(0));
     await service.release();
     await paintedSince(0);
@@ -554,7 +547,7 @@ describe('exporting while a run is in flight', () => {
     const service = new HeldService(counts(CEILING));
     render(<WorkspacePage presetId={mandelbrotField.id} sharedState={null} service={service} />);
 
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
     await waitFor(() => expect(service.pending).toBeGreaterThan(0));
     await service.release();
     await paintedSince(0);
@@ -578,7 +571,7 @@ describe('exporting while a run is in flight', () => {
 
     // A second run, left part-way. The finished artwork is still what Export
     // would write — a delivery never becomes the thing that gets saved.
-    fireEvent.click(screen.getByRole('button', { name: /^Run/ }));
+    pressRun();
     await releaseBands(service, 2);
 
     await user.click(screen.getByRole('button', { name: 'Export' }));

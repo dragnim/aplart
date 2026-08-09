@@ -11,6 +11,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { ADAPTIVE_MARKER } from '@/execution/adaptiveProbe';
 import { stubTryApl } from './stubTryApl';
+import { editorOn, runButton, showMode } from './workspaceModes';
 
 /** Two fixed seeds, so the determinism checks depend on nothing random. */
 const SEED_A = 20_260_805;
@@ -61,7 +62,7 @@ async function sourceOn(page: Page): Promise<string> {
   await fullWorkspaceOn(page);
 
   await page.waitForSelector('.cm-content', { state: 'visible' });
-  return page.locator('.cm-content').innerText();
+  return (await editorOn(page)).innerText();
 }
 
 /**
@@ -134,7 +135,9 @@ test.describe('the two ways into the gallery', () => {
 
     // Still the gallery: a bare fragment is an in-page anchor, and the router
     // deliberately does not read one as a route.
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Tiny programs.');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(
+      'Infinite patterns from tiny programs.',
+    );
     await expect(startAction(page)).toBeVisible();
     await expect(page.getByRole('link', { name: /^Open Modular Bloom/ })).toBeVisible();
 
@@ -148,8 +151,14 @@ test.describe('the two ways into the gallery', () => {
 
     await page.getByRole('link', { name: /^Open Modular Bloom/ }).click();
 
-    // The preset's own program, nothing run until asked, and no seed in the
-    // address: opening a card is what it always was.
+    /*
+     * The preset's own program, nothing run until asked, and no seed in the
+     * address: opening a card is what it always was.
+     *
+     * Named exactly, because this is the card for this artwork. The pool of four
+     * belongs to Start creating, where the seed chooses — a card does not choose
+     * anything, and accepting any of four here would be asserting nothing.
+     */
     await expect(page.getByRole('heading', { level: 1, name: 'Modular Bloom' })).toBeVisible();
     await expect(page.getByText('Press Run to draw this artwork.')).toBeVisible();
     expect(page.url()).not.toContain('play=');
@@ -166,16 +175,30 @@ test.describe('a Start creating session', () => {
 
     await startAction(page).click();
 
-    await expect(page.getByRole('heading', { level: 1, name: 'Modular Bloom' })).toBeVisible();
+    // One of the four artworks the seed may choose, rather than always Modular
+    // Bloom: the pool is what Start creating draws from now.
+    await expect(
+      page.getByRole('heading', {
+        level: 1,
+        name: /Modular Bloom|Checker Shift|Wave Interference|Truchet Grid/,
+      }),
+    ).toBeVisible();
     await waitForArtwork(page);
 
     // Nobody pressed Run, and nothing claims this was sent by somebody else.
     await expect(page.getByText(/shared with you/)).toHaveCount(0);
     expect(runs(stub.requests)).toBe(1);
 
-    // A re-render with nothing to do with the artwork must not start another.
-    await fullWorkspaceOn(page, 'Colour');
-    await page.getByRole('checkbox', { name: /Invert palette/ }).click();
+    /*
+     * A re-render with nothing to do with the artwork must not start another.
+     *
+     * Reached through `showMode` alone. This used to go through a local helper
+     * that clicked the mode tab directly, which works on a wide screen and hangs
+     * on a narrow one — there the modes live inside the Controls sheet, and the
+     * tab is in the document before it is on screen. The shared helper opens the
+     * sheet first, which is the door a person goes through.
+     */
+    await (await showMode(page, 'Colour')).getByRole('checkbox', { name: /Invert palette/ }).click();
     await page.waitForTimeout(300);
     expect(runs(stub.requests)).toBe(1);
   });
@@ -216,7 +239,9 @@ test.describe('a Start creating session', () => {
     const opened = await sourceOn(page);
 
     await page.goBack();
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Tiny programs.');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(
+      'Infinite patterns from tiny programs.',
+    );
 
     /*
      * Coming back to the gallery offers something new — the reason to come back —
@@ -240,6 +265,6 @@ test.describe('a Start creating session', () => {
     // The code first: on a narrow screen the editor and Run share a tab with
     // each other rather than with the artwork.
     expect(await sourceOn(page)).toContain('modulus|multiplier×∘.×⍨⍳size');
-    await expect(page.getByRole('button', { name: /^Run/ })).toBeVisible();
+    await expect(await runButton(page)).toBeVisible();
   });
 });

@@ -1,12 +1,15 @@
 /**
- * The one panel a session is edited from, beside the artwork it edits.
+ * The one panel an artwork is edited from, beside the artwork it edits.
  *
- * Four modes rather than four places: Create, Colour, Advanced and Code all
+ * Modes rather than places: Create, Colour, Animate, Advanced and Code all
  * describe the same artwork, the same source, the same palette and the same
  * history, and the tab only decides which of them you are looking at. The
  * technical controls used to live in a disclosure far below the picture, where
  * changing a palette meant scrolling to a control that changed something you
  * could no longer see.
+ *
+ * How many modes there are is the artwork's business, not this component's: one
+ * without curated controls offers four and opens on Advanced.
  *
  * Every panel stays mounted and is hidden with `hidden` rather than removed from
  * the tree. That is not an optimisation: unmounting the Code panel would tear
@@ -15,7 +18,7 @@
  */
 
 import { useCallback, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
-import { EDITOR_TABS, TAB_NAMES, type EditorTab } from './editorTabs';
+import { TAB_NAMES, type EditorTab } from './editorTabs';
 import { TabIcon } from './TabIcon';
 import styles from './SessionPanel.module.css';
 
@@ -23,18 +26,27 @@ interface Props {
   readonly tab: EditorTab;
   readonly onTabChange: (tab: EditorTab) => void;
   /**
+   * Which modes this artwork offers, in order.
+   *
+   * Passed in rather than read from `EDITOR_TABS` here, because an artwork with
+   * no curated controls has no Create tab — and the tab bar, the arrow keys and
+   * the panels below must all agree about that without any of them working it
+   * out separately.
+   */
+  readonly tabs: readonly EditorTab[];
+  /**
    * What each mode shows, by name.
    *
    * A record rather than one prop per mode, so that adding a mode is an entry in
    * `EDITOR_TABS` and an icon — nothing here counts them, and nothing here has to
-   * be edited to make room.
+   * be edited to make room. Modes absent from `tabs` are never rendered.
    */
   readonly panels: Record<EditorTab, ReactNode>;
-  /** Randomise, Undo, Save image and Share, which outlive the tab. */
+  /** Randomise, Undo and Reset, which outlive the tab. */
   readonly actions: ReactNode;
 }
 
-export function SessionPanel({ tab, onTabChange, panels, actions }: Props) {
+export function SessionPanel({ tab, onTabChange, tabs, panels, actions }: Props) {
   const tabRefs = useRef(new Map<EditorTab, HTMLButtonElement>());
 
   /*
@@ -45,18 +57,18 @@ export function SessionPanel({ tab, onTabChange, panels, actions }: Props) {
    */
   const onKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      const index = EDITOR_TABS.indexOf(tab);
-      const last = EDITOR_TABS.length - 1;
+      const index = tabs.indexOf(tab);
+      const last = tabs.length - 1;
 
       const target =
         event.key === 'ArrowRight'
-          ? EDITOR_TABS[index === last ? 0 : index + 1]
+          ? tabs[index === last ? 0 : index + 1]
           : event.key === 'ArrowLeft'
-            ? EDITOR_TABS[index === 0 ? last : index - 1]
+            ? tabs[index === 0 ? last : index - 1]
             : event.key === 'Home'
-              ? EDITOR_TABS[0]
+              ? tabs[0]
               : event.key === 'End'
-                ? EDITOR_TABS[last]
+                ? tabs[last]
                 : undefined;
 
       if (target === undefined) return;
@@ -64,7 +76,7 @@ export function SessionPanel({ tab, onTabChange, panels, actions }: Props) {
       onTabChange(target);
       tabRefs.current.get(target)?.focus();
     },
-    [tab, onTabChange],
+    [tab, tabs, onTabChange],
   );
 
   return (
@@ -76,9 +88,9 @@ export function SessionPanel({ tab, onTabChange, panels, actions }: Props) {
         onKeyDown={onKeyDown}
         // The column count follows the list rather than being written into the
         // stylesheet, so a mode can be added without touching the CSS.
-        style={{ '--tab-count': EDITOR_TABS.length } as CSSProperties}
+        style={{ '--tab-count': tabs.length } as CSSProperties}
       >
-        {EDITOR_TABS.map((name) => (
+        {tabs.map((name) => (
           <button
             key={name}
             type="button"
@@ -119,7 +131,7 @@ export function SessionPanel({ tab, onTabChange, panels, actions }: Props) {
       </div>
 
       <div className={styles.content}>
-        {EDITOR_TABS.map((name) => (
+        {tabs.map((name) => (
           <div
             key={name}
             className={styles.tabPanel}

@@ -1,6 +1,72 @@
 import source from './apl/modular-bloom.apl?raw';
 import { artworkSource } from './artworkSource';
+import { gcd, nearestAccepted, type CreateQualityRule } from './createQuality';
 import { type ArtworkPreset } from './schema';
+
+/**
+ * How many shades the artwork must be able to draw before Create will offer it.
+ *
+ * `modulus | multiplier × x ∘.× ⍳size` takes only the multiples of
+ * `gcd(multiplier, modulus)` below the modulus, so the picture has exactly
+ * `modulus ÷ gcd` distinct values — whatever `size` is, and however intricate
+ * the arrangement looks in the parameters. At one it is a single flat colour; at
+ * two it is a checkerboard of nothing.
+ *
+ * Five is a floor rather than a target. It rules out the collapses and leaves
+ * everything else alone: of the 220 combinations the two sliders can reach, 39
+ * fall below it and 181 do not, so this is a rule about the corner rather than
+ * about the space.
+ */
+const MINIMUM_SHADES = 5;
+
+/** How many distinct values the artwork draws at these settings. */
+export function shadesDrawn(multiplier: number, modulus: number): number {
+  return modulus / gcd(multiplier, modulus);
+}
+
+const COMPLEXITY = { min: 1, max: 11 };
+const SCALE = { min: 5, max: 24 };
+
+/**
+ * Keep Create out of the flat corner, by moving whichever control is free.
+ *
+ * Complexity and Scale collapse the artwork when they share a large factor —
+ * Complexity 10 against Scale 20 is two shades — and the pair is reachable in
+ * one press from several perfectly good neighbours. Neither value is wrong, and
+ * both stay available in Advanced and in the code; what changes is that the
+ * curated controls will not hand somebody a blank square and call it an artwork.
+ *
+ * The control being moved is the one kept. Moving Scale adjusts Complexity and
+ * moving Complexity adjusts Scale, so the slider under the finger always does
+ * what it says and the correction is somewhere the eye can see it. There is
+ * always an answer: Complexity 1 leaves any modulus at its full count, and a
+ * prime Scale leaves any complexity at its own.
+ */
+export const modularBloomQuality: CreateQualityRule = (values, holding) => {
+  const multiplier = values.get('multiplier');
+  const modulus = values.get('modulus');
+  if (typeof multiplier !== 'number' || typeof modulus !== 'number') return values;
+  if (shadesDrawn(multiplier, modulus) >= MINIMUM_SHADES) return values;
+
+  const adjusted = new Map(values);
+
+  // Scale is held, so Complexity gives way — and the other way about. With
+  // nothing held, Scale moves: the randomiser's recipes are chosen for their
+  // complexity, which is the character of the piece rather than its grain.
+  if (holding === 'modulus') {
+    const next = nearestAccepted(multiplier, COMPLEXITY.min, COMPLEXITY.max, (candidate) => {
+      return shadesDrawn(candidate, modulus) >= MINIMUM_SHADES;
+    });
+    if (next !== null) adjusted.set('multiplier', next);
+    return adjusted;
+  }
+
+  const next = nearestAccepted(modulus, SCALE.min, SCALE.max, (candidate) => {
+    return shadesDrawn(multiplier, candidate) >= MINIMUM_SHADES;
+  });
+  if (next !== null) adjusted.set('modulus', next);
+  return adjusted;
+};
 
 /**
  * Modular Bloom.
@@ -84,6 +150,14 @@ export const modularBloom: ArtworkPreset = {
    * stays between 32 and 72 while the workspace keeps all of 8–88.
    */
   instantPlay: {
+    /*
+     * The floor above, enforced. Until this existed the avoidance was editorial —
+     * recipes hand-picked away from the shared factors and drift chosen small
+     * enough not to wander into them — which protected the artwork somebody was
+     * given and not the artwork they made a moment later with a slider.
+     */
+    quality: modularBloomQuality,
+
     controls: [
       {
         parameterId: 'multiplier',

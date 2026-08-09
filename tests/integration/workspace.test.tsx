@@ -13,6 +13,7 @@ import { MockAplExecutionService } from '@/execution/MockAplExecutionService';
 import { fromNested } from '@/matrix/matrixTypes';
 import { modularBloom } from '@/presets/modular-bloom';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { pressRunWith, showMode, showModeWith } from '../helpers/workspaceModes';
 
 // jsdom implements neither of these, and both run on mount.
 beforeAll(() => {
@@ -72,7 +73,7 @@ describe('the workspace', () => {
     const user = userEvent.setup();
     renderWorkspace();
 
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
 
     await waitFor(() => {
       expect(screen.getByRole('img')).toBeInTheDocument();
@@ -83,7 +84,7 @@ describe('the workspace', () => {
   it('describes the artwork for screen readers, including its palette', async () => {
     const user = userEvent.setup();
     renderWorkspace();
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
 
     await waitFor(() => {
       expect(screen.getByRole('img')).toHaveAccessibleName(/Ember palette/);
@@ -93,7 +94,7 @@ describe('the workspace', () => {
   it('reports how long the run took', async () => {
     const user = userEvent.setup();
     renderWorkspace();
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
 
     await waitFor(() => {
       expect(screen.getByText(/Finished in/)).toBeInTheDocument();
@@ -126,7 +127,7 @@ describe('the workspace', () => {
       const service = renderWorkspace();
 
       fireEvent.change(screen.getByLabelText('Modulus'), { target: { value: '16' } });
-      await user.click(screen.getByRole('button', { name: /^Run/ }));
+      await pressRunWith(user);
 
       await waitFor(() => {
         expect(service.received.length).toBeGreaterThan(0);
@@ -142,11 +143,12 @@ describe('the workspace', () => {
       const user = userEvent.setup();
       const service = renderWorkspace();
 
-      await user.click(screen.getByRole('button', { name: /^Run/ }));
+      await pressRunWith(user);
       await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument());
       const runsAfterFirst = service.executionCount;
 
-      await user.click(screen.getByRole('radio', { name: /Poolrooms/ }));
+      const colour = await showModeWith(user, 'Colour');
+      await user.click(within(colour).getByRole('radio', { name: /Poolrooms/ }));
 
       await waitFor(() => {
         expect(screen.getByRole('img')).toHaveAccessibleName(/Poolrooms palette/);
@@ -175,10 +177,11 @@ describe('the workspace', () => {
         />,
       );
 
-      await user.click(screen.getByRole('button', { name: /^Run/ }));
+      await pressRunWith(user);
       await waitFor(() => expect(screen.getByRole('img')).toHaveAccessibleName(/2 by 3 grid/));
 
-      await user.click(screen.getByRole('radio', { name: '90°' }));
+      const advanced = await showModeWith(user, 'Advanced');
+      await user.click(within(advanced).getByRole('radio', { name: '90°' }));
       await waitFor(() => expect(screen.getByRole('img')).toHaveAccessibleName(/3 by 2 grid/));
     });
   });
@@ -189,13 +192,13 @@ describe('the workspace', () => {
       const service = serviceReturning();
       renderWorkspace(service);
 
-      await user.click(screen.getByRole('button', { name: /^Run/ }));
+      await pressRunWith(user);
       await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument());
       const drawn = screen.getByRole('img').getAttribute('aria-label');
 
       // The next run fails.
       service.register('default', fromNested([[1]]));
-      await user.click(screen.getByRole('button', { name: /^Run/ }));
+      await pressRunWith(user);
 
       await waitFor(() => {
         expect(screen.getByRole('alert')).toBeInTheDocument();
@@ -211,7 +214,7 @@ describe('the workspace', () => {
       });
       renderWorkspace(service);
 
-      await user.click(screen.getByRole('button', { name: /^Run/ }));
+      await pressRunWith(user);
       const alert = await screen.findByRole('alert');
       expect(
         within(alert).getByText(
@@ -225,7 +228,7 @@ describe('the workspace', () => {
       const user = userEvent.setup();
       renderWorkspace(new MockAplExecutionService({ cannedOutput: ['LENGTH ERROR', ' oops', '  ∧'] }));
 
-      await user.click(screen.getByRole('button', { name: /^Run/ }));
+      await pressRunWith(user);
       const alert = await screen.findByRole('alert');
 
       expect(screen.queryByText(/LENGTH ERROR/)).not.toBeInTheDocument();
@@ -273,11 +276,16 @@ describe('the workspace', () => {
       render(<WorkspacePage presetId={modularBloom.id} sharedState={encoded} service={serviceReturning()} />);
 
       await screen.findByText(/shared with you/);
-      expect(screen.queryByLabelText('Size')).not.toBeInTheDocument();
+
+      // The parameter sliders are Advanced's, and a detached one is something
+      // this artwork is saying about its own source — so it is said where the
+      // control that cannot show it would be.
+      const advanced = within(showMode('Advanced'));
+      expect(advanced.queryByLabelText('Size')).not.toBeInTheDocument();
       expect(
-        screen.getByText('The code sets this to something this control cannot show.'),
+        advanced.getByText('The code sets this to something this control cannot show.'),
       ).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Restore control line' })).toBeInTheDocument();
+      expect(advanced.getByRole('button', { name: 'Restore control line' })).toBeInTheDocument();
     });
 
     it('explains a damaged link instead of failing silently', async () => {

@@ -79,13 +79,52 @@ export function featuredPreset(): ArtworkPreset | undefined {
 }
 
 /**
- * The artwork "Start creating" opens, or undefined if there is none.
+ * The artworks "Start creating" may open with.
  *
- * Found by asking which preset declares Instant Play rather than by naming one
- * here, so the gallery cannot advertise an artwork that has no curated
- * variations to offer — including in the case that matters most: a preset
- * dropped by validation above.
+ * Named here rather than derived from which presets have curated controls,
+ * because the two questions are different. Curated controls are what makes an
+ * artwork editable in Create; this list is a judgement about which pieces are
+ * the right first impression of APL Art — the pattern families, whose whole
+ * character changes under a slider. The fractals are fully editable in the
+ * workspace and are simply not what "surprise me" should hand somebody.
+ *
+ * Order is fixed, so the seed below means the same thing tomorrow.
  */
-export function starterPreset(): ArtworkPreset | undefined {
-  return valid.find((preset) => preset.instantPlay !== undefined);
+export const START_CREATING_POOL: readonly string[] = [
+  'modular-bloom',
+  'checker-shift',
+  'wave-interference',
+  'truchet-grid',
+];
+
+/**
+ * The pool as artworks, in the order above.
+ *
+ * Filtered by curated controls as well as by the list, so an artwork that lost
+ * its Instant Play block — or was dropped by validation entirely — leaves the
+ * pool rather than becoming a "Start creating" that opens on a default.
+ */
+export function startCreatingPool(): readonly ArtworkPreset[] {
+  return START_CREATING_POOL.map((id) => byId.get(id)).filter(
+    (preset): preset is ArtworkPreset => preset !== undefined && preset.instantPlay !== undefined,
+  );
+}
+
+/**
+ * Which artwork a "Start creating" seed opens, or undefined if the pool is empty.
+ *
+ * The seed decides the preset as well as the variation within it, so one number
+ * in one link is the whole state: the same seed opens the same artwork at the
+ * same settings, today and after a reload and on somebody else's machine. The
+ * link still names the preset, because the preset is what the address is for —
+ * the seed choosing it is how the gallery picks, not how the workspace reads.
+ */
+export function starterFor(seed: number): ArtworkPreset | undefined {
+  const pool = startCreatingPool();
+  if (pool.length === 0) return undefined;
+
+  // The same generator the variation uses, drawn once before it. Whole-number
+  // arithmetic on the seed itself rather than a float, so this cannot drift
+  // between engines.
+  return pool[seed % pool.length];
 }

@@ -20,6 +20,7 @@ import { MockAplExecutionService } from '@/execution/MockAplExecutionService';
 import { mandelbrotField } from '@/presets/mandelbrot-field';
 import { modularBloom } from '@/presets/modular-bloom';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { codeEditor } from '../helpers/workspaceModes';
 
 /** Modular Bloom exactly as it shipped inline. */
 const BLOOM_AS_SHIPPED = [
@@ -159,7 +160,7 @@ describe('a link shared before the move', () => {
     expect(await screen.findByText(/shared with you/)).toBeInTheDocument();
 
     // The sharer's own value, untouched, with its control bound to it.
-    expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toContain('iterations←28');
+    expect(codeEditor().textContent).toContain('iterations←28');
     expect(screen.getByLabelText('Maximum iterations')).toHaveValue('28');
     expect(screen.getByText('Edited')).toBeInTheDocument();
   });

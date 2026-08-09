@@ -26,6 +26,7 @@ import { mandelbrotField } from '@/presets/mandelbrot-field';
 const CEILING = numberAssignedTo(mandelbrotField.code, 'iterations') ?? 0;
 import { modularBloom } from '@/presets/modular-bloom';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { advanced, codeEditor, pressRunWith } from '../helpers/workspaceModes';
 
 const CANVAS = { left: 0, top: 0, width: 400, height: 400 };
 
@@ -74,7 +75,7 @@ async function openAndRun(matrix = escapeCounts(), sharedState: string | null = 
   service.register('default', matrix);
   render(<WorkspacePage presetId={mandelbrotField.id} sharedState={sharedState} service={service} />);
 
-  await user.click(screen.getByRole('button', { name: /^Run/ }));
+  await pressRunWith(user);
   await waitFor(() => expect(screen.getByRole('img', { name: /grid/ })).toBeInTheDocument());
   return { user, service };
 }
@@ -99,9 +100,9 @@ function announced(): string {
 
 /** Chooses a cell without a pointer, through the controls the keyboard has. */
 async function inspect(user: ReturnType<typeof userEvent.setup>, row: number, column: number) {
-  fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: String(row) } });
-  fireEvent.change(screen.getByLabelText(/^Column/), { target: { value: String(column) } });
-  await user.click(screen.getByRole('button', { name: /^Inspect$/ }));
+  fireEvent.change(advanced().getByLabelText(/^Row/), { target: { value: String(row) } });
+  fireEvent.change(advanced().getByLabelText(/^Column/), { target: { value: String(column) } });
+  await user.click(advanced().getByRole('button', { name: /^Inspect$/ }));
   return announced();
 }
 
@@ -117,7 +118,7 @@ describe('where the controls appear', () => {
     const service = new MockAplExecutionService();
     service.register('default', escapeCounts());
     render(<WorkspacePage presetId={modularBloom.id} sharedState={null} service={service} />);
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
     await waitFor(() => expect(screen.getByRole('img', { name: /grid/ })).toBeInTheDocument());
 
     // Nothing here has a ceiling to map against, so there is nothing honest to
@@ -157,13 +158,13 @@ describe('what changing the colouring costs', () => {
 
   it('leaves the visible APL alone', async () => {
     await openAndRun();
-    const before = screen.getByRole('textbox', { name: /APL/i }).textContent;
+    const before = codeEditor().textContent;
 
     fireEvent.change(modeSelect(), { target: { value: 'insideOutside' } });
 
     // The rule the whole application runs on: if it did not change the
     // calculation, it must not pretend to have changed the code.
-    expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toBe(before);
+    expect(codeEditor().textContent).toBe(before);
   });
 
   it('leaves the matrix and the chosen cell alone', async () => {
@@ -237,9 +238,7 @@ describe('what the inspector says', () => {
      * full, including the failed-run case.
      */
     fireEvent.change(screen.getByLabelText('Maximum iterations'), { target: { value: '60' } });
-    await waitFor(() =>
-      expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toContain('iterations←60'),
-    );
+    await waitFor(() => expect(codeEditor().textContent).toContain('iterations←60'));
 
     expect(await inspect(user, 3, 3)).toContain(`reached the maximum of ${String(CEILING)} iterations`);
   });
@@ -359,6 +358,6 @@ describe('keeping the choice', () => {
 
     // Still bands, and the code really did move — otherwise this proves nothing.
     expect(modeSelect()).toHaveValue('bands');
-    expect(screen.getByRole('textbox', { name: /APL/i }).textContent).not.toContain('zoom←1.4');
+    expect(codeEditor().textContent).not.toContain('zoom←1.4');
   });
 });

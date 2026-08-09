@@ -21,6 +21,7 @@ import { fromNested, type NumericMatrix } from '@/matrix/matrixTypes';
 import { burningShip } from '@/presets/burning-ship';
 import { encodeShareState } from '@/sharing/encodeShareState';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { advanced, codeEditor, pressRunWith } from '../helpers/workspaceModes';
 
 const CANVAS = { left: 0, top: 0, width: 400, height: 400 };
 const CEILING = 48;
@@ -71,7 +72,7 @@ function serviceWith(matrix = counts()) {
   return service;
 }
 
-const editor = () => screen.getByRole('textbox', { name: /APL/i });
+const editor = () => codeEditor();
 const source = () => editor().textContent ?? '';
 
 /** One run sends exactly one first request, whatever transport follows. */
@@ -81,7 +82,7 @@ const runCount = (received: readonly string[]) =>
 async function open(service = serviceWith()) {
   const user = userEvent.setup();
   render(<WorkspacePage presetId={burningShip.id} sharedState={null} service={service} />);
-  await user.click(screen.getByRole('button', { name: /^Run/ }));
+  await pressRunWith(user);
   await waitFor(() => expect(screen.getByText(/Finished in/)).toBeInTheDocument(), { timeout: 5000 });
   return { user, service };
 }
@@ -123,7 +124,7 @@ describe('the controls', () => {
     fireEvent.change(screen.getByLabelText('Maximum iterations'), { target: { value: '60' } });
     await waitFor(() => expect(source()).toContain('iterations←60'));
 
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
     await waitFor(() => expect(runCount(service.received)).toBe(before + 1));
 
     // The step line is untouched by anything a slider does.
@@ -193,9 +194,9 @@ describe('what a cell means', () => {
     const { user } = await open(serviceWith(counts(8)));
 
     // The diagonal is at the ceiling in this fixture, so (3, 3) is a ceiling cell.
-    fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: '2' } });
-    fireEvent.change(screen.getByLabelText(/^Column/), { target: { value: '2' } });
-    await user.click(screen.getByRole('button', { name: /^Inspect$/ }));
+    fireEvent.change(advanced().getByLabelText(/^Row/), { target: { value: '2' } });
+    fireEvent.change(advanced().getByLabelText(/^Column/), { target: { value: '2' } });
+    await user.click(advanced().getByRole('button', { name: /^Inspect$/ }));
 
     const wording = await screen.findByText(
       `This point reached the maximum of ${String(CEILING)} iterations.`,

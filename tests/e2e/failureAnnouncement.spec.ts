@@ -17,6 +17,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { pressRun } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -58,7 +59,7 @@ async function heardRegions(page: Page) {
 async function runAndFail(page: Page) {
   await stubTryApl(page, { failure: 'server' });
   await page.goto('./#/art/modular-bloom');
-  await page.getByRole('button', { name: /^Run/ }).click();
+  await pressRun(page);
   await expect(page.locator('[role="alert"]').first()).toBeVisible();
 }
 

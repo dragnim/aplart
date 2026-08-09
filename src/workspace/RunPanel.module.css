@@ -52,6 +52,26 @@
   color: var(--text);
 }
 
+/*
+ * Beside Run, and quieter than it. Copying the program is a useful thing to be
+ * able to do with the code on screen; it is not what this panel is for.
+ */
+.copy {
+  composes: control from global;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  transition: background var(--motion-fast) var(--ease);
+}
+
+.copy:hover {
+  background: var(--surface-sunken);
+}
+
+.copy:active {
+  transform: translateY(1px);
+}
+
 .stop:hover {
   background: var(--surface-sunken);
 }

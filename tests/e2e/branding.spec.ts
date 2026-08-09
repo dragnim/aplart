@@ -10,6 +10,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { paletteChoice, pressRun, showMode } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -61,7 +62,9 @@ test.describe('palette-responsive branding', () => {
 
     // 1. The gallery uses APL Art's own colours.
     await page.goto('./#/');
-    await expect(page.getByRole('heading', { level: 1, name: /Tiny programs/ })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: /Infinite patterns from tiny programs/ }),
+    ).toBeVisible();
 
     const onGallery = await fills(page);
     expect(onGallery.apl).toBe(LOGO_NEUTRAL);
@@ -80,14 +83,14 @@ test.describe('palette-responsive branding', () => {
     expect(await page.locator('[data-accent]').getAttribute('data-accent')).toBe('palette');
 
     // Run it, so there is something to disturb later.
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
     const afterRun = await runStatus(page).innerText();
     const requestsAfterRun = stub.requests.length;
     expect(requestsAfterRun).toBeGreaterThan(0);
 
     // 4 and 5. A different palette moves the accent again.
-    await page.getByRole('radio', { name: /Neon/ }).click();
+    await (await paletteChoice(page, /Neon/)).click();
     await expect.poll(async () => (await fills(page)).art, { timeout: 5_000 }).not.toBe(onArtwork.art);
 
     const onNeon = await fills(page);
@@ -131,11 +134,11 @@ test.describe('palette-responsive branding', () => {
     await stubTryApl(page);
     await page.goto('./#/art/mandelbrot-field');
     await expect(page.getByRole('heading', { level: 1, name: 'Mandelbrot Field' })).toBeVisible();
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 
     const before = await tokens(page);
-    await page.getByRole('button', { name: 'Animate palette' }).click();
+    await (await showMode(page, 'Animate')).getByRole('button', { name: 'Animate palette' }).click();
 
     /*
      * Several seconds of real frames. The interface follows the palette

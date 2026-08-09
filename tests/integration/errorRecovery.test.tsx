@@ -77,7 +77,7 @@ describe('recovering from a render failure', () => {
 
     // The gallery, not the fallback: cards to choose from and no alert.
     await waitFor(() => {
-      expect(screen.getByRole('heading', { level: 1, name: /Tiny programs/ })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: /Infinite patterns/ })).toBeInTheDocument();
     });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getAllByRole('article').length).toBeGreaterThan(5);

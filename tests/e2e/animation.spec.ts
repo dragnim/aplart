@@ -10,6 +10,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { pressRun, showMode } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -21,7 +22,7 @@ async function openAndRun(page: Page) {
   await stubTryApl(page);
   await page.goto('./#/art/mandelbrot-field');
   await expect(page.getByRole('heading', { level: 1, name: 'Mandelbrot Field' })).toBeVisible();
-  await page.getByRole('button', { name: /^Run/ }).click();
+  await pressRun(page);
   await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 }
 
@@ -76,7 +77,7 @@ test.describe('palette animation', () => {
     await openAndRun(page);
     const still = await settled(page);
 
-    await page.getByRole('button', { name: 'Animate palette' }).click();
+    await (await showMode(page, 'Animate')).getByRole('button', { name: 'Animate palette' }).click();
 
     // Real frames, real clock. Polling rather than a fixed wait, so a slow
     // machine is not the reason this passes or fails.
@@ -97,7 +98,7 @@ test.describe('palette animation', () => {
     const still = await settled(page);
     const atRest = await exportTo(page, testInfo.outputPath('at-rest.png'));
 
-    await page.getByRole('button', { name: 'Animate palette' }).click();
+    await (await showMode(page, 'Animate')).getByRole('button', { name: 'Animate palette' }).click();
     await expect.poll(() => canvasSignature(page), { timeout: 10_000 }).not.toBe(still);
 
     // Paused on a frame somebody liked, which is when Export is most likely to
@@ -119,11 +120,13 @@ test.describe('palette animation', () => {
     const still = await settled(page);
     const atRest = await exportTo(page, testInfo.outputPath('before.png'));
 
-    await page.getByRole('button', { name: 'Animate palette' }).click();
+    await (await showMode(page, 'Animate')).getByRole('button', { name: 'Animate palette' }).click();
     await expect.poll(() => canvasSignature(page), { timeout: 10_000 }).not.toBe(still);
 
-    await page.getByRole('button', { name: 'Reset animation' }).click();
-    await expect(page.getByRole('button', { name: 'Animate palette' })).toBeVisible();
+    await (await showMode(page, 'Animate')).getByRole('button', { name: 'Reset animation' }).click();
+    await expect(
+      (await showMode(page, 'Animate')).getByRole('button', { name: 'Animate palette' }),
+    ).toBeVisible();
 
     // Identical bytes, not merely a similar picture.
     const after = await exportTo(page, testInfo.outputPath('after.png'));
@@ -137,6 +140,8 @@ test.describe('palette animation', () => {
 
     // Nothing moves until it is asked to, whatever the motion preference.
     expect(await canvasSignature(page)).toBe(still);
-    await expect(page.getByRole('button', { name: 'Animate palette' })).toBeVisible();
+    await expect(
+      (await showMode(page, 'Animate')).getByRole('button', { name: 'Animate palette' }),
+    ).toBeVisible();
   });
 });

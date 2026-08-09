@@ -22,7 +22,9 @@ test.describe('site navigation', () => {
   test('the gallery is the home page', async ({ page }) => {
     await page.goto('./');
 
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Tiny programs.');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(
+      'Infinite patterns from tiny programs.',
+    );
     await expect(page).toHaveTitle(/APL Art/);
   });
 
@@ -49,7 +51,9 @@ test.describe('site navigation', () => {
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('We could not find that');
 
     await page.getByRole('link', { name: 'Back to the gallery', exact: true }).click();
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Tiny programs.');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(
+      'Infinite patterns from tiny programs.',
+    );
   });
 
   test('an unknown artwork id shows not found rather than an error', async ({ page }) => {
@@ -128,16 +132,25 @@ test.describe('the gallery with every artwork', () => {
     await page.getByRole('button', { name: /^Fractals/ }).click();
     await expect(page.getByRole('article')).toHaveCount(fractals);
 
-    const beginner = await advertised(page, /^Beginner/);
-    await page.getByRole('button', { name: /^Beginner/ }).click();
-    await expect(page.getByRole('article')).toHaveCount(beginner);
+    /*
+     * Patterns, where Beginner used to be.
+     *
+     * That chip selected on the preset's difficulty — a judgement about how hard
+     * its APL is to read — in a row of chips that otherwise say what an artwork
+     * *is*. Two different questions in one control, and the odd one out was the
+     * one making a claim about the visitor. Every filter names a category now.
+     */
+    const patterns = await advertised(page, /^Patterns/);
+    await page.getByRole('button', { name: /^Patterns/ }).click();
+    await expect(page.getByRole('article')).toHaveCount(patterns);
+    await expect(page.getByRole('button', { name: /^Beginner/ })).toHaveCount(0);
 
     const all = await advertised(page, /^All/);
     await page.getByRole('button', { name: /^All/ }).click();
     await expect(page.getByRole('article')).toHaveCount(all);
 
     // Every filter leads somewhere: none of them advertises an empty gallery.
-    for (const count of [fractals, beginner, all]) expect(count).toBeGreaterThan(0);
+    for (const count of [fractals, patterns, all]) expect(count).toBeGreaterThan(0);
   });
 
   test('every artwork opens', async ({ page }) => {

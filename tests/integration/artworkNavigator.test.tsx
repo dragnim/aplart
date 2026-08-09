@@ -18,6 +18,7 @@ import { mandelbrotField } from '@/presets/mandelbrot-field';
 import { modularBloom } from '@/presets/modular-bloom';
 import { initialWorkspaceState, workspaceReducer } from '@/workspace/workspaceState';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { artworkAction } from '../helpers/workspaceModes';
 
 beforeAll(() => {
   vi.stubGlobal(
@@ -242,8 +243,11 @@ describe('viewport history and the artwork history', () => {
      * of the journey and not a detail of the test: until it lands, the picture is
      * still the zoomed one.
      */
-    fireEvent.click(screen.getByRole('button', { name: 'Reset parameters' }));
-    fireEvent.click(screen.getByRole('button', { name: /^Run/ }));
+    /*
+     * The persistent Reset, which is now the only one — and which draws for
+     * itself, so the Run this journey used to need is part of the press.
+     */
+    fireEvent.click(artworkAction('Reset'));
 
     await waitFor(() => expect(span()).toBe(1.4));
     await waitFor(() => expect(back()).toBeDisabled());

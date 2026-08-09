@@ -22,6 +22,7 @@ import { fromNested, type NumericMatrix } from '@/matrix/matrixTypes';
 import { decodeShareState } from '@/sharing/decodeShareState';
 import { modularBloom } from '@/presets/modular-bloom';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { pressRunWith } from '../helpers/workspaceModes';
 
 /**
  * Every word that would betray the transport, in the spellings a future change
@@ -86,7 +87,7 @@ async function runBandedArtwork() {
   const service = limitedService(tall(128));
   render(<WorkspacePage presetId={modularBloom.id} sharedState={null} service={service} />);
 
-  await user.click(screen.getByRole('button', { name: /^Run/ }));
+  await pressRunWith(user);
   await waitFor(() => expect(screen.getByText(/Finished in/)).toBeInTheDocument(), { timeout: 5000 });
 
   // The premise of both tests: this really did take more than one request.

@@ -9,6 +9,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { editorOn, pressRun } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -17,7 +18,7 @@ function runStatus(page: Page) {
 }
 
 async function runAndSettle(page: Page) {
-  await page.getByRole('button', { name: /^Run/ }).click();
+  await pressRun(page);
   await expect(runStatus(page).first()).not.toHaveText(/Running/, { timeout: 30_000 });
 }
 
@@ -54,7 +55,7 @@ test.describe('Tricorn', () => {
     await page.getByRole('link', { name: 'Open Tricorn' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Tricorn' })).toBeVisible();
     expect(page.url()).toContain('#/art/tricorn');
-    await expect(page.locator('.cm-content')).toContainText('ci-2×zr×zi');
+    await expect(await editorOn(page)).toContainText('ci-2×zr×zi');
   });
 
   test('opens from its own route, visited directly', async ({ page }) => {
@@ -62,7 +63,7 @@ test.describe('Tricorn', () => {
     await page.goto('./#/art/tricorn');
 
     await expect(page.getByRole('heading', { level: 1, name: 'Tricorn' })).toBeVisible();
-    await expect(page.locator('.cm-content')).toContainText('ci-2×zr×zi');
+    await expect(await editorOn(page)).toContainText('ci-2×zr×zi');
   });
 
   test('runs from its own source and draws', async ({ page }) => {
@@ -73,7 +74,7 @@ test.describe('Tricorn', () => {
     await expect(page.locator('canvas').first()).toHaveAttribute('aria-label', /128 by 128/);
     await expect(page.getByText(/Finished in/)).toBeVisible();
     // Its own default view, and its own palette.
-    await expect(page.locator('.cm-content')).toContainText('zoom←1.5');
+    await expect(await editorOn(page)).toContainText('zoom←1.5');
     await expect(page.locator('canvas').first()).toHaveAttribute('aria-label', /Abyss palette/);
   });
 
@@ -91,7 +92,7 @@ test.describe('Tricorn', () => {
      * the same arithmetic.
      */
     await page.goto('./#/art/mandelbrot-field');
-    const editor = page.locator('.cm-content');
+    const editor = await editorOn(page);
     await expect(editor).toContainText('centreX←¯0.6');
     await editor.click();
     await page.keyboard.press('ControlOrMeta+a');
@@ -123,7 +124,7 @@ test.describe('Tricorn', () => {
     await page.goto('./#/art/tricorn');
     await runAndSettle(page);
 
-    const editor = page.locator('.cm-content');
+    const editor = await editorOn(page);
     await expect(editor).toContainText('zoom←1.5');
 
     const canvas = page.locator('canvas').first();

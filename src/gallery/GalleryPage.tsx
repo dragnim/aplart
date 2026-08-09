@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { hrefForPlay } from '@/app/router';
-import { presets, starterPreset } from '@/presets/presets';
+import { presets, starterFor } from '@/presets/presets';
 import { randomSeed } from '@/workspace/randomise';
 import { ArtworkCard } from './ArtworkCard';
 import { GalleryFilters } from './GalleryFilters';
@@ -21,7 +21,13 @@ export function GalleryPage() {
    * fresh visit, which offers a fresh artwork.
    */
   const [playSeed] = useState(randomSeed);
-  const starter = starterPreset();
+  /*
+   * Which artwork the seed opens, as well as which variation of it. "Start
+   * creating" used to be one artwork with a different set of numbers each time,
+   * because Modular Bloom was the only piece with curated controls; it is now a
+   * choice among the pattern families, and the seed makes it.
+   */
+  const starter = starterFor(playSeed);
 
   const counts = useMemo(() => {
     const result = {} as Record<FilterId, number>;
@@ -36,11 +42,7 @@ export function GalleryPage() {
   return (
     <div className={styles.page}>
       <section className={styles.hero}>
-        <h1 className={styles.title}>
-          Tiny programs.
-          <br />
-          Infinite patterns.
-        </h1>
+        <h1 className={styles.title}>Infinite patterns from tiny programs.</h1>
         <p className={styles.intro}>
           Create patterns, fractals and generative art with Dyalog APL. Choose a piece, change the code and
           see what happens.

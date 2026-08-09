@@ -14,6 +14,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { advanced, artworkActions, editorOn, pressRun, showMode } from './workspaceModes';
 
 /** WCAG 2.2 AA is the stated target. */
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
@@ -75,16 +76,16 @@ test.describe('accessibility of the workspace', () => {
   test('has no violations before a run', async ({ page }) => {
     await stubTryApl(page);
     await page.goto('./#/art/modular-bloom');
-    await page.waitForSelector('.cm-content');
+    await page.waitForSelector('.cm-content', { state: 'attached' });
     await audit(page);
   });
 
   test('has no violations after a successful run', async ({ page }) => {
     await stubTryApl(page);
     await page.goto('./#/art/modular-bloom');
-    await page.waitForSelector('.cm-content');
+    await page.waitForSelector('.cm-content', { state: 'attached' });
 
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(page.locator('[role="status"][data-status]')).toHaveText(/Finished in/, {
       timeout: 20_000,
     });
@@ -95,22 +96,30 @@ test.describe('accessibility of the workspace', () => {
   test('has no violations while showing an error', async ({ page }) => {
     await stubTryApl(page, { failure: 'server' });
     await page.goto('./#/art/modular-bloom');
-    await page.waitForSelector('.cm-content');
+    await page.waitForSelector('.cm-content', { state: 'attached' });
 
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(page.getByRole('alert')).toBeVisible();
 
     await audit(page);
   });
 
-  test('has no violations with the reset dialog open', async ({ page }) => {
+  test('has no violations after a reset, which no longer asks first', async ({ page }) => {
+    /*
+     * This audited the reset confirmation dialog. There is no dialog: Reset is a
+     * recorded action with an Undo beside it, so the warning it used to show —
+     * that the reset could not be undone — stopped being true and the dialog
+     * went with it. What is audited instead is the state the press leaves
+     * behind, which is what somebody now actually sees.
+     */
     await stubTryApl(page);
     await page.goto('./#/art/modular-bloom');
-    await page.waitForSelector('.cm-content');
+    await page.waitForSelector('.cm-content', { state: 'attached' });
 
-    await page.locator('.cm-content').fill('size←8');
-    await page.getByRole('button', { name: 'Reset', exact: true }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
+    await (await editorOn(page)).fill('size←8');
+    await artworkActions(page).getByRole('button', { name: 'Reset', exact: true }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(artworkActions(page).getByRole('button', { name: /^Undo/ })).toBeEnabled();
 
     await audit(page);
   });
@@ -118,9 +127,9 @@ test.describe('accessibility of the workspace', () => {
   test('has no violations in Focus mode, drawer open or closed', async ({ page }) => {
     await stubTryApl(page);
     await page.goto('./#/art/modular-bloom');
-    await page.waitForSelector('.cm-content');
+    await page.waitForSelector('.cm-content', { state: 'attached' });
 
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(page.locator('[role="status"][data-status]')).toHaveText(/Finished in/, {
       timeout: 20_000,
     });
@@ -143,16 +152,16 @@ test.describe('accessibility of the workspace', () => {
   test('has no violations with a cell being inspected', async ({ page }) => {
     await stubTryApl(page);
     await page.goto('./#/art/modular-bloom');
-    await page.waitForSelector('.cm-content');
+    await page.waitForSelector('.cm-content', { state: 'attached' });
 
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(page.locator('[role="status"][data-status]')).toHaveText(/Finished in/, {
       timeout: 20_000,
     });
 
     // Through the controls rather than the canvas, since that is the route this
     // audit can reach — and the one that has to work without a pointer.
-    await page.getByRole('button', { name: 'Inspect' }).click();
+    await (await advanced(page)).getByRole('button', { name: 'Inspect' }).click();
     await expect(page.getByText(/^Row 1, column 1$/u)).toBeVisible();
 
     // The readout sits over the artwork rather than on a surface, so its
@@ -163,8 +172,9 @@ test.describe('accessibility of the workspace', () => {
   test('has no violations with a primitive explanation expanded', async ({ page }) => {
     await stubTryApl(page);
     await page.goto('./#/art/modular-bloom');
-    await page.waitForSelector('.cm-content');
+    await page.waitForSelector('.cm-content', { state: 'attached' });
 
+    await showMode(page, 'Code');
     await page
       .getByRole('region', { name: 'APL used in this piece' })
       .getByRole('button', { name: /Residue/ })
@@ -209,7 +219,7 @@ test.describe('accessibility of a Play session', () => {
 
     for (const mode of ['Colour', 'Advanced', 'Code']) {
       await page.getByRole('tab', { name: mode }).click();
-      if (mode === 'Code') await page.waitForSelector('.cm-content');
+      if (mode === 'Code') await page.waitForSelector('.cm-content', { state: 'attached' });
       await audit(page, undefined, mode);
     }
   });
@@ -277,7 +287,7 @@ test.describe('reduced motion', () => {
   test('transitions are switched off, not merely shortened', async ({ page }) => {
     await stubTryApl(page);
     await page.goto('./#/art/modular-bloom');
-    await page.waitForSelector('.cm-content');
+    await page.waitForSelector('.cm-content', { state: 'attached' });
 
     // The duration tokens are zeroed under the media query, so every
     // transition built on them stops rather than each one needing its own rule.
@@ -309,17 +319,17 @@ test.describe('reduced motion', () => {
     // WCAG asks for motion to be reduced, not for feedback to be deleted.
     await stubTryApl(page, { delayMs: 2500 });
     await page.goto('./#/art/modular-bloom');
-    await page.waitForSelector('.cm-content');
+    await page.waitForSelector('.cm-content', { state: 'attached' });
 
     // The spinner overlays an existing artwork, so there has to be one first.
     // Before the first run the canvas shows a message instead, which is the
     // right thing to show when there is nothing to overlay.
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(page.locator('[role="status"][data-status]')).toHaveText(/Finished in/, {
       timeout: 30_000,
     });
 
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     const duration = await page
       .locator('[class*="spinner"]')
       .evaluate((element) => getComputedStyle(element).animationDuration);
@@ -333,7 +343,7 @@ test.describe('target sizes', () => {
   test('controls are comfortable to hit', async ({ page }) => {
     await stubTryApl(page);
     await page.goto('./#/art/modular-bloom');
-    await page.waitForSelector('.cm-content');
+    await page.waitForSelector('.cm-content', { state: 'attached' });
 
     // The spec asks for roughly 44x44, which is stricter than WCAG 2.2 AA's
     // 24x24. Inline links inside prose are exempt from both and are excluded

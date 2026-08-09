@@ -22,6 +22,7 @@ import { encodeShareState } from '@/sharing/encodeShareState';
 import { LocalProjectRepository } from '@/storage/LocalProjectRepository';
 import { migrateProject } from '@/storage/storageMigrations';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { advanced, codeEditor, paletteChoice, pressRunWith } from '../helpers/workspaceModes';
 
 const CANVAS = { left: 0, top: 0, width: 400, height: 400 };
 
@@ -70,7 +71,7 @@ async function openAndRun(preset = mandelbrotField.id, sharedState: string | nul
   service.register('default', escapeCounts());
   render(<WorkspacePage presetId={preset} sharedState={sharedState} service={service} />);
 
-  await user.click(screen.getByRole('button', { name: /^Run/ }));
+  await pressRunWith(user);
   await waitFor(() => expect(screen.getByRole('img', { name: /grid/ })).toBeInTheDocument());
   return { user, service };
 }
@@ -78,7 +79,7 @@ async function openAndRun(preset = mandelbrotField.id, sharedState: string | nul
 const canvas = () => screen.getByRole('img', { name: /grid/ });
 // Testing-library matches an accessible name in full, so "Repeat" cannot
 // accidentally select "Mirror repeat" here the way a Playwright locator would.
-const mode = (name: string) => screen.getByRole('radio', { name });
+const mode = (name: string) => advanced().getByRole('radio', { name });
 const label = () => canvas().getAttribute('aria-label') ?? '';
 
 describe('the Display control', () => {
@@ -129,14 +130,14 @@ describe('switching display', () => {
   it('costs no execution and changes no source', async () => {
     const { user, service } = await openAndRun();
     const before = service.executionCount;
-    const code = screen.getByRole('textbox', { name: /APL/i }).textContent;
+    const code = codeEditor().textContent;
 
     await user.click(mode('Smooth'));
     await user.click(mode('Pixel'));
     await user.click(mode('Smooth'));
 
     expect(service.executionCount).toBe(before);
-    expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toBe(code);
+    expect(codeEditor().textContent).toBe(code);
   });
 
   it('leaves the matrix and its range alone', async () => {
@@ -184,10 +185,10 @@ describe('switching display', () => {
     const { user } = await openAndRun();
     await user.click(mode('Smooth'));
 
-    await user.click(screen.getByRole('radio', { name: /Abyss/ }));
+    await user.click(paletteChoice(/Abyss/));
     expect(mode('Smooth')).toHaveAttribute('aria-checked', 'true');
 
-    await user.click(screen.getByRole('radio', { name: /Custom/ }));
+    await user.click(paletteChoice(/Custom/));
     await waitFor(() => expect(canvas()).toHaveAccessibleName(/Custom palette/));
     expect(mode('Smooth')).toHaveAttribute('aria-checked', 'true');
   });

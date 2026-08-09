@@ -13,6 +13,7 @@ import { MockAplExecutionService } from '@/execution/MockAplExecutionService';
 import { fromNested } from '@/matrix/matrixTypes';
 import { modularBloom } from '@/presets/modular-bloom';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { animate, artworkAction, paletteChoice, pressRunWith } from '../helpers/workspaceModes';
 import type * as CanvasRenderer from '@/renderer/CanvasRenderer';
 
 type CanvasRendererModule = typeof CanvasRenderer;
@@ -139,7 +140,7 @@ async function openAndRun() {
   service.register('default', labelled(8, 8));
   render(<WorkspacePage presetId={modularBloom.id} sharedState={null} service={service} />);
 
-  await user.click(screen.getByRole('button', { name: /^Run/ }));
+  await pressRunWith(user);
   await waitFor(() => expect(screen.getByRole('img', { name: /grid/ })).toBeInTheDocument());
   return { user, service };
 }
@@ -149,13 +150,13 @@ describe('starting and stopping', () => {
     await openAndRun();
     // Not part of the artwork, so nothing about a saved project or a link can
     // set it going.
-    expect(screen.getByRole('button', { name: 'Animate palette' })).toBeInTheDocument();
+    expect(animate().getByRole('button', { name: 'Animate palette' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument();
   });
 
   it('offers Pause the moment anything moves', async () => {
     const { user } = await openAndRun();
-    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+    await user.click(animate().getByRole('button', { name: 'Animate palette' }));
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
   });
 
@@ -163,7 +164,7 @@ describe('starting and stopping', () => {
     const { user, service } = await openAndRun();
     const before = service.executionCount;
 
-    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+    await user.click(animate().getByRole('button', { name: 'Animate palette' }));
     advance(500);
     advance(500);
 
@@ -174,7 +175,7 @@ describe('starting and stopping', () => {
     const { user } = await openAndRun();
     const described = screen.getByRole('img', { name: /grid/ }).getAttribute('aria-label');
 
-    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+    await user.click(animate().getByRole('button', { name: 'Animate palette' }));
     advance(1200);
 
     expect(screen.getByRole('img', { name: /grid/ })).toHaveAccessibleName(described ?? '');
@@ -182,12 +183,12 @@ describe('starting and stopping', () => {
 
   it('leaves the saved palette alone', async () => {
     const { user } = await openAndRun();
-    await user.click(screen.getByRole('radio', { name: /Custom/ }));
+    await user.click(paletteChoice(/Custom/));
     const before = screen
       .getAllByLabelText(/^Hex value of stop/)
       .map((element) => (element as HTMLInputElement).value);
 
-    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+    await user.click(animate().getByRole('button', { name: 'Animate palette' }));
     advance(900);
 
     // The stops are the artwork; the animation is something being done to it.
@@ -197,16 +198,24 @@ describe('starting and stopping', () => {
     expect(after).toEqual(before);
   });
 
-  it('does not fill the palette editor’s undo history', async () => {
+  it('adds nothing to the undo history, however long it runs', async () => {
+    /*
+     * The same claim as before, against a history that now records appearance.
+     *
+     * Choosing a palette is a decision and is undoable, so this can no longer
+     * ask whether Undo is disabled — it asks whether two thousand milliseconds
+     * of animation changed what Undo would take back. Movement is done *to* the
+     * artwork rather than being part of it, and a history that filled up with
+     * frames would be a history nobody could step back through.
+     */
     const { user } = await openAndRun();
-    await user.click(screen.getByRole('radio', { name: /Custom/ }));
-    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    await user.click(paletteChoice(/Custom/));
+    const before = artworkAction(/^Undo/).getAttribute('aria-label');
 
-    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+    await user.click(animate().getByRole('button', { name: 'Animate palette' }));
     advance(2000);
 
-    // Nothing was edited, so there is nothing to take back.
-    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    expect(artworkAction(/^Undo/).getAttribute('aria-label')).toBe(before);
   });
 
   it('keeps the cell being read', async () => {
@@ -216,7 +225,7 @@ describe('starting and stopping', () => {
     fireEvent.pointerUp(canvas, { button: 0, pointerId: 1, clientX: 125, clientY: 75 });
     await screen.findByText('Row 2, column 3');
 
-    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+    await user.click(animate().getByRole('button', { name: 'Animate palette' }));
     advance(1000);
 
     expect(screen.getByText('Row 2, column 3')).toBeInTheDocument();
@@ -227,7 +236,7 @@ describe('starting and stopping', () => {
 describe('the frames', () => {
   it('moves the palette without moving anything else', async () => {
     const { user } = await openAndRun();
-    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+    await user.click(animate().getByRole('button', { name: 'Animate palette' }));
     clearPaints();
 
     advance(700);
@@ -242,7 +251,7 @@ describe('the frames', () => {
   it('freezes where it was when paused', async () => {
     const { user } = await openAndRun();
 
-    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+    await user.click(animate().getByRole('button', { name: 'Animate palette' }));
     advance(700);
     expect(painted().at(-1)).toBeDefined();
 
@@ -258,14 +267,14 @@ describe('the frames', () => {
   it('carries on from where it paused', async () => {
     const { user } = await openAndRun();
 
-    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+    await user.click(animate().getByRole('button', { name: 'Animate palette' }));
     advance(700);
     const before = painted().at(-1);
 
     await user.click(screen.getByRole('button', { name: 'Pause' }));
     // Time passes while paused, and must not count towards the phase.
     clock += 10_000;
-    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+    await user.click(animate().getByRole('button', { name: 'Animate palette' }));
 
     clearPaints();
     advance(0);
@@ -274,7 +283,7 @@ describe('the frames', () => {
 
   it('does not advance while the document is hidden', async () => {
     const { user } = await openAndRun();
-    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+    await user.click(animate().getByRole('button', { name: 'Animate palette' }));
     advance(700);
     const before = painted().at(-1);
 
@@ -297,15 +306,15 @@ describe('the frames', () => {
     const atRest = painted().at(-1);
     expect(atRest).toBeDefined();
 
-    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+    await user.click(animate().getByRole('button', { name: 'Animate palette' }));
     advance(700);
     expect(painted().at(-1)).not.toEqual(atRest);
 
-    await user.click(screen.getByRole('button', { name: 'Reset animation' }));
+    await user.click(animate().getByRole('button', { name: 'Reset animation' }));
 
     // Identical to the unanimated palette, not merely close to it.
     expect(painted().at(-1)).toEqual(atRest);
-    expect(screen.getByRole('button', { name: 'Animate palette' })).toBeInTheDocument();
+    expect(animate().getByRole('button', { name: 'Animate palette' })).toBeInTheDocument();
   });
 });
 
@@ -313,12 +322,12 @@ describe('with a hard-edged palette', () => {
   it('stays valid all the way round', async () => {
     const { user } = await openAndRun();
 
-    await user.click(screen.getByRole('radio', { name: /Custom/ }));
+    await user.click(paletteChoice(/Custom/));
     // Two stops in the same place.
     fireEvent.change(screen.getByLabelText('Position of stop 2, per cent'), { target: { value: '50' } });
     fireEvent.change(screen.getByLabelText('Position of stop 3, per cent'), { target: { value: '50' } });
 
-    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+    await user.click(animate().getByRole('button', { name: 'Animate palette' }));
     clearPaints();
     for (let step = 0; step < 12; step += 1) advance(600);
 
@@ -334,7 +343,7 @@ describe('with a hard-edged palette', () => {
 describe('in Focus mode', () => {
   it('uses the same loop rather than starting another', async () => {
     const { user } = await openAndRun();
-    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+    await user.click(animate().getByRole('button', { name: 'Animate palette' }));
 
     await user.click(screen.getByRole('button', { name: 'Focus mode' }));
     clearPaints();
@@ -363,7 +372,7 @@ describe('when motion is reduced', () => {
     const { user } = await openAndRun();
 
     expect(screen.getByText(/set to reduce motion/)).toBeInTheDocument();
-    const start = screen.getByRole('button', { name: 'Animate palette' });
+    const start = animate().getByRole('button', { name: 'Animate palette' });
     expect(start).toBeEnabled();
 
     // Available on request, never on arrival.

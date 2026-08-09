@@ -61,11 +61,30 @@ const withRecipe = (index: number, patch: Record<string, unknown>): InstantPlayC
 const firstControl = base.controls[0] as InstantPlayControl;
 const firstRecipe = base.recipes[0] as InstantPlayRecipe;
 
-describe('the starter preset', () => {
-  it('is Modular Bloom, and it is the only preset that opts in for now', () => {
+describe('the presets with curated controls', () => {
+  it('are the four pattern families Start creating draws from', () => {
+    /*
+     * It was Modular Bloom alone, and that was also what decided which artworks
+     * had a workspace worth using — curated controls and the tabbed workspace
+     * were the same condition. They are separate now: every artwork is edited in
+     * the same workspace, and curated controls are what gives it a Create tab.
+     *
+     * So this asserts a curation decision rather than an implementation limit.
+     * The fractals are fully editable through Colour, Animate, Advanced and Code
+     * and are deliberately not here: their meaningful parameters are viewport
+     * coordinates, which a friendly slider models badly.
+     */
     const opted = presets.filter((preset) => preset.instantPlay !== undefined);
 
-    expect(opted.map((preset) => preset.id)).toEqual(['modular-bloom']);
+    expect(opted.map((preset) => preset.id).sort()).toEqual(
+      ['checker-shift', 'modular-bloom', 'truchet-grid', 'wave-interference'].sort(),
+    );
+  });
+
+  it('every one of them validates, so none can open an empty Create tab', () => {
+    for (const preset of presets.filter((candidate) => candidate.instantPlay !== undefined)) {
+      expect(validatePreset(preset), preset.id).toEqual([]);
+    }
   });
 
   it('passes the preset validator with its Instant Play block', () => {

@@ -85,5 +85,17 @@ export function generateInstantPlayVariation(
     values.set(parameter.variable, snapWithin(base + offset, range.min, range.max, step));
   }
 
-  return { recipeId: recipe.id, seed, values };
+  /*
+   * The preset's own quality rule, last, over the finished set.
+   *
+   * Applied here rather than per control because a rule is about the relationship
+   * between values, and only the whole set has one. Deterministic, so this stays
+   * a pure function of the seed: the same link still opens the same artwork.
+   *
+   * Nothing is held — nobody is moving a slider — so the rule is free to adjust
+   * whichever value it judges the less important.
+   */
+  const curated = config.quality === undefined ? values : new Map(config.quality(values));
+
+  return { recipeId: recipe.id, seed, values: curated };
 }

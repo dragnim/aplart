@@ -21,9 +21,11 @@ interface Props {
   readonly onResetCode: () => void;
   /** Runs a particular source, for retrying the attempt that failed. */
   readonly onRetry: (source: string) => void;
+  /** Puts the source on the clipboard. Beside Run, because both are about the code. */
+  readonly onCopyApl: () => void;
 }
 
-export function RunPanel({ state, onRun, onStop, onResetCode, onRetry }: Props) {
+export function RunPanel({ state, onRun, onStop, onResetCode, onRetry, onCopyApl }: Props) {
   const [detailOpen, setDetailOpen] = useState(false);
   const running = state.status === 'running';
 
@@ -51,6 +53,9 @@ export function RunPanel({ state, onRun, onStop, onResetCode, onRetry }: Props) 
             <kbd className={styles.shortcut}>{shortcutLabel()}</kbd>
           </button>
         )}
+        <button type="button" className={styles.copy} onClick={onCopyApl}>
+          Copy APL
+        </button>
       </div>
 
       {/*

@@ -23,6 +23,7 @@ import { COLOURING_MODES } from '@/renderer/escapeColouring';
 import { encodeShareState } from '@/sharing/encodeShareState';
 import { LocalProjectRepository } from '@/storage/LocalProjectRepository';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { codeEditor, paletteChoice, pressRunWith } from '../helpers/workspaceModes';
 
 const CANVAS = { left: 0, top: 0, width: 400, height: 400 };
 
@@ -79,14 +80,14 @@ async function openAndRun(sharedState: string | null = null) {
   service.register('default', escapeCounts());
   render(<WorkspacePage presetId={mandelbrotField.id} sharedState={sharedState} service={service} />);
 
-  await user.click(screen.getByRole('button', { name: /^Run/ }));
+  await pressRunWith(user);
   await waitFor(() => expect(screen.getByRole('img', { name: /grid/ })).toBeInTheDocument());
   return { user, service };
 }
 
 const canvas = () => screen.getByRole('img', { name: /grid/ });
-const editor = () => screen.getByRole('textbox', { name: /APL/i });
-const palette = (name: string) => screen.getByRole('radio', { name: new RegExp(name, 'u') });
+const editor = () => codeEditor();
+const palette = (name: string) => paletteChoice(new RegExp(name, 'u'));
 
 /** What the canvas reports about the numbers, with the palette's name removed. */
 function describedNumbers(): string {
@@ -182,7 +183,7 @@ describe('switching between palettes', () => {
     const { user } = await openAndRun();
     await user.click(palette('Abyss'));
 
-    await user.click(screen.getByRole('radio', { name: /Custom/ }));
+    await user.click(paletteChoice(/Custom/));
     await waitFor(() => expect(canvas()).toHaveAccessibleName(/Custom palette/));
 
     // A custom ramp has its own stops; returning to Abyss must restore the
@@ -264,7 +265,7 @@ describe('state written before Abyss existed', () => {
     const service = new MockAplExecutionService();
     service.register('default', escapeCounts());
     render(<WorkspacePage presetId={mandelbrotField.id} sharedState={null} service={service} />);
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
     await waitFor(() => expect(canvas()).toBeInTheDocument());
 
     expect(canvas()).toHaveAccessibleName(/Abyss palette/);

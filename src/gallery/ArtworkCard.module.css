@@ -52,29 +52,12 @@
   font-size: var(--text-xs);
 }
 
-.category,
-.difficulty {
+.category {
   padding: 0.1em 0.5em;
   border-radius: 999px;
   text-transform: capitalize;
   border: 1px solid var(--border);
   color: var(--text-muted);
-}
-
-/* Difficulty carries a word as well as a colour, never colour alone. */
-.difficulty[data-level='beginner'] {
-  border-color: #9ad3b3;
-  color: var(--success);
-}
-
-.difficulty[data-level='intermediate'] {
-  border-color: #e3c48a;
-  color: var(--warning);
-}
-
-.difficulty[data-level='advanced'] {
-  border-color: #e6a9a3;
-  color: var(--error);
 }
 
 .title {

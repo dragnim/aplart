@@ -10,6 +10,7 @@
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { advanced, paletteChoice, pressRun, runButton, showMode } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 const NARROW = { width: 390, height: 780 };
@@ -80,7 +81,7 @@ test.describe('the header brand', () => {
      * than two competing ones.
      */
     for (const [route, heading] of [
-      ['./#/', /Tiny programs/],
+      ['./#/', /Infinite patterns from tiny programs/],
       ['./#/art/julia-set', /Julia Set/],
       ['./#/art/sierpinski-array', /Sierpiński Array/],
     ] as const) {
@@ -124,21 +125,21 @@ test.describe('the artwork title', () => {
     const teal = await before(title(page), 'background-color');
 
     // A control that is not the palette.
-    await page.getByRole('checkbox', { name: /Invert palette/ }).check();
+    await (await showMode(page, 'Colour')).getByRole('checkbox', { name: /Invert palette/ }).check();
     expect(await before(title(page), 'background-color')).toBe(teal);
 
-    await page.getByRole('radio', { name: /Neon/ }).click();
+    await (await paletteChoice(page, /Neon/)).click();
     await expect.poll(() => before(title(page), 'background-color'), { timeout: 5_000 }).not.toBe(teal);
     expect(await before(title(page), 'background-color')).toBe(await token(page, '--ui-accent-solid'));
   });
 
   test('is unmoved by animation frames', async ({ page }) => {
     await open(page, 'mandelbrot-field', 'Mandelbrot Field');
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 
     const settled = await before(title(page), 'background-color');
-    await page.getByRole('button', { name: 'Animate palette' }).click();
+    await (await showMode(page, 'Animate')).getByRole('button', { name: 'Animate palette' }).click();
     await page.waitForTimeout(1_200);
 
     expect(await before(title(page), 'background-color')).toBe(settled);
@@ -268,15 +269,25 @@ test.describe('the artwork title', () => {
 test.describe('what stayed neutral', () => {
   test.use({ viewport: WIDE });
 
-  test('section headings take the quiet marker, with neutral words', async ({ page }) => {
+  test('section headings carry no marker, and neutral words', async ({ page }) => {
+    /*
+     * They used to carry a small square in the accent's border tone — a third
+     * rank of the wordmark's motif, below the artwork title's own block. It was
+     * wayfinding for one long column of controls on a phone, where every section
+     * ran into the next; in a short tabbed panel with a title at the top of it,
+     * the square had stopped standing for anything and read as an artefact.
+     *
+     * So the assertion is inverted rather than dropped: the words stay neutral,
+     * and there is nothing drawn before them.
+     */
     await open(page, 'julia-set', 'Julia Set');
     const text = await token(page, '--text');
-    const quiet = await token(page, '--ui-accent-border');
 
+    await showMode(page, 'Advanced');
     for (const heading of ['Code controls', 'Appearance']) {
       const node = page.getByRole('heading', { name: heading }).first();
       await expect(node).toHaveCSS('color', text);
-      expect(await before(node, 'background-color'), heading).toBe(quiet);
+      expect(await before(node, 'content'), heading).toBe('none');
     }
 
     /*
@@ -285,45 +296,41 @@ test.describe('what stayed neutral', () => {
      * still inherits it, because the properties live on the shell rather than
      * being painted onto whatever happened to be on screen.
      */
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 
-    const later = page.getByRole('heading', { name: 'Read a value' }).first();
+    const later = (await advanced(page)).getByRole('heading', { name: 'Read a value' }).first();
     await expect(later).toBeVisible();
     await expect(later).toHaveCSS('color', text);
-    expect(await before(later, 'background-color')).toBe(quiet);
+    expect(await before(later, 'content')).toBe('none');
   });
 
-  test('the marker stops at the section headings', async ({ page }) => {
+  test('nothing below the artwork title carries the motif', async ({ page }) => {
     await open(page, 'julia-set', 'Julia Set');
     const text = await token(page, '--text');
 
-    // A group legend and the primitive reference: both plain, so the motif marks
-    // where a section begins rather than becoming a texture.
-    for (const node of [
-      page.locator('legend', { hasText: 'Palette' }).first(),
-      page.getByRole('heading', { name: /APL used in this piece/ }).first(),
-    ]) {
-      await expect(node).toHaveCSS('color', text);
-      expect(await before(node, 'content')).toBe('none');
-    }
+    await showMode(page, 'Colour');
+    const legend = page.locator('legend', { hasText: 'Palette' }).first();
+    await expect(legend).toHaveCSS('color', text);
+    expect(await before(legend, 'content')).toBe('none');
+
+    await showMode(page, 'Code');
+    const primitives = page.getByRole('heading', { name: /APL used in this piece/ }).first();
+    await expect(primitives).toHaveCSS('color', text);
+    expect(await before(primitives, 'content')).toBe('none');
   });
 
-  test('keeps the hierarchy: the title block outranks a section block', async ({ page }) => {
+  test('leaves the artwork title as the only heading below the wordmark that carries it', async ({
+    page,
+  }) => {
     await open(page, 'julia-set', 'Julia Set');
 
-    const blockWidth = (locator: Locator) =>
-      locator.evaluate((node) => Number.parseFloat(getComputedStyle(node, '::before').width));
-
-    expect(await blockWidth(title(page))).toBeGreaterThan(
-      await blockWidth(page.getByRole('heading', { name: 'Appearance' }).first()),
-    );
-
-    // And the stronger of the two accent tokens belongs to the title.
+    // The strongest accent token, and now the only heading block in the
+    // workspace that uses one.
     expect(await before(title(page), 'background-color')).toBe(await token(page, '--ui-accent-solid'));
-    expect(await before(page.getByRole('heading', { name: 'Appearance' }).first(), 'background-color')).toBe(
-      await token(page, '--ui-accent-border'),
-    );
+
+    await showMode(page, 'Advanced');
+    expect(await before(page.getByRole('heading', { name: 'Appearance' }).first(), 'content')).toBe('none');
   });
 
   test('Help and About keep their own appearance', async ({ page }) => {
@@ -415,7 +422,9 @@ test.describe('the coherence journey', () => {
 
     // 1. The default header.
     await page.goto('./#/');
-    await expect(page.getByRole('heading', { level: 1, name: /Tiny programs/ })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: /Infinite patterns from tiny programs/ }),
+    ).toBeVisible();
     const defaultArt = await page
       .getByRole('link', { name: 'APL Art' })
       .locator('svg path')
@@ -433,7 +442,7 @@ test.describe('the coherence journey', () => {
         .locator('svg path')
         .nth(1)
         .evaluate((node) => getComputedStyle(node).fill),
-      run: await css(page.getByRole('button', { name: /^Run/ }), 'background-color'),
+      run: await css(await runButton(page), 'background-color'),
       marker: await before(title(page), 'background-color'),
       source: await token(page, '--ui-accent-source'),
     });
@@ -446,7 +455,7 @@ test.describe('the coherence journey', () => {
     expect(await css(aplHalf(page), 'fill')).toBe(neutralApl);
 
     // 4 and 5. A different palette moves all three together.
-    await page.getByRole('radio', { name: /Heat/ }).click();
+    await (await paletteChoice(page, /Heat/)).click();
 
     /*
      * Polled on the wordmark rather than on the title's block: the block is a
@@ -490,7 +499,9 @@ test.describe('the coherence journey', () => {
 
     // 9 and 10. The gallery is itself again.
     await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Gallery' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: /Tiny programs/ })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: /Infinite patterns from tiny programs/ }),
+    ).toBeVisible();
 
     await expect
       .poll(

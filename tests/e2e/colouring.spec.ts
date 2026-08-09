@@ -10,6 +10,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { pressRun, showMode } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -53,14 +54,14 @@ test.describe('iteration colouring', () => {
     const stub = await stubTryApl(page);
     await page.goto('./#/art/mandelbrot-field');
     await expect(page.getByRole('heading', { level: 1, name: 'Mandelbrot Field' })).toBeVisible();
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 
     const smooth = await settled(page);
     const sent = stub.requests.length;
     expect(sent).toBeGreaterThan(0);
 
-    const mode = page.getByLabel('Mode');
+    const mode = (await showMode(page, 'Colour')).getByLabel('Mode');
     const signatures = new Set([smooth]);
     for (const choice of ['bands', 'repeating', 'insideOutside', 'threshold']) {
       await mode.selectOption(choice);
@@ -77,7 +78,7 @@ test.describe('iteration colouring', () => {
     await stubTryApl(page);
     await page.goto('./#/art/mandelbrot-field');
     await expect(page.getByRole('heading', { level: 1, name: 'Mandelbrot Field' })).toBeVisible();
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
     await settled(page);
 
@@ -91,7 +92,7 @@ test.describe('iteration colouring', () => {
     };
 
     const smooth = await save('smooth.png');
-    await page.getByLabel('Mode').selectOption('insideOutside');
+    await (await showMode(page, 'Colour')).getByLabel('Mode').selectOption('insideOutside');
     await settled(page);
     const split = await save('inside-outside.png');
 

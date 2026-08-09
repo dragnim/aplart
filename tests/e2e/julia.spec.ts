@@ -10,6 +10,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { choice, editorOn, pressRun, showMode } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -17,12 +18,8 @@ function runStatus(page: Page) {
   return page.locator('[role="status"][data-status]');
 }
 
-function radio(page: Page, name: string) {
-  return page.getByRole('radio', { name, exact: true });
-}
-
 async function choose(page: Page, name: string) {
-  const control = radio(page, name);
+  const control = await choice(page, name);
   await control.scrollIntoViewIfNeeded();
   await control.click();
   await expect(control).toHaveAttribute('aria-checked', 'true');
@@ -31,7 +28,7 @@ async function choose(page: Page, name: string) {
 async function openAndRun(page: Page) {
   await stubTryApl(page);
   await page.goto('./#/art/julia-set');
-  await page.getByRole('button', { name: /^Run/ }).click();
+  await pressRun(page);
   await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 }
 
@@ -51,7 +48,7 @@ test.describe('Julia Set', () => {
     await openAndRun(page);
 
     // Its own program, not Mandelbrot's.
-    const editor = page.locator('.cm-content');
+    const editor = await editorOn(page);
     await expect(editor).toContainText('realC←¯0.8');
     await expect(editor).toContainText('imagC←0.156');
     await expect(editor).toContainText('startR←(size,size)⍴ax');
@@ -72,7 +69,7 @@ test.describe('Julia Set', () => {
     const julia = await save(page);
 
     await page.goto('./#/art/mandelbrot-field');
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
     const mandelbrot = await save(page);
 
@@ -143,8 +140,8 @@ test.describe('Julia Set', () => {
     await choose(page, 'Smooth');
     await expect(page.locator('canvas').first()).toHaveAttribute('aria-label', /smooth interpolation/);
     await choose(page, 'Pixel');
-    await page.getByLabel('Mode').selectOption('bands');
-    await expect(page.getByLabel('Mode')).toHaveValue('bands');
+    await (await showMode(page, 'Colour')).getByLabel('Mode').selectOption('bands');
+    await expect((await showMode(page, 'Colour')).getByLabel('Mode')).toHaveValue('bands');
 
     // Focus mode and back.
     await page.getByRole('button', { name: 'Focus mode' }).click();
@@ -197,7 +194,7 @@ test.describe('Julia Set', () => {
 
   test('drags to zoom without changing which set it is', async ({ page }) => {
     await openAndRun(page);
-    const editor = page.locator('.cm-content');
+    const editor = await editorOn(page);
 
     await page
       .locator('canvas')
@@ -223,6 +220,13 @@ test.describe('Julia Set', () => {
     const card = page.getByRole('article').filter({ hasText: 'Julia Set' });
     await expect(card).toBeVisible();
     await expect(card).toContainText(/characters/);
-    await expect(card).toContainText(/Intermediate/i);
+    /*
+     * The category, and no longer a difficulty beside it. Beginner, Intermediate
+     * and Advanced described how hard the *program* is to read; on a card showing
+     * a picture and a description it was read as how hard the piece is to use,
+     * and it was colour-coded red for every fractal.
+     */
+    await expect(card).toContainText(/fractal/i);
+    await expect(card).not.toContainText(/Intermediate/i);
   });
 });

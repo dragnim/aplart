@@ -1,5 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import {
+  advanced,
+  artworkActions,
+  editorLocator,
+  editorOn,
+  paletteChoice,
+  pressRun,
+  showMode,
+} from './workspaceModes';
 
 /** The status region belonging to the Run controls, not the toolbar's notice. */
 function runStatus(page: Page) {
@@ -13,7 +22,7 @@ async function openModularBloom(page: Page) {
 }
 
 async function runAndWait(page: Page) {
-  await page.getByRole('button', { name: /^Run/ }).click();
+  await pressRun(page);
   await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 20_000 });
 }
 
@@ -61,7 +70,7 @@ async function settledCanvasSignature(page: Page): Promise<string> {
 /** Replaces the editor's contents. fill() drives contenteditable reliably; a
  *  select-all keystroke does not on every browser. */
 async function setCode(page: Page, code: string) {
-  await page.locator('.cm-content').fill(code);
+  await (await editorOn(page)).fill(code);
 }
 
 /*
@@ -92,12 +101,12 @@ test.describe('the artwork journey', () => {
     await runAndWait(page);
     const before = await settledCanvasSignature(page);
 
-    await expect(page.locator('.cm-content')).toContainText('modulus←17');
+    await expect(await editorOn(page)).toContainText('modulus←17');
 
-    await page.getByLabel('Modulus').fill('12');
+    await (await advanced(page)).getByLabel('Modulus').fill('12');
 
     // The editor shows the change, which is the whole point of the control.
-    await expect(page.locator('.cm-content')).toContainText('modulus←12');
+    await expect(await editorOn(page)).toContainText('modulus←12');
     await runAndWait(page);
 
     expect(stub.requests.at(-1)).toContain('modulus←12');
@@ -114,7 +123,7 @@ test.describe('the artwork journey', () => {
     await stubTryApl(page);
     await openModularBloom(page);
 
-    await page.locator('.cm-content').click();
+    await (await editorOn(page)).click();
     await page.keyboard.press('ControlOrMeta+Enter');
     await expect(runStatus(page)).toHaveText(/Finished in/, { timeout: 20_000 });
   });
@@ -127,7 +136,7 @@ test.describe('the artwork journey', () => {
     const requestsAfterRun = stub.requests.length;
     const before = await settledCanvasSignature(page);
 
-    await page.getByRole('radio', { name: /Poolrooms/ }).click();
+    await (await paletteChoice(page, /Poolrooms/)).click();
 
     await expect(page.getByRole('img', { name: /Poolrooms palette/ })).toBeVisible();
     await expect
@@ -145,31 +154,31 @@ test.describe('the artwork journey', () => {
     // Remove the size assignment so the expression cannot resolve.
     await setCode(page, 'modulus←9\nmodulus|1');
 
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(page.getByRole('alert')).toBeVisible({ timeout: 20_000 });
 
     // The artwork survives the failure untouched.
     expect(await canvasSignature(page)).toBe(drawn);
   });
 
-  // Resetting is covered in full by "reset artwork asks first and then
-  // restores everything", which also exercises the confirmation step.
+  // Resetting is covered in full by "reset restores everything at once, draws
+  // it, and can be taken back", further down this file.
 
   test('reports a server failure without losing the code', async ({ page }) => {
     await stubTryApl(page, { failure: 'server' });
     await openModularBloom(page);
 
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
 
     await expect(page.getByRole('alert')).toContainText('The APL service did not respond');
-    await expect(page.locator('.cm-content')).toContainText('modulus←17');
+    await expect(await editorOn(page)).toContainText('modulus←17');
   });
 
   test('shows a stop control while a run is in flight', async ({ page }) => {
     await stubTryApl(page, { delayMs: 3000 });
     await openModularBloom(page);
 
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible();
     await expect(runStatus(page)).toHaveText(/Running/);
 
@@ -190,7 +199,7 @@ test.describe('sharing and export', () => {
     await openModularBloom(page);
 
     await setCode(page, 'size←24\nmodulus←5\nmultiplier←3\nmodulus|multiplier×∘.×⍨⍳size');
-    await page.getByRole('radio', { name: /Neon/ }).click();
+    await (await paletteChoice(page, /Neon/)).click();
 
     await page.getByRole('button', { name: 'Share' }).click();
     const link = await page.evaluate(() => navigator.clipboard.readText());
@@ -199,8 +208,8 @@ test.describe('sharing and export', () => {
     // Open the link as a stranger would.
     await page.goto(link);
     await expect(page.getByText(/shared with you/)).toBeVisible();
-    await expect(page.locator('.cm-content')).toContainText('modulus←5');
-    await expect(page.getByRole('radio', { name: /Neon/ })).toHaveAttribute('aria-checked', 'true');
+    await expect(await editorOn(page)).toContainText('modulus←5');
+    await expect(await paletteChoice(page, /Neon/)).toHaveAttribute('aria-checked', 'true');
 
     // Shared code is never run until the visitor asks.
     await expect(page.getByText('Press Run to draw this artwork.')).toBeVisible();
@@ -282,10 +291,10 @@ test.describe('narrow viewports', () => {
     await openModularBloom(page);
 
     await expect(page.getByRole('tab', { name: 'Artwork' })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.locator('.cm-content')).toBeHidden();
+    await expect(editorLocator(page)).toBeHidden();
 
     await page.getByRole('tab', { name: 'Code' }).click();
-    await expect(page.locator('.cm-content')).toBeVisible();
+    await expect(await editorOn(page)).toBeVisible();
     await runAndWait(page);
 
     await page.getByRole('tab', { name: 'Artwork' }).click();
@@ -309,23 +318,25 @@ test.describe('editing aids', () => {
     await openModularBloom(page);
 
     await setCode(page, 'size←4');
-    await page.locator('.cm-content').click();
+    await showMode(page, 'Code');
+    await editorLocator(page).click();
     await page.keyboard.press('End');
 
     await page.getByRole('button', { name: /Insert Index generator/ }).click();
-    await expect(page.locator('.cm-content')).toContainText('size←4⍳');
+    await expect(editorLocator(page)).toContainText('size←4⍳');
 
     // Focus must come back, or a run of glyphs cannot be tapped out.
-    await expect(page.locator('.cm-content')).toBeFocused();
+    await expect(editorLocator(page)).toBeFocused();
 
     await page.getByRole('button', { name: /Insert Reshape/ }).click();
-    await expect(page.locator('.cm-content')).toContainText('size←4⍳⍴');
+    await expect(editorLocator(page)).toContainText('size←4⍳⍴');
   });
 
   test('every symbol button has a name a screen reader can read', async ({ page }) => {
     await stubTryApl(page);
     await openModularBloom(page);
 
+    await showMode(page, 'Code');
     const buttons = page.getByRole('toolbar', { name: 'APL symbols' }).getByRole('button');
     const count = await buttons.count();
     expect(count).toBeGreaterThan(40);
@@ -341,54 +352,70 @@ test.describe('editing aids', () => {
     await stubTryApl(page);
     await openModularBloom(page);
 
-    const before = await page.locator('.cm-content').innerText();
+    const before = await (await editorOn(page)).innerText();
     await page.getByRole('button', { name: 'Randomise' }).click();
 
-    await expect(page.locator('.cm-content')).not.toHaveText(before);
+    await expect(await editorOn(page)).not.toHaveText(before);
     await expect(page.getByText('Edited')).toBeVisible();
     await runAndWait(page);
     await expect(page.getByRole('img', { name: /grid/ })).toBeVisible();
   });
 
-  test('reset parameters restores the defaults but keeps other edits', async ({ page }) => {
-    await stubTryApl(page);
-    await openModularBloom(page);
+  /*
+   * "Reset parameters restores the defaults but keeps other edits" used to live
+   * here, testing a second reset that existed only inside the technical panel.
+   * It has gone: two controls with the word Reset on them, one keeping hand
+   * edits and one not, was a distinction nobody asked for and the reason the
+   * panel needed its own action row. What remains is one Reset, tested below.
+   */
 
-    // A hand-written comment stands in for work the user does not want lost.
-    await setCode(page, '⍝ mine\nsize←16\nmodulus←3\nmultiplier←1\nmodulus|multiplier×∘.×⍨⍳size');
-    await page.getByRole('button', { name: 'Reset parameters' }).click();
-
-    await expect(page.locator('.cm-content')).toContainText('size←64');
-    await expect(page.locator('.cm-content')).toContainText('modulus←17');
-    await expect(page.locator('.cm-content')).toContainText('⍝ mine');
-  });
-
-  test('reset artwork asks first and then restores everything', async ({ page }) => {
+  test('reset restores everything at once, draws it, and can be taken back', async ({ page }) => {
+    /*
+     * It used to ask first, through a dialog warning that the reset could not be
+     * undone — which was true, because it wrote the preset's values through the
+     * uncommitted path and discarded the history in doing so. It is a recorded
+     * action now: one snapshot of the artwork as it stood, source, seed and
+     * appearance replaced together, and the result submitted in the same breath.
+     * A confirmation guarding an action with an Undo beside it is a confirmation
+     * worth removing, so the dialog went with the defect.
+     */
     await stubTryApl(page);
     await openModularBloom(page);
 
     await setCode(page, 'size←8');
-    await page.getByRole('radio', { name: /Neon/ }).click();
+    await (await paletteChoice(page, /Neon/)).click();
 
-    await page.getByRole('button', { name: 'Reset', exact: true }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
+    await artworkActions(page).getByRole('button', { name: 'Reset', exact: true }).click();
 
-    // Backing out must change nothing.
-    await page.getByRole('button', { name: 'Keep my changes' }).click();
-    await expect(page.locator('.cm-content')).toContainText('size←8');
+    // No dialog stands between the press and the reset.
+    await expect(page.getByRole('dialog')).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'Reset', exact: true }).click();
-    await page.getByRole('button', { name: 'Reset everything' }).click();
-
-    await expect(page.locator('.cm-content')).toContainText('modulus←17');
-    await expect(page.getByRole('radio', { name: /Ember/ })).toHaveAttribute('aria-checked', 'true');
+    await expect(await editorOn(page)).toContainText('modulus←17');
+    await expect(await paletteChoice(page, /Ember/)).toHaveAttribute('aria-checked', 'true');
     await expect(page.getByText('Original', { exact: true })).toBeVisible();
+
+    /*
+     * Drawn without anybody having to find Run. The run status belongs to the
+     * Code mode, as Run does, so this goes there to read it — which is the same
+     * journey the visitor is being spared.
+     */
+    await showMode(page, 'Code');
+    await expect(runStatus(page)).toHaveText(/Finished in/, { timeout: 20_000 });
+
+    const undo = artworkActions(page).getByRole('button', { name: /^Undo/ });
+    await expect(undo).toBeEnabled();
+    await expect(undo).toHaveAccessibleName('Undo Reset');
+
+    await undo.click();
+    await expect(await editorOn(page)).toContainText('size←8');
   });
 
   test('lists the primitives used, with an explanation for each', async ({ page }) => {
     await stubTryApl(page);
     await openModularBloom(page);
 
+    // The primitive reference reads the program, so it sits with the program.
+    await showMode(page, 'Code');
     const panel = page.getByRole('region', { name: 'APL used in this piece' });
     await expect(panel).toBeVisible();
 
@@ -405,7 +432,7 @@ test.describe('remembering work between visits', () => {
     await openModularBloom(page);
 
     await setCode(page, 'size←24\nmodulus←5\nmultiplier←1\nmodulus|multiplier×∘.×⍨⍳size');
-    await page.getByRole('radio', { name: /Forest/ }).click();
+    await (await paletteChoice(page, /Forest/)).click();
     await runAndWait(page);
 
     // Leave, and come back the way a returning visitor would.
@@ -413,8 +440,8 @@ test.describe('remembering work between visits', () => {
     await page.reload();
     await page.getByRole('link', { name: /^Open Modular Bloom/ }).click();
 
-    await expect(page.locator('.cm-content')).toContainText('modulus←5');
-    await expect(page.getByRole('radio', { name: /Forest/ })).toHaveAttribute('aria-checked', 'true');
+    await expect(await editorOn(page)).toContainText('modulus←5');
+    await expect(await paletteChoice(page, /Forest/)).toHaveAttribute('aria-checked', 'true');
   });
 
   test('clearing local data puts the artwork back to its original', async ({ page }) => {
@@ -429,7 +456,7 @@ test.describe('remembering work between visits', () => {
     await expect(page.getByText('Everything saved in this browser has been removed.')).toBeVisible();
 
     await page.goto('./#/art/modular-bloom');
-    await expect(page.locator('.cm-content')).toContainText('modulus←17');
+    await expect(await editorOn(page)).toContainText('modulus←17');
   });
 });
 
@@ -440,21 +467,27 @@ test.describe('the narrow toolbar', () => {
     await stubTryApl(page);
     await openModularBloom(page);
 
-    // Four buttons wrapped onto three rows here, pushing the artwork off the
-    // screen. Only one control should be showing.
+    // The toolbar's actions wrapped onto three rows here, pushing the artwork
+    // off the screen. Only one control should be showing.
     await expect(page.getByRole('button', { name: 'Actions' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Copy APL' })).toBeHidden();
     await expect(page.getByRole('button', { name: 'Share' })).toBeHidden();
 
     await page.getByRole('button', { name: 'Actions' }).click();
 
     const menu = page.getByRole('menu');
-    await expect(menu.getByRole('menuitem', { name: 'Copy APL' })).toBeVisible();
     await expect(menu.getByRole('menuitem', { name: 'Share' })).toBeVisible();
     await expect(menu.getByRole('menuitem', { name: 'Export 512 × 512' })).toBeVisible();
 
-    // Reset is offered but inert until there is something to reset.
-    await expect(menu.getByRole('menuitem', { name: 'Reset' })).toBeDisabled();
+    /*
+     * And neither Copy APL nor Reset, which this menu used to carry.
+     *
+     * Copy APL went to the Code mode, where the code it copies is; Reset went to
+     * the row of actions beneath the modes, beside the Undo that can now take it
+     * back. What is left in here is what the toolbar is for: the artwork as a
+     * finished thing, to send or to take away.
+     */
+    await expect(menu.getByRole('menuitem', { name: 'Copy APL' })).toHaveCount(0);
+    await expect(menu.getByRole('menuitem', { name: 'Reset' })).toHaveCount(0);
   });
 
   test('the artwork tabs are reachable without scrolling past the header', async ({ page }) => {

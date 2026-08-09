@@ -1,6 +1,6 @@
 # APL Art
 
-**Tiny programs. Infinite patterns.**
+**Infinite patterns from tiny programs.**
 
 Create patterns, fractals and generative art with Dyalog APL. Choose a piece, change the code and see
 what happens.

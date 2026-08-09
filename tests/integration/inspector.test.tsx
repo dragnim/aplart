@@ -26,6 +26,7 @@ const CEILING = numberAssignedTo(mandelbrotField.code, 'iterations') ?? 0;
 import { modularBloom } from '@/presets/modular-bloom';
 import { truchetGrid } from '@/presets/truchet-grid';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { advanced, paletteChoice, pressRunWith } from '../helpers/workspaceModes';
 
 /** Square, so a square matrix fills it and u = x / 400. */
 const CANVAS = { left: 0, top: 0, width: 400, height: 400 };
@@ -75,7 +76,7 @@ async function openAndRun(presetId: string, matrix = labelled(8, 8)) {
   service.register('default', matrix);
   render(<WorkspacePage presetId={presetId} sharedState={null} service={service} />);
 
-  await user.click(screen.getByRole('button', { name: /^Run/ }));
+  await pressRunWith(user);
   await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument());
   return { user, service };
 }
@@ -219,7 +220,7 @@ describe('the reading and the presentation', () => {
     press(125, 75);
     await screen.findByText('Row 2, column 3');
 
-    await user.click(screen.getByRole('radio', { name: /Poolrooms/ }));
+    await user.click(paletteChoice(/Poolrooms/));
 
     // Recolouring changes nothing about which cell was chosen.
     expect(screen.getByText('Row 2, column 3')).toBeInTheDocument();
@@ -231,7 +232,7 @@ describe('the reading and the presentation', () => {
     press(125, 75);
     await screen.findByText('Row 2, column 3');
 
-    await user.click(screen.getByRole('radio', { name: '90°' }));
+    await user.click(advanced().getByRole('radio', { name: '90°' }));
 
     /*
      * The cell is remembered in the matrix's own coordinates, so a quarter turn
@@ -244,7 +245,7 @@ describe('the reading and the presentation', () => {
 
   it('resolves a press correctly once the artwork has been turned', async () => {
     const { user } = await openAndRun(modularBloom.id);
-    await user.click(screen.getByRole('radio', { name: '90°' }));
+    await user.click(advanced().getByRole('radio', { name: '90°' }));
 
     /*
      * A quarter turn sends the matrix's first row to the display's last column,
@@ -299,7 +300,7 @@ describe('putting the reading away', () => {
 
     // The next run returns something smaller, which has no row 8.
     service.register('default', labelled(3, 3));
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
 
     await waitFor(() => expect(screen.queryByText('Row 8, column 8')).not.toBeInTheDocument());
     // And nothing is reported in its place, rather than a cell nobody chose.
@@ -319,12 +320,12 @@ describe('putting the reading away', () => {
     await screen.findByText('Row 8, column 8');
 
     service.register('default', labelled(3, 3));
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
     await waitFor(() => expect(screen.queryByText(/^Row /)).not.toBeInTheDocument());
 
     // Big enough to hold row 8 again.
     service.register('default', labelled(8, 8));
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
     await waitFor(() => expect(screen.getByRole('img')).toHaveAccessibleName(/8 by 8 grid/));
 
     expect(screen.queryByText('Row 8, column 8')).not.toBeInTheDocument();
@@ -339,7 +340,7 @@ describe('putting the reading away', () => {
     await screen.findByText('Row 2, column 3');
 
     service.register('default', labelled(8, 8));
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
 
     await waitFor(() => expect(screen.getByText('Row 2, column 3')).toBeInTheDocument());
   });
@@ -349,11 +350,11 @@ describe('choosing a cell without a pointer', () => {
   it('inspects the coordinates that were typed', async () => {
     const { user } = await openAndRun(modularBloom.id);
 
-    await user.clear(screen.getByLabelText(/^Row/));
-    await user.type(screen.getByLabelText(/^Row/), '4');
-    await user.clear(screen.getByLabelText(/^Column/));
-    await user.type(screen.getByLabelText(/^Column/), '7');
-    await user.click(screen.getByRole('button', { name: 'Inspect' }));
+    await user.clear(advanced().getByLabelText(/^Row/));
+    await user.type(advanced().getByLabelText(/^Row/), '4');
+    await user.clear(advanced().getByLabelText(/^Column/));
+    await user.type(advanced().getByLabelText(/^Column/), '7');
+    await user.click(advanced().getByRole('button', { name: 'Inspect' }));
 
     expect(await screen.findByText('Row 4, column 7')).toBeInTheDocument();
     expect(screen.getByText('407')).toBeInTheDocument();
@@ -362,8 +363,8 @@ describe('choosing a cell without a pointer', () => {
   it('waits for the deliberate action rather than reading each keystroke', async () => {
     const { user } = await openAndRun(modularBloom.id);
 
-    await user.clear(screen.getByLabelText(/^Row/));
-    await user.type(screen.getByLabelText(/^Row/), '12');
+    await user.clear(advanced().getByLabelText(/^Row/));
+    await user.type(advanced().getByLabelText(/^Row/), '12');
 
     // "1" on the way to "12" must not choose a cell — and must not count every
     // matching cell in the matrix while doing it.
@@ -379,11 +380,11 @@ describe('choosing a cell without a pointer', () => {
 
   it('refuses a coordinate the matrix does not have', async () => {
     const { user } = await openAndRun(modularBloom.id, labelled(4, 4));
-    await user.click(screen.getByRole('button', { name: 'Inspect' }));
+    await user.click(advanced().getByRole('button', { name: 'Inspect' }));
     await screen.findByText('Row 1, column 1');
 
-    fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: '99' } });
-    await user.click(screen.getByRole('button', { name: 'Inspect' }));
+    fireEvent.change(advanced().getByLabelText(/^Row/), { target: { value: '99' } });
+    await user.click(advanced().getByRole('button', { name: 'Inspect' }));
 
     /*
      * The field declares its extent, so the browser refuses the submission and
@@ -391,7 +392,7 @@ describe('choosing a cell without a pointer', () => {
      * which is what an application-side clamp alone would do, and is how this
      * was first written.
      */
-    expect(screen.getByLabelText(/^Row/)).toBeInvalid();
+    expect(advanced().getByLabelText(/^Row/)).toBeInvalid();
     expect(screen.getByText('Row 1, column 1')).toBeInTheDocument();
   });
 
@@ -400,9 +401,9 @@ describe('choosing a cell without a pointer', () => {
     // application and has to mean something sensible.
     const { user } = await openAndRun(modularBloom.id, labelled(4, 4));
 
-    fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: '' } });
-    fireEvent.change(screen.getByLabelText(/^Column/), { target: { value: '3' } });
-    await user.click(screen.getByRole('button', { name: 'Inspect' }));
+    fireEvent.change(advanced().getByLabelText(/^Row/), { target: { value: '' } });
+    fireEvent.change(advanced().getByLabelText(/^Column/), { target: { value: '3' } });
+    await user.click(advanced().getByRole('button', { name: 'Inspect' }));
 
     expect(await screen.findByText('Row 1, column 3')).toBeInTheDocument();
   });
@@ -410,10 +411,10 @@ describe('choosing a cell without a pointer', () => {
   it('steps through the cells in reading order', async () => {
     const { user } = await openAndRun(modularBloom.id, labelled(4, 4));
 
-    await user.click(screen.getByRole('button', { name: 'Inspect' }));
+    await user.click(advanced().getByRole('button', { name: 'Inspect' }));
     await screen.findByText('Row 1, column 1');
 
-    await user.click(screen.getByRole('button', { name: 'Next cell' }));
+    await user.click(advanced().getByRole('button', { name: 'Next cell' }));
     expect(await screen.findByText('Row 1, column 2')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Previous cell' }));
@@ -423,12 +424,12 @@ describe('choosing a cell without a pointer', () => {
   it('carries on to the next row at the end of one', async () => {
     const { user } = await openAndRun(modularBloom.id, labelled(4, 4));
 
-    await user.clear(screen.getByLabelText(/^Column/));
-    await user.type(screen.getByLabelText(/^Column/), '4');
-    await user.click(screen.getByRole('button', { name: 'Inspect' }));
+    await user.clear(advanced().getByLabelText(/^Column/));
+    await user.type(advanced().getByLabelText(/^Column/), '4');
+    await user.click(advanced().getByRole('button', { name: 'Inspect' }));
     await screen.findByText('Row 1, column 4');
 
-    await user.click(screen.getByRole('button', { name: 'Next cell' }));
+    await user.click(advanced().getByRole('button', { name: 'Next cell' }));
     expect(await screen.findByText('Row 2, column 1')).toBeInTheDocument();
   });
 
@@ -439,10 +440,10 @@ describe('choosing a cell without a pointer', () => {
 
     // The fields show where the press landed, so stepping goes on from there
     // rather than from wherever they were left.
-    expect(screen.getByLabelText(/^Row/)).toHaveValue(2);
-    expect(screen.getByLabelText(/^Column/)).toHaveValue(3);
+    expect(advanced().getByLabelText(/^Row/)).toHaveValue(2);
+    expect(advanced().getByLabelText(/^Column/)).toHaveValue(3);
 
-    await user.click(screen.getByRole('button', { name: 'Next cell' }));
+    await user.click(advanced().getByRole('button', { name: 'Next cell' }));
     expect(await screen.findByText('Row 2, column 4')).toBeInTheDocument();
   });
 
@@ -453,12 +454,12 @@ describe('choosing a cell without a pointer', () => {
     await screen.findByText('Row 2, column 3');
     const pressed = announced();
 
-    await user.click(screen.getByRole('button', { name: 'Clear selection' }));
-    await user.clear(screen.getByLabelText(/^Row/));
-    await user.type(screen.getByLabelText(/^Row/), '2');
-    await user.clear(screen.getByLabelText(/^Column/));
-    await user.type(screen.getByLabelText(/^Column/), '3');
-    await user.click(screen.getByRole('button', { name: 'Inspect' }));
+    await user.click(advanced().getByRole('button', { name: 'Clear selection' }));
+    await user.clear(advanced().getByLabelText(/^Row/));
+    await user.type(advanced().getByLabelText(/^Row/), '2');
+    await user.clear(advanced().getByLabelText(/^Column/));
+    await user.type(advanced().getByLabelText(/^Column/), '3');
+    await user.click(advanced().getByRole('button', { name: 'Inspect' }));
 
     await screen.findByText('Row 2, column 3');
     // Two routes, one result model.
@@ -470,7 +471,7 @@ describe('choosing a cell without a pointer', () => {
     press(125, 75);
     await screen.findByText('Row 2, column 3');
 
-    await user.click(screen.getByRole('button', { name: 'Clear selection' }));
+    await user.click(advanced().getByRole('button', { name: 'Clear selection' }));
     expect(screen.queryByText('Row 2, column 3')).not.toBeInTheDocument();
   });
 
@@ -478,9 +479,9 @@ describe('choosing a cell without a pointer', () => {
     const { user, service } = await openAndRun(modularBloom.id);
     const before = service.executionCount;
 
-    await user.click(screen.getByRole('button', { name: 'Inspect' }));
+    await user.click(advanced().getByRole('button', { name: 'Inspect' }));
     await screen.findByText('Row 1, column 1');
-    await user.click(screen.getByRole('button', { name: 'Next cell' }));
+    await user.click(advanced().getByRole('button', { name: 'Next cell' }));
     await screen.findByText('Row 1, column 2');
 
     expect(service.executionCount).toBe(before);
@@ -590,7 +591,7 @@ describe('what a preset can add', () => {
 
     fireEvent.change(screen.getByLabelText('Maximum iterations'), { target: { value: '40' } });
     await waitFor(() => expect(screen.getByLabelText('Maximum iterations')).toHaveValue('40'));
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
     await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument());
 
     press(300, 300);

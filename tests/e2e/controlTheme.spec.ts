@@ -10,6 +10,7 @@
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { advanced, paletteChoice, runLocator, showMode } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 const NARROW = { width: 390, height: 780 };
@@ -62,12 +63,14 @@ const heaviestWeight = (control: Locator) =>
   );
 
 const runStatus = (page: Page) => page.locator('[role="status"][data-status]');
-const runButton = (page: Page) => page.getByRole('button', { name: /^Run/ });
 
 async function openArtwork(page: Page, id: string, heading: string) {
   await stubTryApl(page);
   await page.goto(`./#/art/${id}`);
   await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
+  // Run and the editor are measured here, so the mode holding them has to be
+  // the one on screen: a hidden panel has no computed colours worth reading.
+  await showMode(page, 'Code');
 }
 
 test.describe('themed controls', () => {
@@ -81,21 +84,21 @@ test.describe('themed controls', () => {
     const onSolid = await token(page, '--ui-accent-on-solid');
 
     // Resting.
-    await follows(page, runButton(page), 'background-color', '--ui-accent-solid');
-    await follows(page, runButton(page), 'color', '--ui-accent-on-solid');
+    await follows(page, runLocator(page), 'background-color', '--ui-accent-solid');
+    await follows(page, runLocator(page), 'color', '--ui-accent-on-solid');
     expect(hover).not.toBe(solid);
     expect(onSolid).not.toBe(solid);
 
     // Hover.
-    await runButton(page).hover();
-    await follows(page, runButton(page), 'background-color', '--ui-accent-solid-hover');
+    await runLocator(page).hover();
+    await follows(page, runLocator(page), 'background-color', '--ui-accent-solid-hover');
 
     // Pressed, held down so the active rule is the one in effect throughout.
-    const box = await runButton(page).boundingBox();
+    const box = await runLocator(page).boundingBox();
     await page.mouse.move((box as { x: number }).x + 10, (box as { y: number }).y + 10);
     await page.mouse.down();
-    await follows(page, runButton(page), 'background-color', '--ui-accent-solid-active');
-    const pressed = await css(runButton(page), 'background-color');
+    await follows(page, runLocator(page), 'background-color', '--ui-accent-solid-active');
+    const pressed = await css(runLocator(page), 'background-color');
     await page.mouse.up();
     expect(pressed).not.toBe(hover);
   });
@@ -123,7 +126,8 @@ test.describe('themed controls', () => {
     await openArtwork(page, 'julia-set', 'Julia Set');
 
     const solid = await token(page, '--ui-accent-solid');
-    const sliders = page.locator('input[type="range"]');
+    // The sliders are Advanced's; Julia has five of them there.
+    const sliders = (await advanced(page)).locator('input[type="range"]');
     const count = await sliders.count();
     expect(count).toBeGreaterThan(0);
 
@@ -146,7 +150,7 @@ test.describe('themed controls', () => {
   test('checked controls colour the box and keep their tick', async ({ page }) => {
     await openArtwork(page, 'julia-set', 'Julia Set');
 
-    const box = page.getByRole('checkbox', { name: /Invert palette/ });
+    const box = (await showMode(page, 'Colour')).getByRole('checkbox', { name: /Invert palette/ });
     await expect(box).toHaveCSS('accent-color', await token(page, '--ui-accent-solid'));
 
     // The state itself is the native checkbox's, and stays that way.
@@ -162,8 +166,8 @@ test.describe('themed controls', () => {
     const border = await token(page, '--ui-accent-border');
     const soft = await token(page, '--ui-accent-soft');
 
-    const selected = page.getByRole('radio', { name: /Poolrooms/ });
-    const other = page.getByRole('radio', { name: /Forest/ });
+    const selected = await paletteChoice(page, /Poolrooms/);
+    const other = await paletteChoice(page, /Forest/);
 
     await expect(selected).toHaveAttribute('aria-checked', 'true');
     await expect(selected).toHaveCSS('border-top-color', border);
@@ -189,8 +193,8 @@ test.describe('themed controls', () => {
     await openArtwork(page, 'truchet-grid', 'Truchet Grid');
 
     const border = await token(page, '--ui-accent-border');
-    const selected = page.getByRole('radio', { name: /Mono/ });
-    const other = page.getByRole('radio', { name: /Neon/ });
+    const selected = await paletteChoice(page, /Mono/);
+    const other = await paletteChoice(page, /Neon/);
 
     // The accent is a grey here, by design — so the ring has to differ from the
     // ordinary border rather than merely be colourful.
@@ -206,8 +210,22 @@ test.describe('themed controls', () => {
     const accent = await token(page, '--ui-accent-border');
     expect(stable).not.toBe(accent);
 
+    /*
+     * The mode is opened once, and then focus is moved by keyboard.
+     *
+     * `:focus-visible` is deliberately conditional on how focus arrived: a ring
+     * for somebody navigating by keyboard, none for somebody who just clicked.
+     * The browser decides that from the last interaction — so opening the Colour
+     * tab with a pointer inside this loop would suppress the very ring being
+     * measured, and the test would be reporting the click rather than the CSS.
+     * A Tab press restores the keyboard heuristic, which is the state this has
+     * always implicitly assumed and the state the rule exists for.
+     */
+    const colour = await showMode(page, 'Colour');
+    await page.keyboard.press('Tab');
+
     for (const name of [/Poolrooms/, /Forest/]) {
-      const card = page.getByRole('radio', { name });
+      const card = colour.getByRole('radio', { name });
       await card.focus();
       await expect(card).toBeFocused();
       expect(await css(card, 'outline-color')).toBe(stable);
@@ -215,16 +233,16 @@ test.describe('themed controls', () => {
     }
 
     // So a focused selected card shows both: an accent ring inside, blue outside.
-    const selected = page.getByRole('radio', { name: /Poolrooms/ });
+    const selected = colour.getByRole('radio', { name: /Poolrooms/ });
     expect(await css(selected, 'border-top-color')).toBe(accent);
   });
 
   test('the playing state is what carries the accent, not the button', async ({ page }) => {
     await openArtwork(page, 'mandelbrot-field', 'Mandelbrot Field');
-    await runButton(page).click();
+    await runLocator(page).click();
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 
-    const animate = page.getByRole('button', { name: 'Animate palette' });
+    const animate = (await showMode(page, 'Animate')).getByRole('button', { name: 'Animate palette' });
     const solid = await token(page, '--ui-accent-solid');
 
     // Stopped: as neutral as its neighbours.
@@ -245,15 +263,20 @@ test.describe('themed controls', () => {
     await follows(page, pause, 'color', '--ui-accent-on-solid');
 
     await pause.click();
-    await expect(page.getByRole('button', { name: 'Animate palette' })).toBeVisible();
-    expect(await css(page.getByRole('button', { name: 'Animate palette' }), 'background-color')).not.toBe(
-      solid,
-    );
+    await expect(
+      (await showMode(page, 'Animate')).getByRole('button', { name: 'Animate palette' }),
+    ).toBeVisible();
+    expect(
+      await css(
+        (await showMode(page, 'Animate')).getByRole('button', { name: 'Animate palette' }),
+        'background-color',
+      ),
+    ).not.toBe(solid);
   });
 
   test('a control on the artwork itself uses the dark variants', async ({ page }) => {
     await openArtwork(page, 'mandelbrot-field', 'Mandelbrot Field');
-    await runButton(page).click();
+    await runLocator(page).click();
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 
     await page
@@ -274,7 +297,7 @@ test.describe('themed controls', () => {
 
     // A run that cannot succeed, so the failure styling is on screen.
     await page.route('**/Exec', (route) => route.abort());
-    await runButton(page).click();
+    await runLocator(page).click();
 
     const alert = page.getByRole('alert').first();
     await expect(alert).toBeVisible({ timeout: 30_000 });
@@ -308,7 +331,18 @@ test.describe('themed controls, narrow screen', () => {
   test.use({ viewport: NARROW });
 
   test('the selected tab is accent text on a raised card, not a filled block', async ({ page }) => {
-    await openArtwork(page, 'julia-set', 'Julia Set');
+    /*
+     * Opened without selecting a mode.
+     *
+     * These are the narrow layout's own tabs — Artwork, Code, Controls — rather
+     * than the editing modes, and the artwork is the one this layout opens on.
+     * Going to the Code mode first would open the Controls sheet and select a
+     * different tab, so the shared opener is not used here: it ends by selecting
+     * Code, which is right for the tests that measure Run and wrong for this one.
+     */
+    await stubTryApl(page);
+    await page.goto('./#/art/julia-set');
+    await expect(page.getByRole('heading', { level: 1, name: 'Julia Set' })).toBeVisible();
 
     const selected = page.getByRole('tab', { name: 'Artwork' });
     const other = page.getByRole('tab', { name: 'Code' });
@@ -333,45 +367,75 @@ test.describe('the whole control journey', () => {
     await page.goto('./#/art/julia-set');
     await expect(page.getByRole('heading', { level: 1, name: 'Julia Set' })).toBeVisible();
 
+    /*
+     * Each control is measured in the mode that holds it.
+     *
+     * Run is Code's, the parameter sliders are Advanced's, the palette cards are
+     * Colour's. The journey is unchanged — this is still one artwork, one palette
+     * change and one trip through Focus mode — but reaching a control is now a
+     * press of its tab, so each step says where it is looking.
+     */
+
     // 2. What the primary action looks like to begin with.
-    const teal = await css(runButton(page), 'background-color');
+    await showMode(page, 'Code');
+    const teal = await css(runLocator(page), 'background-color');
     expect(teal).toBe(await token(page, '--ui-accent-solid'));
 
     // 3. And a slider and the selected card agree with it.
-    await expect(page.locator('input[type="range"]').first()).toHaveCSS(
+    await expect((await advanced(page)).locator('input[type="range"]').first()).toHaveCSS(
       'accent-color',
       await token(page, '--ui-accent-solid'),
     );
-    await expect(page.getByRole('radio', { name: /Poolrooms/ })).toHaveCSS(
+    await expect(await paletteChoice(page, /Poolrooms/)).toHaveCSS(
       'border-top-color',
       await token(page, '--ui-accent-border'),
     );
 
-    await runButton(page).click();
+    await showMode(page, 'Code');
+    await runLocator(page).click();
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
     const runs = stub.requests.length;
 
     // 4. A different palette.
-    await page.getByRole('radio', { name: /Neon/ }).click();
+    await (await paletteChoice(page, /Neon/)).click();
 
     // 5. Everything themed moves together, and nothing ran again.
-    await expect.poll(() => css(runButton(page), 'background-color'), { timeout: 5_000 }).not.toBe(teal);
-    await follows(page, runButton(page), 'background-color', '--ui-accent-solid');
+    await showMode(page, 'Code');
+    await expect.poll(() => css(runLocator(page), 'background-color'), { timeout: 5_000 }).not.toBe(teal);
+    await follows(page, runLocator(page), 'background-color', '--ui-accent-solid');
     const purple = await token(page, '--ui-accent-solid');
     expect(purple).not.toBe(teal);
-    await follows(page, page.locator('input[type="range"]').first(), 'accent-color', '--ui-accent-solid');
-    await expect(page.getByRole('radio', { name: /Neon/ })).toHaveCSS(
+    await follows(
+      page,
+      (await advanced(page)).locator('input[type="range"]').first(),
+      'accent-color',
+      '--ui-accent-solid',
+    );
+    await expect(await paletteChoice(page, /Neon/)).toHaveCSS(
       'border-top-color',
       await token(page, '--ui-accent-border'),
     );
     expect(stub.requests.length).toBe(runs);
 
-    // 6. The controls still do what they did.
-    const slider = page.locator('input[type="range"]').first();
+    /*
+     * 6. The controls still do what they did — and one of them now draws.
+     *
+     * A parameter slider used to write its value and wait for Run, so this step
+     * cost no execution and the count above carried through to Focus mode. Every
+     * control commits and redraws now, which is the point of the consolidation:
+     * "controls change the artwork, code must be run". So the arrow key is
+     * expected to cost exactly one run, and the baseline moves with it rather
+     * than the claim being dropped.
+     */
+    const slider = (await advanced(page)).locator('input[type="range"]').first();
     await slider.focus();
     const before = await slider.inputValue();
     await page.keyboard.press('ArrowRight');
     expect(await slider.inputValue()).not.toBe(before);
+    await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
+
+    const afterSlider = stub.requests.length;
+    expect(afterSlider).toBeGreaterThan(runs);
 
     // 7 and 8. Focus mode: the toolbar over the artwork uses dark variants, and
     // the drawer's own controls stay on the light tokens because the drawer is light.
@@ -381,14 +445,18 @@ test.describe('the whole control journey', () => {
 
     await expect(controls).toHaveAttribute('aria-expanded', 'true');
     expect(await css(controls, 'border-top-color')).toBe(await token(page, '--ui-accent-border-on-dark'));
-    await follows(page, runButton(page), 'background-color', '--ui-accent-solid');
-    expect(stub.requests.length).toBe(runs);
+    await showMode(page, 'Code');
+    await follows(page, runLocator(page), 'background-color', '--ui-accent-solid');
+    // Entering Focus mode is a change of layout, not of artwork.
+    expect(stub.requests.length).toBe(afterSlider);
 
     await page.getByRole('button', { name: 'Exit focus' }).click();
 
     // 9 and 10. The gallery returns to APL Art's own colours.
     await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Gallery' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: /Tiny programs/ })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: /Infinite patterns from tiny programs/ }),
+    ).toBeVisible();
 
     expect(await page.locator('[data-accent]').getAttribute('data-accent')).toBe('default');
     const current = page.locator('[aria-current="page"]');
@@ -403,8 +471,8 @@ test.describe('forced colours', () => {
     await page.emulateMedia({ forcedColors: 'active' });
     await openArtwork(page, 'julia-set', 'Julia Set');
 
-    const selected = page.getByRole('radio', { name: /Poolrooms/ });
-    const other = page.getByRole('radio', { name: /Forest/ });
+    const selected = await paletteChoice(page, /Poolrooms/);
+    const other = await paletteChoice(page, /Forest/);
 
     // The palette cannot be seen in forced colours, so what has to survive is the
     // part that was never colour: the state, and the weight that shows it.

@@ -11,15 +11,12 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { choice, pressRun, showMode } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
 function runStatus(page: Page) {
   return page.locator('[role="status"][data-status]');
-}
-
-function radio(page: Page, name: string) {
-  return page.getByRole('radio', { name, exact: true });
 }
 
 /**
@@ -31,7 +28,7 @@ function radio(page: Page, name: string) {
  * failure of the test rather than of the control.
  */
 async function choose(page: Page, name: string) {
-  const control = radio(page, name);
+  const control = await choice(page, name);
   await control.scrollIntoViewIfNeeded();
   await control.click();
   await expect(control).toHaveAttribute('aria-checked', 'true');
@@ -40,7 +37,7 @@ async function choose(page: Page, name: string) {
 async function openAndRun(page: Page) {
   await stubTryApl(page);
   await page.goto('./#/art/mandelbrot-field');
-  await page.getByRole('button', { name: /^Run/ }).click();
+  await pressRun(page);
   await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 }
 
@@ -139,7 +136,7 @@ test.describe('Pixel and Smooth on screen', () => {
   test('asks the service for nothing', async ({ page }) => {
     const stub = await stubTryApl(page);
     await page.goto('./#/art/mandelbrot-field');
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 
     const sent = stub.requests.length;
@@ -248,7 +245,7 @@ test.describe('what neither mode may do', () => {
     // Home takes the range to its minimum. The default centre is already inside
     // the main cardioid, so the smallest span is entirely interior.
     await page.getByLabel('Span').press('Home');
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 
     // Confirmed flat by the interface's own account of it before measuring.
@@ -284,7 +281,7 @@ test.describe('what neither mode may do', () => {
     for (const display of ['Pixel', 'Smooth']) {
       await choose(page, display);
 
-      await page.getByRole('button', { name: 'Animate palette' }).click();
+      await (await showMode(page, 'Animate')).getByRole('button', { name: 'Animate palette' }).click();
       await page.waitForTimeout(600);
       await page.getByRole('button', { name: 'Pause' }).click();
 

@@ -21,7 +21,6 @@ import {
   type ParameterValue,
 } from '@/editor/parameterBinding';
 import { SymbolToolbar } from '@/editor/SymbolToolbar';
-import { Dialog } from '@/components/Dialog/Dialog';
 import { WIDE_LAYOUT_QUERY, useMediaQuery } from '@/app/useMediaQuery';
 import { type AplExecutionService } from '@/execution/AplExecutionService';
 import { NotFoundPage } from '@/pages/NotFoundPage';
@@ -54,12 +53,13 @@ import { readPlaySeed, startCreating } from './startCreating';
 import { generateInstantPlayVariation } from './instantPlayVariation';
 import { randomSeed } from './randomise';
 import { playLabelFor } from '@/presets/instantPlay';
+import { curatedValuesAfter } from '@/presets/createQuality';
 import { AnimationControls } from './AnimationControls';
 import { ArtworkNavigator } from './ArtworkNavigator';
 import { PlayControls } from './PlayControls';
 import { SessionActions } from './SessionActions';
 import { SessionPanel } from './SessionPanel';
-import { type EditorTab } from './editorTabs';
+import { defaultTabFor, tabsFor, type EditorTab } from './editorTabs';
 import { revealTargetFor, type RevealTarget } from './peek';
 import { readSavedProjectImmediate, useLocalProject } from './useLocalProject';
 import { FocusToolbar } from './FocusToolbar';
@@ -79,7 +79,7 @@ import { RenderControls } from './RenderControls';
 import { RunPanel } from './RunPanel';
 import { WorkspaceToolbar } from './WorkspaceToolbar';
 import { useWorkspace } from './useWorkspace';
-import { initialWorkspaceState } from './workspaceState';
+import { initialWorkspaceState, sameRenderOptions } from './workspaceState';
 import {
   HANDOFF_FROM,
   HANDOFF_TO,
@@ -105,15 +105,6 @@ type MobileTab = 'artwork' | 'code' | 'controls';
 
 /** How many views back the Back button can reach. */
 const VIEW_HISTORY_LIMIT = 40;
-
-/**
- * What Play's Save image writes.
- *
- * One size rather than a menu, because this surface answers "save what I made"
- * and not "at which resolution". A thousand pixels is large enough to post and
- * small enough to send; the full choice is still in the toolbar's Export menu.
- */
-const PLAY_EXPORT_SIZE = 1024;
 
 export function WorkspacePage({ presetId, sharedState, handoff = null, play = null, service }: Props) {
   const preset = getPreset(presetId);
@@ -262,18 +253,8 @@ function Workspace({
     ...(service === undefined ? {} : { service }),
     ...(initialState === undefined ? {} : { initialState }),
   });
-  const {
-    state,
-    setCode,
-    commitCode,
-    undo,
-    setRenderOptions,
-    commitRenderOptions,
-    run,
-    runCode,
-    stop,
-    inspectCell,
-  } = workspace;
+  const { state, setCode, commitCode, undo, commitRenderOptions, run, runCode, stop, reset, inspectCell } =
+    workspace;
 
   /**
    * The last source Play asked the service for.
@@ -341,15 +322,7 @@ function Workspace({
   const editorHandle = useRef<AplEditorHandle>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [tab, setTab] = useState<MobileTab>('artwork');
-  /*
-   * Which editing mode a session is in. Presentation and nothing else: no run,
-   * no history entry, no address change, and the artwork does not know about it.
-   * Create, because arriving somewhere you can immediately change something is
-   * the point of a session.
-   */
-  const [editorTab, setEditorTab] = useState<EditorTab>('create');
   const wide = useMediaQuery(WIDE_LAYOUT_QUERY);
-  const [confirmingReset, setConfirmingReset] = useState(false);
   /*
    * Which curated recipe the artwork on screen stands on.
    *
@@ -361,14 +334,22 @@ function Workspace({
   const playRecipe = useRef<string | undefined>(session?.recipeId);
 
   /*
-   * Whether this is a Play session, and what it offers.
+   * The curated controls this artwork offers, if anybody has curated any.
    *
-   * Both conditions, because either alone would be wrong: a seed in the link that
-   * named no valid variation must not produce a Play surface with nothing behind
-   * it, and a preset with Instant Play opened from its card is not a session — the
-   * card is the ordinary way in and stays exactly that.
+   * A property of the preset alone now, not of how it was opened. Every artwork
+   * is edited in this workspace — the seed in the link decides whether it opens
+   * at a curated variation or at its own default, and nothing else. An artwork
+   * without curated controls simply has no Create tab and opens on Advanced,
+   * where its real parameters are.
    */
-  const playConfig = session === null ? undefined : preset.instantPlay;
+  const createConfig = preset.instantPlay;
+  const tabs = useMemo(() => tabsFor(createConfig !== undefined), [createConfig]);
+
+  /*
+   * Which editing mode you are in. Presentation and nothing else: no run, no
+   * history entry, no address change, and the artwork does not know about it.
+   */
+  const [editorTab, setEditorTab] = useState<EditorTab>(() => defaultTabFor(createConfig !== undefined));
 
   /**
    * A line the editor should be shown, once it is on screen to be shown it.
@@ -629,14 +610,11 @@ function Workspace({
   /**
    * A technical control's new value.
    *
-   * In a session this is recorded rather than merely written, and the artwork is
-   * redrawn when the control is let go — the same commit-and-draw path the Create
-   * sliders take, so both panels make one kind of history and neither has an
-   * execution model of its own. `advancedGesture` gives a drag its identity, so
-   * twenty steps of one slider remain one thing to undo.
-   *
-   * The ordinary workspace keeps writing and waiting for Run, which is the
-   * deliberate two-step that surface has always had.
+   * Recorded rather than merely written, and the artwork is redrawn when the
+   * control is let go — the same commit-and-draw path the Create sliders take, so
+   * every panel makes one kind of history and none has an execution model of its
+   * own. `advancedGesture` gives a drag its identity, so twenty steps of one
+   * slider remain one thing to undo.
    */
   const advancedGesture = useRef(0);
 
@@ -645,17 +623,12 @@ function Workspace({
       const updated = setParameterValue(state.code, parameter.variable, value);
       if (!updated.ok) return;
 
-      if (playConfig === undefined) {
-        setCode(updated.code);
-        return;
-      }
-
       commitCode(updated.code, {
         label: parameter.label,
         coalesce: `advanced:${parameter.id}:${String(advancedGesture.current)}`,
       });
     },
-    [state.code, setCode, commitCode, playConfig],
+    [state.code, commitCode],
   );
 
   const handleParameterRestore = useCallback(
@@ -668,10 +641,8 @@ function Workspace({
   /**
    * An appearance change, named so Undo can say what it would take back.
    *
-   * In a session this is recorded: Undo is one button and a visitor who has just
-   * recoloured an artwork means the colour by it, not the slider they moved
-   * before that. Elsewhere appearance stays outside the history, as it always
-   * has — the ordinary workspace's Undo does not exist to be surprised by.
+   * Recorded: Undo is one button and a visitor who has just recoloured an artwork
+   * means the colour by it, not the slider they moved before that.
    *
    * Dragging a colour stop coalesces, for the reason a dragged slider does: the
    * drag is one decision expressed forty times. Choosing a palette does not, so
@@ -679,11 +650,6 @@ function Workspace({
    */
   const handleRenderChange = useCallback(
     (options: Partial<RenderOptions>) => {
-      if (playConfig === undefined) {
-        setRenderOptions(options);
-        return;
-      }
-
       const [key] = Object.keys(options);
       const named: Record<string, string> = {
         paletteId: 'Palette',
@@ -704,7 +670,7 @@ function Workspace({
         ...(continuous ? { coalesce: `colour:${key ?? ''}` } : {}),
       });
     },
-    [playConfig, setRenderOptions, commitRenderOptions],
+    [commitRenderOptions],
   );
 
   const handleResetCode = useCallback(() => {
@@ -712,29 +678,33 @@ function Workspace({
   }, [preset.code, setCode]);
 
   /**
-   * Reset parameters puts the controls back without touching anything else the
-   * user has written, so an edited expression survives. Reset artwork restores
-   * the preset wholesale, which is the destructive one and asks first.
+   * Back to the preset, drawn, and undoable — one press, one thing to take back.
+   *
+   * It used to write the source and the appearance and then wait: the sliders
+   * moved, the picture did not, and the way to make them agree was to find Run in
+   * another tab. It also asked first, through a dialog warning that it could not
+   * be undone, and left no history entry — which was true, and is what made the
+   * warning necessary.
+   *
+   * Now the reducer records the artwork as it stood and replaces source, seed and
+   * appearance together, and the preset's own code is submitted in the same
+   * breath. So the artwork redraws itself, Undo comes straight back to what was
+   * there, and there is nothing left for a confirmation to protect.
    */
-  const handleResetParameters = useCallback(() => {
-    const defaults = new Map(
-      preset.parameters.map((parameter) => [parameter.variable, parameter.defaultValue]),
-    );
-    setCode(setParameterValues(state.code, defaults));
-  }, [preset.parameters, state.code, setCode]);
+  const handleReset = useCallback(() => {
+    reset();
+    runCode(preset.code);
+  }, [reset, runCode, preset.code]);
 
-  const handleResetArtwork = useCallback(() => {
-    setCode(preset.code);
-    setRenderOptions(defaultRenderOptions(preset.defaultPaletteId));
-    setConfirmingReset(false);
-  }, [preset, setCode, setRenderOptions]);
-
-  const requestResetArtwork = useCallback(() => {
-    // Only ask when there is something to lose. Confirming a reset that would
-    // change nothing is just an extra click.
-    if (state.modified) setConfirmingReset(true);
-    else handleResetArtwork();
-  }, [state.modified, handleResetArtwork]);
+  /*
+   * Whether there is anything to put back: the source, the seed a variation came
+   * from, or the way it is drawn. `modified` alone would leave Reset dead after a
+   * recolour, which changes the artwork and not a character of its code.
+   */
+  const canReset =
+    state.modified ||
+    state.seed !== undefined ||
+    !sameRenderOptions(state.renderOptions, defaultRenderOptions(preset.defaultPaletteId));
 
   const openDrawer = useCallback(() => {
     drawerOpener.current = document.activeElement as HTMLElement | null;
@@ -785,9 +755,6 @@ function Workspace({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
 
-      // A dialog handles its own Escape; do not unwind past it.
-      if (confirmingReset) return;
-
       event.preventDefault();
       if (drawerOpen) closeDrawer();
       else exitFocus();
@@ -795,7 +762,7 @@ function Workspace({
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [focus, drawerOpen, confirmingReset, closeDrawer, exitFocus]);
+  }, [focus, drawerOpen, closeDrawer, exitFocus]);
 
   /*
    * On a narrow screen the artwork is the backdrop, so it is not also a tab.
@@ -1071,35 +1038,35 @@ function Workspace({
       ? preset.valueNotes.viewAtCeiling
       : null;
 
+  /**
+   * Randomise: somewhere else worth looking.
+   *
+   * Two sources of values, one button. An artwork with curated recipes moves
+   * between them — the same generator the gallery's link uses, given a fresh seed
+   * and the recipe already on screen so that it moves somewhere *else*. An
+   * artwork without them draws from its parameters' own ranges, which is what
+   * this button has always done in the technical panel.
+   *
+   * Either way: one commit for every value at once, then one run of exactly the
+   * source that was written. So the whole thing is a single step back, and the
+   * artwork that appears is the artwork the code describes.
+   */
   const handleRandomise = useCallback(() => {
     analytics.track({ name: 'randomise_used', presetId: preset.id });
-    const { values, seed } = randomiseParameters(preset.parameters);
-    // One code change for all of them, so undo treats it as a single action
-    // and only one run follows. The seed travels with it, so the artwork stays
-    // reproducible and stepping back restores the seed that made this one.
-    commitCode(setParameterValues(state.code, values), { label: 'Randomise', seed });
-  }, [preset.id, preset.parameters, state.code, commitCode]);
 
-  /*
-   * Randomise, as the Play surface offers it.
-   *
-   * The same generator the gallery's link uses, given a fresh seed and the recipe
-   * already on screen so that it moves somewhere else. One commit for all three
-   * values, then one run of exactly the source that was written — so the whole
-   * thing is a single step back, and the artwork that appears is the artwork the
-   * code describes.
-   */
-  const handlePlayRandomise = useCallback(() => {
-    analytics.track({ name: 'randomise_used', presetId: preset.id });
+    const variation =
+      createConfig === undefined
+        ? null
+        : generateInstantPlayVariation(preset, randomSeed(), playRecipe.current);
 
-    const variation = generateInstantPlayVariation(preset, randomSeed(), playRecipe.current);
-    if (variation === null) return;
-    playRecipe.current = variation.recipeId;
+    if (variation !== null) playRecipe.current = variation.recipeId;
 
-    const next = setParameterValues(state.code, variation.values);
-    commitCode(next, { label: 'Randomise', seed: variation.seed });
+    const chosen = variation ?? randomiseParameters(preset.parameters);
+
+    const next = setParameterValues(state.code, chosen.values);
+    commitCode(next, { label: 'Randomise', seed: chosen.seed });
     drawPlay(next);
-  }, [preset, state.code, commitCode, drawPlay]);
+  }, [preset, createConfig, state.code, commitCode, drawPlay]);
 
   /**
    * A step of a Play gesture: the value is written, the artwork waits.
@@ -1110,9 +1077,18 @@ function Workspace({
    */
   const handlePlayAdjust = useCallback(
     (parameter: ArtworkParameter, value: number, gesture: string) => {
-      const updated = setParameterValue(state.code, parameter.variable, value);
-      if (!updated.ok) return;
-      commitCode(updated.code, { label: playLabelFor(preset, parameter), coalesce: gesture });
+      /*
+       * Every curated value, not only the one that moved.
+       *
+       * The preset's quality rule may answer with a different set — Modular
+       * Bloom's moves Scale off a factor it shares with Complexity, because the
+       * pair would otherwise draw two shades — so what gets written is what the
+       * rule returned. The control being held is never the one it changes.
+       */
+      const next = curatedValuesAfter(preset, state.code, parameter.variable, value);
+      const updated = setParameterValues(state.code, next);
+      if (updated === state.code) return;
+      commitCode(updated, { label: playLabelFor(preset, parameter), coalesce: gesture });
     },
     [preset, state.code, commitCode],
   );
@@ -1216,6 +1192,13 @@ function Workspace({
         // The failed source verbatim, so a retry is the same run and not a new
         // one built from whatever the editor holds by now.
         onRetry={runCode}
+        /*
+         * Copy APL sits with the APL. It was in the toolbar above, among Share
+         * and Export, where it was the only action about the program rather than
+         * about the picture — and it was offered on every tab, including the four
+         * that never show a character of code.
+         */
+        onCopyApl={actions.copyApl}
       />
     </div>
   );
@@ -1237,19 +1220,13 @@ function Workspace({
       <h2 className={styles.sectionHeading} id="code-controls-heading">
         Code controls
       </h2>
-      <p className={styles.sectionNote}>
-        {playConfig === undefined
-          ? 'These change the APL and need a run.'
-          : 'These change the APL. The artwork redraws when you let go.'}
-      </p>
+      <p className={styles.sectionNote}>These change the APL. The artwork redraws when you let go.</p>
       <ParameterControls
         parameters={preset.parameters}
         code={state.code}
         onChange={handleParameterChange}
         onRestore={handleParameterRestore}
-        // A session draws what a control writes; the ordinary workspace waits
-        // for Run, as it always has.
-        onCommit={playConfig === undefined ? undefined : handleParameterCommit}
+        onCommit={handleParameterCommit}
         /*
          * From the source that produced the artwork, not the editor. Editing
          * the class count changes what the next run will be able to say and
@@ -1257,14 +1234,14 @@ function Workspace({
          */
         edges={edgeClaim}
       />
-      <div className={styles.parameterActions}>
-        <button type="button" className={styles.secondary} onClick={handleRandomise}>
-          Randomise
-        </button>
-        <button type="button" className={styles.secondary} onClick={handleResetParameters}>
-          Reset parameters
-        </button>
-      </div>
+      {/*
+        Randomise and Reset parameters used to sit here. Both are now in the row
+        of actions beneath every mode, which is where the artwork's own verbs
+        belong — and having them in both places meant two Randomise buttons on
+        one screen doing subtly different things, since this one drew from the
+        raw parameter ranges and that one from the curated recipes. One artwork,
+        one Randomise, one Reset.
+      */}
 
       {/*
         The precise numbers stay here; moving about the plane happens on the
@@ -1351,27 +1328,15 @@ function Workspace({
     </>
   );
 
-  /**
-   * The ordinary workspace's one long column, exactly as it has always been.
+  /* ── The editing modes ───────────────────────────────────────────────────
    *
-   * Built only when this is not a session, so the nodes below can hold the same
-   * components without either arrangement mounting a second copy of anything.
-   */
-  const controlsPanel =
-    playConfig !== undefined ? null : (
-      <div className={styles.controlsPanel}>
-        {codeControlsSection}
-        {appearanceSection('both')}
-        {inspectSection}
-        {readingSection}
-      </div>
-    );
-
-  /* ── A session's editing modes ───────────────────────────────────────────
+   * These sections used to have a second arrangement as well: one long column
+   * holding all of them at once, which is how an artwork opened from its card
+   * was edited. There is one workspace now, so there is one arrangement — the
+   * sections themselves are unchanged and are simply dealt into separate hands.
    *
-   * The same components as the column above, dealt into separate hands. Each is
-   * built once and given to whichever layout is rendering — wide, narrow or
-   * Focus — and since those are alternatives, nothing here is ever mounted
+   * Each is built once and given to whichever layout is rendering — wide, narrow
+   * or Focus — and since those are alternatives, nothing here is ever mounted
    * twice. That is what keeps one editor, one palette and one set of parameter
    * controls over one piece of state.
    */
@@ -1420,17 +1385,15 @@ function Workspace({
     </div>
   );
 
-  const sessionActions =
-    playConfig === undefined ? null : (
-      <SessionActions
-        onRandomise={handlePlayRandomise}
-        onUndo={undo}
-        undoLabel={state.past.at(-1)?.label ?? null}
-        onSaveImage={() => actions.exportAt(PLAY_EXPORT_SIZE)}
-        onShare={actions.share}
-        canSave={state.result !== null}
-      />
-    );
+  const sessionActions = (
+    <SessionActions
+      onRandomise={handleRandomise}
+      onUndo={undo}
+      undoLabel={state.past.at(-1)?.label ?? null}
+      onReset={handleReset}
+      canReset={canReset}
+    />
+  );
 
   const artworkPanel = (
     <div className={styles.artworkPanel}>
@@ -1530,10 +1493,10 @@ function Workspace({
    * anything in here.
    */
   const createPanel =
-    playConfig === undefined ? null : (
+    createConfig === undefined ? null : (
       <PlayControls
         preset={preset}
-        config={playConfig}
+        config={createConfig}
         code={state.code}
         onAdjust={handlePlayAdjust}
         onAdjustEnd={handlePlayAdjustEnd}
@@ -1549,21 +1512,21 @@ function Workspace({
    * column, the narrow sheet and the Focus drawer can all show it without any of
    * them owning a second copy of the editor or the palette.
    */
-  const sessionPanel =
-    playConfig === undefined ? null : (
-      <SessionPanel
-        tab={editorTab}
-        onTabChange={setEditorTab}
-        panels={{
-          create: createPanel,
-          colour: colourPanel,
-          animate: animatePanel,
-          advanced: advancedPanel,
-          code: codePanel,
-        }}
-        actions={sessionActions}
-      />
-    );
+  const sessionPanel = (
+    <SessionPanel
+      tab={editorTab}
+      onTabChange={setEditorTab}
+      tabs={tabs}
+      panels={{
+        create: createPanel,
+        colour: colourPanel,
+        animate: animatePanel,
+        advanced: advancedPanel,
+        code: codePanel,
+      }}
+      actions={sessionActions}
+    />
+  );
 
   /*
    * The editor and every technical control, which is also the Focus-mode drawer.
@@ -1589,14 +1552,7 @@ function Workspace({
           Close
         </button>
       </div>
-      {playConfig === undefined ? (
-        <>
-          {editorPanel}
-          {controlsPanel}
-        </>
-      ) : (
-        sessionPanel
-      )}
+      {sessionPanel}
     </div>
   );
 
@@ -1614,9 +1570,9 @@ function Workspace({
     <div
       className={styles.page}
       data-focus={focus ? 'true' : undefined}
-      // A session is laid out as an application rather than as a page; every
+      // The workspace is laid out as an application rather than as a page; every
       // other route keeps the reading measure.
-      data-session={playConfig === undefined ? undefined : 'true'}
+      data-session="true"
     >
       {focus ? (
         <FocusToolbar
@@ -1634,28 +1590,8 @@ function Workspace({
           actions={actions}
           onEnterFocus={enterFocus}
           focusButtonRef={focusTrigger}
-          onResetArtwork={requestResetArtwork}
         />
       )}
-
-      <Dialog
-        open={confirmingReset}
-        title="Reset this artwork?"
-        onClose={() => setConfirmingReset(false)}
-        actions={
-          <>
-            <button type="button" className={styles.secondary} onClick={() => setConfirmingReset(false)}>
-              Keep my changes
-            </button>
-            <button type="button" className={styles.destructive} onClick={handleResetArtwork}>
-              Reset everything
-            </button>
-          </>
-        }
-      >
-        Your edits to the code, the parameters and the appearance will all be replaced with the original. This
-        cannot be undone.
-      </Dialog>
 
       {shareNotice !== null && !focus && (
         <p className={styles.shareNotice} role="status">
@@ -1679,31 +1615,19 @@ function Workspace({
         display: none also keeps the hidden chrome out of the tab order.
       */}
       {wide ? (
-        <div className={styles.columns} data-play={playConfig === undefined ? undefined : 'true'}>
+        <div className={styles.columns} data-play="true">
           {/*
-            In a session the artwork and its three controls come first, in the
-            document as well as on screen, and the technical workspace follows.
-            Ordinarily the editor leads, as it always has.
-
-            The order is decided once, when the workspace is built: a session and
-            an ordinary opening are separate addresses, so nothing here changes
-            under a mounted component and no element is ever moved between
-            positions — which would remount the editor and lose its undo history.
+            The artwork leads, in the document as well as on screen, and the
+            panel of modes follows it. One order for every artwork, so nothing
+            here changes under a mounted component and no element is ever moved
+            between positions — which would remount the editor and lose its undo
+            history.
           */}
-          {playConfig === undefined ? (
-            <>
-              {secondaryColumn}
-              {artworkPanel}
-            </>
-          ) : (
-            <>
-              {artworkPanel}
-              {secondaryColumn}
-            </>
-          )}
+          {artworkPanel}
+          {secondaryColumn}
         </div>
       ) : (
-        <div className={styles.stacked} data-play={playConfig === undefined ? undefined : 'true'}>
+        <div className={styles.stacked} data-play="true">
           {/* The artwork sits behind the sheet in Focus mode, always visible. */}
           <div className={styles.focusBackdrop}>{focus ? artworkPanel : null}</div>
 
@@ -1765,31 +1689,23 @@ function Workspace({
               {/* Never both: in Focus mode the artwork lives in the backdrop. */}
               {shownTab === 'artwork' && !focus ? artworkPanel : null}
               {/*
-                A session's four modes, in the sheet this layout already had.
-                The same components as the wide panel and the same state, laid
-                out for a narrow screen rather than rebuilt for one: Create sits
-                with the artwork, because on a phone those two together are what
-                somebody arrived to use.
+                The same modes as the wide panel and the same state, laid out for
+                a narrow screen rather than rebuilt for one: Create sits with the
+                artwork, because on a phone those two together are what somebody
+                arrived to use. An artwork with no curated controls has no Create
+                panel, and the artwork tab is then the picture and the actions.
               */}
-              {playConfig !== undefined ? (
+              {shownTab === 'artwork' && !focus ? createPanel : null}
+              {shownTab === 'artwork' && !focus ? sessionActions : null}
+              {shownTab === 'code' ? codePanel : null}
+              {shownTab === 'controls' ? (
                 <>
-                  {shownTab === 'artwork' && !focus ? createPanel : null}
-                  {shownTab === 'artwork' && !focus ? sessionActions : null}
-                  {shownTab === 'code' ? codePanel : null}
-                  {shownTab === 'controls' ? (
-                    <>
-                      {colourPanel}
-                      {advancedPanel}
-                      {sessionActions}
-                    </>
-                  ) : null}
+                  {colourPanel}
+                  {animatePanel}
+                  {advancedPanel}
+                  {sessionActions}
                 </>
-              ) : (
-                <>
-                  {shownTab === 'code' ? editorPanel : null}
-                  {shownTab === 'controls' ? controlsPanel : null}
-                </>
-              )}
+              ) : null}
             </div>
           </div>
         </div>

@@ -14,6 +14,7 @@ import { MockAplExecutionService } from '@/execution/MockAplExecutionService';
 import { fromNested } from '@/matrix/matrixTypes';
 import { modularBloom } from '@/presets/modular-bloom';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { advanced, animate, codeEditor, paletteChoice, pressRunWith } from '../helpers/workspaceModes';
 import type * as CanvasRenderer from '@/renderer/CanvasRenderer';
 
 type CanvasRendererModule = typeof CanvasRenderer;
@@ -93,13 +94,13 @@ async function openAndRun(sharedState: string | null = null) {
   service.register('default', labelled(8, 8));
   render(<WorkspacePage presetId={modularBloom.id} sharedState={sharedState} service={service} />);
 
-  await user.click(screen.getByRole('button', { name: /^Run/ }));
+  await pressRunWith(user);
   await waitFor(() => expect(screen.getByRole('img', { name: /grid/ })).toBeInTheDocument());
   return { user, service };
 }
 
-const repeatButton = () => screen.getByRole('radio', { name: 'Repeat' });
-const singleButton = () => screen.getByRole('radio', { name: 'Single' });
+const repeatButton = () => advanced().getByRole('radio', { name: 'Repeat' });
+const singleButton = () => advanced().getByRole('radio', { name: 'Single' });
 
 function announced(): string {
   const spoken = screen
@@ -113,14 +114,14 @@ describe('turning the repeat on', () => {
     await openAndRun();
     expect(singleButton()).toHaveAttribute('aria-checked', 'true');
     // No count control until there is something to count.
-    expect(screen.queryByRole('radio', { name: '3 by 3' })).not.toBeInTheDocument();
+    expect(advanced().queryByRole('radio', { name: '3 by 3' })).not.toBeInTheDocument();
   });
 
   it('offers the counts once repeating, and defaults to three by three', async () => {
     const { user } = await openAndRun();
     await user.click(repeatButton());
 
-    expect(screen.getByRole('radio', { name: '3 by 3' })).toHaveAttribute('aria-checked', 'true');
+    expect(advanced().getByRole('radio', { name: '3 by 3' })).toHaveAttribute('aria-checked', 'true');
     expect(lastTiling()).toMatchObject({ mode: 'repeat', columns: 3, rows: 3 });
   });
 
@@ -129,7 +130,7 @@ describe('turning the repeat on', () => {
     await user.click(repeatButton());
 
     for (const count of [2, 5, 3]) {
-      await user.click(screen.getByRole('radio', { name: `${String(count)} by ${String(count)}` }));
+      await user.click(advanced().getByRole('radio', { name: `${String(count)} by ${String(count)}` }));
       expect(lastTiling()).toMatchObject({ columns: count, rows: count });
     }
   });
@@ -152,7 +153,7 @@ describe('what repeating must not disturb', () => {
     const before = service.executionCount;
 
     await user.click(repeatButton());
-    await user.click(screen.getByRole('radio', { name: '5 by 5' }));
+    await user.click(advanced().getByRole('radio', { name: '5 by 5' }));
     await user.click(singleButton());
 
     // Drawing the same result again is not a reason to compute it again.
@@ -161,11 +162,11 @@ describe('what repeating must not disturb', () => {
 
   it('leaves the visible APL alone', async () => {
     const { user } = await openAndRun();
-    const before = screen.getByRole('textbox', { name: /APL/i }).textContent;
+    const before = codeEditor().textContent;
 
     await user.click(repeatButton());
 
-    expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toBe(before);
+    expect(codeEditor().textContent).toBe(before);
   });
 
   it('leaves the matrix alone', async () => {
@@ -179,9 +180,9 @@ describe('what repeating must not disturb', () => {
 
   it('keeps the cell somebody was reading', async () => {
     const { user } = await openAndRun();
-    fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: '4' } });
-    fireEvent.change(screen.getByLabelText(/^Column/), { target: { value: '7' } });
-    await user.click(screen.getByRole('button', { name: /^Inspect$/ }));
+    fireEvent.change(advanced().getByLabelText(/^Row/), { target: { value: '4' } });
+    fireEvent.change(advanced().getByLabelText(/^Column/), { target: { value: '7' } });
+    await user.click(advanced().getByRole('button', { name: /^Inspect$/ }));
     expect(announced()).toContain('Row 4, column 7');
 
     await user.click(repeatButton());
@@ -203,7 +204,7 @@ describe('pressing a repeated copy', () => {
   it('reads the same source cell from every copy', async () => {
     const { user } = await openAndRun();
     await user.click(repeatButton());
-    await user.click(screen.getByRole('radio', { name: '3 by 3' }));
+    await user.click(advanced().getByRole('radio', { name: '3 by 3' }));
 
     const canvas = screen.getByRole('img', { name: /grid/ });
     const readings: string[] = [];
@@ -235,8 +236,8 @@ describe('pressing a repeated copy', () => {
 
     // Eight rows, whatever is drawn. The keyboard controls address the source
     // matrix and repeating does not enlarge it.
-    expect(screen.getByLabelText(/^Row/)).toHaveAttribute('max', '8');
-    expect(screen.getByLabelText(/^Column/)).toHaveAttribute('max', '8');
+    expect(advanced().getByLabelText(/^Row/)).toHaveAttribute('max', '8');
+    expect(advanced().getByLabelText(/^Column/)).toHaveAttribute('max', '8');
   });
 });
 
@@ -244,7 +245,7 @@ describe('keeping the setting', () => {
   it('saves it and restores it', async () => {
     const { user } = await openAndRun();
     await user.click(repeatButton());
-    await user.click(screen.getByRole('radio', { name: '5 by 5' }));
+    await user.click(advanced().getByRole('radio', { name: '5 by 5' }));
 
     const { readSavedProjectImmediate } = await import('@/workspace/useLocalProject');
     await waitFor(
@@ -272,7 +273,7 @@ describe('keeping the setting', () => {
     await screen.findByText(/shared with you/);
 
     expect(repeatButton()).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('radio', { name: '2 by 2' })).toHaveAttribute('aria-checked', 'true');
+    expect(advanced().getByRole('radio', { name: '2 by 2' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('opens a link written before repeating existed', async () => {
@@ -338,7 +339,7 @@ describe('tile scale', () => {
     expect(screen.queryByRole('radio', { name: '100%' })).not.toBeInTheDocument();
 
     await user.click(repeatButton());
-    expect(screen.getByRole('radio', { name: '100%' })).toHaveAttribute('aria-checked', 'true');
+    expect(advanced().getByRole('radio', { name: '100%' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('changes the copies without touching the artwork', async () => {
@@ -357,9 +358,9 @@ describe('tile scale', () => {
   it('keeps the cell somebody was reading', async () => {
     const { user } = await openAndRun();
     await user.click(repeatButton());
-    fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: '4' } });
-    fireEvent.change(screen.getByLabelText(/^Column/), { target: { value: '7' } });
-    await user.click(screen.getByRole('button', { name: /^Inspect$/ }));
+    fireEvent.change(advanced().getByLabelText(/^Row/), { target: { value: '4' } });
+    fireEvent.change(advanced().getByLabelText(/^Column/), { target: { value: '7' } });
+    await user.click(advanced().getByRole('button', { name: /^Inspect$/ }));
 
     await user.click(screen.getByRole('radio', { name: '200%' }));
 
@@ -397,7 +398,7 @@ describe('tile scale', () => {
     await screen.findByText(/shared with you/);
 
     expect(lastTiling()?.scale).toBe(1);
-    expect(screen.getByRole('radio', { name: '100%' })).toHaveAttribute('aria-checked', 'true');
+    expect(advanced().getByRole('radio', { name: '100%' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('clamps an absurd scale from a link', async () => {
@@ -423,7 +424,7 @@ describe('palette animation across the copies', () => {
   it('paints every copy from one palette, in one loop', async () => {
     const { user } = await openAndRun();
     await user.click(repeatButton());
-    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+    await user.click(animate().getByRole('button', { name: 'Animate palette' }));
 
     /*
      * There is nothing to synchronise, and that is the point: the copies are
@@ -435,11 +436,11 @@ describe('palette animation across the copies', () => {
     expect(painted?.palette?.colours).toBeDefined();
     expect(painted?.options.tiling).toMatchObject({ mode: 'repeat', columns: 3, rows: 3 });
 
-    await user.click(screen.getByRole('button', { name: 'Pause' }));
+    await user.click(animate().getByRole('button', { name: 'Pause' }));
   });
 });
 
-const mirrorButton = () => screen.getByRole('radio', { name: 'Mirror repeat' });
+const mirrorButton = () => advanced().getByRole('radio', { name: 'Mirror repeat' });
 
 describe('mirror repeat', () => {
   it('is offered beside the other modes and describes itself honestly', async () => {
@@ -468,14 +469,14 @@ describe('mirror repeat', () => {
   it('never runs the APL or touches the code', async () => {
     const { user, service } = await openAndRun();
     const before = service.executionCount;
-    const code = screen.getByRole('textbox', { name: /APL/i }).textContent;
+    const code = codeEditor().textContent;
 
     await user.click(mirrorButton());
-    await user.click(screen.getByRole('radio', { name: '5 by 5' }));
+    await user.click(advanced().getByRole('radio', { name: '5 by 5' }));
     await user.click(screen.getByRole('radio', { name: '50%' }));
 
     expect(service.executionCount).toBe(before);
-    expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toBe(code);
+    expect(codeEditor().textContent).toBe(code);
   });
 
   it('leaves the artwork’s own mirror settings alone', async () => {
@@ -496,7 +497,7 @@ describe('mirror repeat', () => {
   it('reads the same source cell from every parity', async () => {
     const { user } = await openAndRun();
     await user.click(mirrorButton());
-    await user.click(screen.getByRole('radio', { name: '2 by 2' }));
+    await user.click(advanced().getByRole('radio', { name: '2 by 2' }));
 
     const canvas = screen.getByRole('img', { name: /grid/ });
     const readings: string[] = [];
@@ -528,7 +529,7 @@ describe('mirror repeat', () => {
     // no-op: the same offset into a reflected copy is a different cell.
     const { user } = await openAndRun();
     await user.click(mirrorButton());
-    await user.click(screen.getByRole('radio', { name: '2 by 2' }));
+    await user.click(advanced().getByRole('radio', { name: '2 by 2' }));
 
     const canvas = screen.getByRole('img', { name: /grid/ });
     const read = (x: number, y: number) => {
@@ -545,7 +546,7 @@ describe('mirror repeat', () => {
   it('saves and restores locally', async () => {
     const { user } = await openAndRun();
     await user.click(mirrorButton());
-    await user.click(screen.getByRole('radio', { name: '5 by 5' }));
+    await user.click(advanced().getByRole('radio', { name: '5 by 5' }));
 
     const { readSavedProjectImmediate } = await import('@/workspace/useLocalProject');
     await waitFor(
@@ -580,9 +581,9 @@ describe('mirror repeat', () => {
 
   it('keeps the inspected cell when switching between repeat and mirror', async () => {
     const { user } = await openAndRun();
-    fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: '4' } });
-    fireEvent.change(screen.getByLabelText(/^Column/), { target: { value: '7' } });
-    await user.click(screen.getByRole('button', { name: /^Inspect$/ }));
+    fireEvent.change(advanced().getByLabelText(/^Row/), { target: { value: '4' } });
+    fireEvent.change(advanced().getByLabelText(/^Column/), { target: { value: '7' } });
+    await user.click(advanced().getByRole('button', { name: /^Inspect$/ }));
 
     await user.click(repeatButton());
     await user.click(mirrorButton());
@@ -609,7 +610,7 @@ describe('seam guides', () => {
 
   it('are available in mirror repeat too', async () => {
     const { user } = await openAndRun();
-    await user.click(screen.getByRole('radio', { name: 'Mirror repeat' }));
+    await user.click(advanced().getByRole('radio', { name: 'Mirror repeat' }));
     expect(guidesToggle()).toBeInTheDocument();
   });
 
@@ -617,21 +618,21 @@ describe('seam guides', () => {
     const { user, service } = await openAndRun();
     await user.click(repeatButton());
     const before = service.executionCount;
-    const code = screen.getByRole('textbox', { name: /APL/i }).textContent;
+    const code = codeEditor().textContent;
 
     await user.click(guidesToggle());
 
     expect(lastTiling()?.showSeamGuides).toBe(true);
     expect(service.executionCount).toBe(before);
-    expect(screen.getByRole('textbox', { name: /APL/i }).textContent).toBe(code);
+    expect(codeEditor().textContent).toBe(code);
   });
 
   it('leave the chosen cell exactly where it was', async () => {
     const { user } = await openAndRun();
     await user.click(repeatButton());
-    fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: '4' } });
-    fireEvent.change(screen.getByLabelText(/^Column/), { target: { value: '7' } });
-    await user.click(screen.getByRole('button', { name: /^Inspect$/ }));
+    fireEvent.change(advanced().getByLabelText(/^Row/), { target: { value: '4' } });
+    fireEvent.change(advanced().getByLabelText(/^Column/), { target: { value: '7' } });
+    await user.click(advanced().getByRole('button', { name: /^Inspect$/ }));
 
     await user.click(guidesToggle());
 
@@ -711,11 +712,11 @@ describe('the edge check', () => {
     const { user } = await openAndRun();
     const before = edgeText();
 
-    await user.click(screen.getByRole('radio', { name: 'Mirror repeat' }));
+    await user.click(advanced().getByRole('radio', { name: 'Mirror repeat' }));
     expect(edgeText()).toBe(before);
 
     await user.click(repeatButton());
-    await user.click(screen.getByRole('radio', { name: '5 by 5' }));
+    await user.click(advanced().getByRole('radio', { name: '5 by 5' }));
     await user.click(screen.getByRole('radio', { name: '200%' }));
     expect(edgeText()).toBe(before);
   });
@@ -744,7 +745,7 @@ describe('the edge check', () => {
     const { user } = await openAndRun();
     const upright = edgeText();
 
-    await user.click(screen.getByRole('radio', { name: '90°' }));
+    await user.click(advanced().getByRole('radio', { name: '90°' }));
     // Rotating swaps the axes, so the two sentences trade places.
     const turned = edgeText();
     expect(turned).toMatch(/Left and right edges/);
@@ -761,13 +762,13 @@ describe('the edge check', () => {
     const { user } = await openAndRun();
     const before = edgeText();
 
-    await user.click(screen.getByRole('button', { name: 'Animate palette' }));
+    await user.click(animate().getByRole('button', { name: 'Animate palette' }));
     expect(edgeText()).toBe(before);
 
-    await user.click(screen.getByRole('radio', { name: /Neon/ }));
+    await user.click(paletteChoice(/Neon/));
     expect(edgeText()).toBe(before);
 
-    await user.click(screen.getByRole('button', { name: 'Pause' }));
+    await user.click(animate().getByRole('button', { name: 'Pause' }));
     expect(edgeText()).toBe(before);
   });
 

@@ -30,15 +30,13 @@
   gap: var(--space-2);
 }
 
+/* The same sizing family as the orientation and display choices beside it. */
 .mode {
-  min-height: var(--tap-target);
-  padding: 0 var(--space-4);
+  composes: control from global;
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
   background: var(--surface);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--text-sm);
+  color: var(--text);
+  font-weight: 600;
 }
 
 .mode:hover {

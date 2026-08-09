@@ -11,6 +11,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { ADAPTIVE_MARKER } from '@/execution/adaptiveProbe';
 import { stubTryApl } from './stubTryApl';
+import { editorLocator, editorOn, runButton } from './workspaceModes';
 
 const playPanel = (page: Page) => page.getByRole('region', { name: 'Make it yours' });
 /** The four session actions, which sit beneath the editing modes rather than in them. */
@@ -45,11 +46,35 @@ test.describe('the Instant Play journey', () => {
     const start = page.getByRole('link', { name: 'Start creating' });
     await expect(start).toBeVisible();
 
-    // 2. Choose it, and 3. receive a finished artwork without asking twice.
+    /*
+     * 2. Choose it, and 3. receive a finished artwork without asking twice.
+     *
+     * Which artwork is the seed's business now: Start creating draws from four
+     * pattern families rather than always opening Modular Bloom, so the press is
+     * checked to land on one of them and to draw on arrival.
+     */
     await start.click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Modular Bloom' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', {
+        level: 1,
+        name: /Modular Bloom|Checker Shift|Wave Interference|Truchet Grid/,
+      }),
+    ).toBeVisible();
     await expect(artwork(page)).toBeVisible({ timeout: 30_000 });
     expect(runs(stub.requests)).toBe(1);
+
+    /*
+     * The rest of the journey is Modular Bloom's, so it is opened by name.
+     *
+     * Everything from here on reads that artwork's own controls — Complexity,
+     * Scale, the `modulus` line a Peek explains — and those are the arithmetic
+     * of this piece rather than of the pool. Writing the journey against
+     * whichever artwork the seed happened to choose would mean asserting nothing
+     * in particular about any of them.
+     */
+    await page.goto('./#/art/modular-bloom?play=20260805');
+    await expect(page.getByRole('heading', { level: 1, name: 'Modular Bloom' })).toBeVisible();
+    await expect(artwork(page)).toBeVisible({ timeout: 30_000 });
     const opened = await settings(page);
 
     /*
@@ -114,9 +139,11 @@ test.describe('the Instant Play journey', () => {
     expect(runs(stub.requests)).toBe(beforeUndo);
     await expect(undo(page)).toBeDisabled();
 
-    // 7. Save the image.
+    // 7. Take the image away. Export, where Save image used to be: the same act
+    //    through the control that offers a size for it.
     const download = page.waitForEvent('download');
-    await sessionActions(page).getByRole('button', { name: 'Save image' }).click();
+    await page.getByRole('button', { name: 'Export' }).click();
+    await page.getByRole('menuitem', { name: '1024 × 1024' }).click();
     const file = await (await download).path();
     const { readFile } = await import('node:fs/promises');
     expect([...(await readFile(file)).subarray(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
@@ -126,16 +153,23 @@ test.describe('the Instant Play journey', () => {
       await context.grantPermissions(['clipboard-read', 'clipboard-write']);
       const sessionUrl = page.url();
 
-      await sessionActions(page).getByRole('button', { name: 'Share' }).click();
+      // Share is in the toolbar now, beside Export: both act on the finished
+      // artwork rather than on the editing of it.
+      await page.getByRole('button', { name: 'Share' }).click();
       const link = await page.evaluate(() => navigator.clipboard.readText());
       expect(link).toContain('#/art/modular-bloom?s=');
 
       await page.goto(link);
       await expect(page.getByText(/shared with you/)).toBeVisible();
-      // A share is somebody else's creation, so it is the ordinary workspace and
-      // it waits to be run rather than drawing itself.
-      await expect(playPanel(page)).toHaveCount(0);
-      await expect(page.locator('.cm-content')).toBeVisible();
+      /*
+       * A share is somebody else's creation, so it waits to be run rather than
+       * drawing itself. It arrives in the same workspace as everything else —
+       * the curated controls belong to the artwork, and a link is not entitled
+       * to withhold them — which is the part of this that changed.
+       */
+      await expect(page.getByText('Press Run to draw this artwork.')).toBeVisible();
+      await expect(playPanel(page)).toBeVisible();
+      await expect(await editorOn(page)).toBeVisible();
 
       // Back to the session, which is still exactly where it was left.
       await page.goto(sessionUrl);
@@ -148,9 +182,15 @@ test.describe('the Instant Play journey', () => {
     await peek.getByText('How this changes the APL').click();
     await expect(peek).toContainText(`modulus←${String(await valueOf(page, 'Scale'))}`);
 
-    // 10. Open the APL at that line, with the value selected and ready to type.
+    /*
+     * 10. Open the APL at that line, with the value selected and ready to type.
+     *
+     * A passive locator: "Edit the APL" has already selected the Code mode, and
+     * pressing the tab again to look would move focus to the tab — taking the
+     * selection with it, and with it the point of the next two steps.
+     */
     await peek.getByRole('button', { name: /^Edit the APL/ }).click();
-    await expect(page.locator('.cm-content')).toBeVisible();
+    await expect(editorLocator(page)).toBeVisible();
     expect(await page.evaluate(() => window.getSelection()?.toString() ?? '')).toBe(
       String(await valueOf(page, 'Scale')),
     );
@@ -158,7 +198,7 @@ test.describe('the Instant Play journey', () => {
     // 11. Edit it directly. The control follows the code, because the code is
     // what it reads.
     await page.keyboard.type('13');
-    await expect(page.locator('.cm-content')).toContainText('modulus←13');
+    await expect(editorLocator(page)).toContainText('modulus←13');
     await expect.poll(() => valueOf(page, 'Scale')).toBe(13);
 
     // 12. And the history that could no longer be trusted is gone, rather than
@@ -167,6 +207,6 @@ test.describe('the Instant Play journey', () => {
 
     // The artwork is still there, and Run is still the way to draw the edit.
     await expect(artwork(page)).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Run/ })).toBeVisible();
+    await expect(await runButton(page)).toBeVisible();
   });
 });

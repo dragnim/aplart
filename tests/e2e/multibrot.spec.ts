@@ -9,6 +9,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { advanced, editorOn, paletteChoice, pressRun } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -22,12 +23,12 @@ function runStatus(page: Page) {
  * By role, not by label alone: the symbol toolbar has buttons labelled "Insert
  * Power, *" and "Insert Power operator, ⍣", so a label lookup finds three things.
  */
-function powerSlider(page: Page) {
-  return page.getByRole('slider', { name: 'Power' });
+async function powerSlider(page: Page) {
+  return (await advanced(page)).getByRole('slider', { name: 'Power' });
 }
 
 async function runAndSettle(page: Page) {
-  await page.getByRole('button', { name: /^Run/ }).click();
+  await pressRun(page);
   await expect(runStatus(page).first()).not.toHaveText(/Running/, { timeout: 30_000 });
 }
 
@@ -58,7 +59,7 @@ test.describe('Multibrot', () => {
     await page.getByRole('link', { name: 'Open Multibrot' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Multibrot' })).toBeVisible();
     expect(page.url()).toContain('#/art/multibrot');
-    await expect(page.locator('.cm-content')).toContainText('power←3');
+    await expect(await editorOn(page)).toContainText('power←3');
   });
 
   test('opens from its own route, visited directly', async ({ page }) => {
@@ -72,7 +73,7 @@ test.describe('Multibrot', () => {
      * 25 of 27 and simply is not in the DOM until it is scrolled to. The step is
      * asserted in the unit tests, which read the source rather than the editor.
      */
-    await expect(page.locator('.cm-content')).toContainText('power←3');
+    await expect(await editorOn(page)).toContainText('power←3');
   });
 
   test('runs from its own source and draws', async ({ page }) => {
@@ -90,10 +91,10 @@ test.describe('Multibrot', () => {
     await page.goto('./#/art/multibrot');
     await runAndSettle(page);
 
-    const editor = page.locator('.cm-content');
+    const editor = await editorOn(page);
     await expect(editor).toContainText('power←3');
 
-    await powerSlider(page).fill('5');
+    await (await powerSlider(page)).fill('5');
     await expect(editor).toContainText('power←5');
 
     // Nothing else moved. These are the settings a visitor would be angry to lose.
@@ -108,8 +109,8 @@ test.describe('Multibrot', () => {
     await runAndSettle(page);
     const cubed = await canvasDigest(page);
 
-    await powerSlider(page).fill('6');
-    await expect(page.locator('.cm-content')).toContainText('power←6');
+    await (await powerSlider(page)).fill('6');
+    await expect(await editorOn(page)).toContainText('power←6');
     await runAndSettle(page);
     const sixth = await canvasDigest(page);
 
@@ -127,8 +128,8 @@ test.describe('Multibrot', () => {
     await stubTryApl(page);
     await page.goto('./#/art/multibrot');
 
-    const editor = page.locator('.cm-content');
-    await powerSlider(page).fill('2');
+    const editor = await editorOn(page);
+    await (await powerSlider(page)).fill('2');
     await page.getByLabel('Centre across').fill('-0.6');
     await expect(editor).toContainText('power←2');
     await expect(editor).toContainText('centreX←¯0.6');
@@ -144,7 +145,7 @@ test.describe('Multibrot', () => {
      * the moment the page's layout shifted: a click that missed left Mandelbrot in
      * Abyss, and two pictures in different palettes will never match.
      */
-    const ember = page.getByRole('radio', { name: 'Ember', exact: true });
+    const ember = await paletteChoice(page, 'Ember');
     await ember.scrollIntoViewIfNeeded();
     await ember.click();
     await expect(ember).toHaveAttribute('aria-checked', 'true');

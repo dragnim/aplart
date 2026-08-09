@@ -15,6 +15,7 @@ import { fromNested } from '@/matrix/matrixTypes';
 import { mandelbrotField } from '@/presets/mandelbrot-field';
 import { modularBloom } from '@/presets/modular-bloom';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { pressRunWith } from '../helpers/workspaceModes';
 
 /** The canvas, as jsdom would never lay it out. Square, so u = x / 400. */
 const CANVAS = { left: 0, top: 0, width: 400, height: 400 };
@@ -79,7 +80,7 @@ async function openAndRun(presetId: string) {
   const service = serviceReturning();
   render(<WorkspacePage presetId={presetId} sharedState={null} service={service} />);
 
-  await user.click(screen.getByRole('button', { name: /^Run/ }));
+  await pressRunWith(user);
   await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument());
   return { user, service };
 }
@@ -313,7 +314,7 @@ describe('exploring the plane', () => {
       render(<WorkspacePage presetId={mandelbrotField.id} sharedState={encoded} service={service} />);
       await screen.findByText(/shared with you/);
 
-      await user.click(screen.getByRole('button', { name: /^Run/ }));
+      await pressRunWith(user);
       await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument());
       return { user, service };
     }

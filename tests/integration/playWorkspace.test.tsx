@@ -22,6 +22,7 @@ import { decodeShareState } from '@/sharing/decodeShareState';
 import { generateInstantPlayVariation } from '@/workspace/instantPlayVariation';
 import { startCreating } from '@/workspace/startCreating';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { colour } from '../helpers/workspaceModes';
 
 beforeAll(() => {
   vi.stubGlobal(
@@ -107,9 +108,8 @@ function serviceTellingArtworksApart(): MockAplExecutionService {
 }
 
 const playPanel = () => screen.getByRole('region', { name: 'Make it yours' });
-const noPlayPanel = () => screen.queryByRole('region', { name: 'Make it yours' });
 /**
- * Randomise, Undo, Save image and Share.
+ * Randomise, Undo and Reset.
  *
  * Beneath the editing modes rather than inside the curated controls: they belong
  * to the artwork, not to one way of changing it, so they stay put as the tab
@@ -231,21 +231,48 @@ describe('when a session is what opened the workspace', () => {
     }
   });
 
-  it('exposes Randomise, Undo, Save image and Share directly, in every mode', () => {
+  it('exposes Randomise, Undo and Reset directly, in every mode', () => {
     openPlay();
 
     for (const mode of ['Create', 'Colour', 'Advanced', 'Code'] as const) {
       chooseTab(mode);
       const actions = sessionActions();
 
-      for (const name of ['Randomise', 'Save image', 'Share']) {
+      for (const name of ['Randomise', 'Reset']) {
         expect(within(actions).getByRole('button', { name }), `${name} in ${mode}`).toBeInTheDocument();
       }
       expect(within(actions).getByRole('button', { name: /^Undo/ }), `Undo in ${mode}`).toBeInTheDocument();
     }
 
+    const actions = within(sessionActions());
+
     // Run is not among them: it means "run this source", which is a Code idea.
-    expect(within(sessionActions()).queryByRole('button', { name: /^Run/ })).toBeNull();
+    expect(actions.queryByRole('button', { name: /^Run/ })).toBeNull();
+
+    /*
+     * And neither is Share nor Save image, which used to be here.
+     *
+     * Share belongs to the artwork as an output and is in the toolbar above,
+     * where Export is; offering it in both places made two of these four
+     * duplicates of controls already on screen. Save image is gone altogether —
+     * it called the same function Export calls, at a fixed 1024 pixels and with
+     * no say over the size, the caption or the composition.
+     */
+    expect(actions.queryByRole('button', { name: 'Share' })).toBeNull();
+    expect(actions.queryByRole('button', { name: 'Save image' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save image' })).toBeNull();
+  });
+
+  it('puts Focus mode, Share and Export in the toolbar, and nothing else', () => {
+    openPlay();
+
+    const toolbar = screen.getByRole('link', { name: /Gallery/ }).closest('div')?.parentElement;
+    expect(toolbar).not.toBeNull();
+
+    const named = within(toolbar as HTMLElement)
+      .getAllByRole('button')
+      .map((button) => button.textContent?.trim());
+    expect(named).toEqual(['Focus mode', 'Share', 'Export']);
   });
 
   it('keeps the whole technical workspace one press away, and never unmounts it', async () => {
@@ -274,7 +301,20 @@ describe('when a session is what opened the workspace', () => {
     expect(screen.getByLabelText('Modulus')).toBeInTheDocument();
     expect(screen.getByLabelText('Multiplier')).toBeInTheDocument();
     expect(screen.getByLabelText('Size')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Reset parameters' })).toBeInTheDocument();
+
+    /*
+     * And no Randomise or Reset parameters of its own.
+     *
+     * Advanced used to carry both, beside a persistent row offering the same two
+     * words — and they were not even the same actions: this Randomise drew from
+     * the raw parameter ranges while that one draws from the curated recipes.
+     * One artwork, one Randomise, one Reset, in the row that belongs to the
+     * artwork rather than to one way of editing it.
+     */
+    expect(screen.queryByRole('button', { name: 'Reset parameters' })).toBeNull();
+    expect(
+      within(screen.getByRole('tabpanel', { name: 'Advanced' })).queryByRole('button', { name: 'Randomise' }),
+    ).toBeNull();
 
     fireEvent.click(screen.getByRole('tab', { name: 'Code' }));
     expect(screen.getByRole('button', { name: /^Run/ })).toBeInTheDocument();
@@ -299,20 +339,37 @@ describe('when a session is what opened the workspace', () => {
   });
 });
 
-describe('when it is not', () => {
-  it('an artwork opened from its card has no Play surface', () => {
+/*
+ * There used to be two workspaces, and this block asked which one you got.
+ *
+ * There is one now. What the seed decides is no longer the interface but the
+ * artwork: with a seed you are given a curated variation, without one you get
+ * the preset as it ships — or whatever you last left on it. So these ask what
+ * actually differs.
+ */
+describe('opening the same artwork without a seed', () => {
+  it('uses the same workspace, with the same modes', () => {
     openPlay(null);
 
-    expect(noPlayPanel()).toBeNull();
-    expect(screen.getByText('Press Run to draw this artwork.')).toBeInTheDocument();
-    // And the full workspace is in front of you, not behind a session's tabs.
-    expect(screen.queryByRole('tab', { name: 'Create' })).toBeNull();
+    expect(screen.getByRole('tab', { name: 'Create' })).toBeInTheDocument();
+    for (const mode of ['Colour', 'Animate', 'Advanced', 'Code']) {
+      expect(screen.getByRole('tab', { name: mode }), mode).toBeInTheDocument();
+    }
+    // Create is where an artwork with curated controls opens.
+    expect(screen.getByRole('tab', { selected: true })).toHaveAttribute('aria-label', 'Create');
   });
 
-  it('a seed that is not a seed opens the ordinary workspace', () => {
+  it('shows the preset’s own code, not a variation of it, and waits to be run', () => {
+    openPlay(null);
+
+    expect(source()).toBe(asRendered(modularBloom.code));
+    expect(screen.getByText('Press Run to draw this artwork.')).toBeInTheDocument();
+  });
+
+  it('and a seed that is not a seed is the same as no seed at all', () => {
     openPlay('nonsense');
 
-    expect(noPlayPanel()).toBeNull();
+    expect(source()).toBe(asRendered(modularBloom.code));
   });
 });
 
@@ -514,7 +571,8 @@ describe('Randomise, on the Play surface', () => {
       },
     });
 
-    await user.click(within(sessionActions()).getByRole('button', { name: 'Share' }));
+    // Share is a toolbar action now: it acts on the artwork as an output.
+    await user.click(screen.getByRole('button', { name: 'Share' }));
     await waitFor(() => expect(copied).not.toBe(''));
 
     const shared = decodeShareState(new URL(copied).hash.split('?s=')[1] ?? '');
@@ -545,7 +603,8 @@ describe('Randomise, on the Play surface', () => {
       },
     });
 
-    await user.click(within(sessionActions()).getByRole('button', { name: 'Share' }));
+    // Share is a toolbar action now: it acts on the artwork as an output.
+    await user.click(screen.getByRole('button', { name: 'Share' }));
     await waitFor(() => expect(copied).not.toBe(''));
 
     // The seed the session opened with, because that is what produced the artwork
@@ -666,7 +725,7 @@ describe('what Undo may and may not reach', () => {
      * is why a step back here restores the colour and leaves the slider alone.
      */
     chooseTab('Colour');
-    const invert = () => screen.getByRole('checkbox', { name: /Invert palette/ }) as HTMLInputElement;
+    const invert = () => colour().getByRole('checkbox', { name: /Invert palette/ }) as HTMLInputElement;
 
     await user.click(invert());
     expect(invert().checked).toBe(true);
@@ -680,7 +739,10 @@ describe('what Undo may and may not reach', () => {
     expect(undo()).toBeEnabled();
   });
 
-  it('nor does saving the image or sharing the link', async () => {
+  it('nor does sharing the link', async () => {
+    // Save image used to be tested here beside Share. It has gone: Export does
+    // the same thing with the choices it was missing, and the two of them being
+    // separate controls for one act was the reason to remove it.
     await withAGestureBehindIt();
     const user = userEvent.setup();
 
@@ -689,8 +751,7 @@ describe('what Undo may and may not reach', () => {
       value: { writeText: () => Promise.resolve() },
     });
 
-    await user.click(within(sessionActions()).getByRole('button', { name: 'Save image' }));
-    await user.click(within(sessionActions()).getByRole('button', { name: 'Share' }));
+    await user.click(screen.getByRole('button', { name: 'Share' }));
 
     expect(undo()).toBeEnabled();
   });
@@ -722,17 +783,42 @@ describe('what Undo may and may not reach', () => {
     expect(undo()).toBeEnabled();
   });
 
-  it('but a Reset still cannot be stepped back over', async () => {
+  it('and a Reset can now be stepped back over, which it could not before', async () => {
+    /*
+     * The one assertion in this file whose meaning is the opposite of what it
+     * was, and deliberately so.
+     *
+     * Reset used to write the preset's values through the uncommitted path,
+     * which discarded the history — so it was true that nothing could step back
+     * over it, and it was why the action needed a confirmation dialog warning
+     * that it could not be undone. It is now a recorded action like any other:
+     * it takes one snapshot of the artwork as it stood, replaces source, seed
+     * and appearance together, and draws the result. The dialog went with it.
+     */
     const user = userEvent.setup();
     await withAGestureBehindIt();
+    const beforeReset = source();
 
-    chooseTab('Advanced');
-    await user.click(screen.getByRole('button', { name: 'Reset parameters' }));
+    await user.click(within(sessionActions()).getByRole('button', { name: 'Reset' }));
 
-    // The preset's own values, and no way back to a session that is gone. A
-    // Reset is not a control being committed; it discards what the controls were.
     expect(source()).toBe(asRendered(modularBloom.code));
-    expect(undo()).toBeDisabled();
+    expect(undo()).toBeEnabled();
+    expect(undo()).toHaveAccessibleName('Undo Reset');
+
+    await user.click(undo());
+    expect(source()).toBe(beforeReset);
+  });
+
+  it('and Reset redraws the artwork without waiting for Run', async () => {
+    const { service } = openPlay(String(SEED));
+    await drawn();
+
+    const drawnRuns = runs(service.received);
+    fireEvent.click(within(sessionActions()).getByRole('button', { name: 'Reset' }));
+
+    // The preset's own source, submitted in the same breath it was restored.
+    await waitFor(() => expect(runs(service.received)).toBe(drawnRuns + 1));
+    expect(service.received.at(-1)).toContain('multiplier←1');
   });
 
   it('and a Create control afterwards continues the same history', async () => {
@@ -893,28 +979,38 @@ describe('Edit the APL', () => {
     expect(source()).toBe(asRendered(started?.code ?? ''));
   });
 
-  it('is offered by every control, and only inside a session', async () => {
+  it('is offered by every curated control, seed or no seed', async () => {
+    /*
+     * It used to be "only inside a session", because Create only existed when a
+     * seed had opened the workspace. Create is a property of the artwork now —
+     * Modular Bloom has curated controls whether you arrived by a seeded link or
+     * from its card — so the disclosure is there either way. What the seed
+     * decides is the values, not the controls.
+     */
     openPlay();
     await drawn();
-    expect(screen.getAllByRole('button', { name: /^Edit the APL/ })).toHaveLength(3);
+    expect(
+      within(screen.getByRole('tabpanel', { name: 'Create' })).getAllByRole('button', {
+        name: /^Edit the APL/,
+      }),
+    ).toHaveLength(3);
 
     cleanup();
 
     openPlay(null);
-    expect(screen.queryByRole('button', { name: /^Edit the APL/ })).toBeNull();
-    expect(screen.queryByText('How this changes the APL')).toBeNull();
+    expect(
+      within(screen.getByRole('tabpanel', { name: 'Create' })).getAllByRole('button', {
+        name: /^Edit the APL/,
+      }),
+    ).toHaveLength(3);
   });
 });
 
-describe('Save image', () => {
-  it('waits until there is an artwork to save', async () => {
-    // Nothing has been drawn on arrival for a heartbeat, so the button says so by
-    // being unavailable rather than by failing when pressed.
-    openPlay();
-    const save = () => within(sessionActions()).getByRole('button', { name: 'Save image' });
-    expect(save()).toBeDisabled();
-
-    await drawn();
-    expect(save()).toBeEnabled();
-  });
-});
+/*
+ * "Save image" had a describe block of its own here, asserting that it waited
+ * until there was an artwork to save. The control is gone — Export does the same
+ * thing and offers the size, caption and composition it never did — so the
+ * behaviour it described belongs to Export, which has its own coverage in
+ * `tests/e2e/studio.spec.ts`. Its absence from the session actions is asserted
+ * at the top of this file, where the row is described.
+ */

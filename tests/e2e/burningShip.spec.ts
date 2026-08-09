@@ -14,6 +14,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { choice, editorOn, pressRun, showMode } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -22,7 +23,9 @@ function runStatus(page: Page) {
 }
 
 async function choose(page: Page, name: string) {
-  const control = page.getByRole('radio', { name, exact: true });
+  // Through the shared helper, which knows that palettes are chosen in Colour
+  // and orientation, display and tiling in Advanced.
+  const control = await choice(page, name);
   await control.scrollIntoViewIfNeeded();
   await control.click();
   await expect(control).toHaveAttribute('aria-checked', 'true');
@@ -30,7 +33,7 @@ async function choose(page: Page, name: string) {
 
 async function openAndRun(page: Page, id = 'burning-ship') {
   await page.goto(`./#/art/${id}`);
-  await page.getByRole('button', { name: /^Run/ }).click();
+  await pressRun(page);
   await expect(runStatus(page).first()).not.toHaveText(/Running/, { timeout: 30_000 });
 }
 
@@ -73,7 +76,7 @@ test.describe('Burning Ship', () => {
     await page.getByRole('link', { name: 'Open Burning Ship' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Burning Ship' })).toBeVisible();
     expect(page.url()).toContain('#/art/burning-ship');
-    await expect(page.locator('.cm-content')).toContainText('x←|zr');
+    await expect(await editorOn(page)).toContainText('x←|zr');
   });
 
   test('opens from its own route, visited directly', async ({ page }) => {
@@ -83,7 +86,7 @@ test.describe('Burning Ship', () => {
     await page.goto('./#/art/burning-ship');
 
     await expect(page.getByRole('heading', { level: 1, name: 'Burning Ship' })).toBeVisible();
-    await expect(page.locator('.cm-content')).toContainText('x←|zr');
+    await expect(await editorOn(page)).toContainText('x←|zr');
   });
 
   test('runs from its own source and draws its own fractal', async ({ page }) => {
@@ -91,7 +94,7 @@ test.describe('Burning Ship', () => {
     await openAndRun(page);
 
     // Its own program, with the absolute values visible in it.
-    const editor = page.locator('.cm-content');
+    const editor = await editorOn(page);
     await expect(editor).toContainText('x←|zr');
     await expect(editor).toContainText('y←|zi');
     await expect(editor).toContainText('centreX←¯1.755');
@@ -113,7 +116,7 @@ test.describe('Burning Ship', () => {
     const ship = await canvasDigest(page);
 
     await page.goto('./#/art/mandelbrot-field');
-    const editor = page.locator('.cm-content');
+    const editor = await editorOn(page);
     await expect(editor).toContainText('centreX←¯0.6');
     await editor.click();
     await page.keyboard.press('ControlOrMeta+a');
@@ -132,7 +135,7 @@ test.describe('Burning Ship', () => {
         '⊃⌽step⍣iterations⊢(cr×0)(ci×0)((size,size)⍴1)(cr×0)',
       ].join('\n'),
     );
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(runStatus(page).first()).not.toHaveText(/Running/, { timeout: 30_000 });
     const mandelbrot = await canvasDigest(page);
 
@@ -154,8 +157,8 @@ test.describe('Burning Ship', () => {
     await choose(page, 'Smooth');
     await expect(page.locator('canvas').first()).toHaveAttribute('aria-label', /smooth interpolation/);
     await choose(page, 'Pixel');
-    await page.getByLabel('Mode').selectOption('bands');
-    await expect(page.getByLabel('Mode')).toHaveValue('bands');
+    await (await showMode(page, 'Colour')).getByLabel('Mode').selectOption('bands');
+    await expect((await showMode(page, 'Colour')).getByLabel('Mode')).toHaveValue('bands');
 
     // Focus mode and back.
     await page.getByRole('button', { name: 'Focus mode' }).click();
@@ -171,7 +174,7 @@ test.describe('Burning Ship', () => {
     await stubTryApl(page);
     await openAndRun(page);
 
-    const editor = page.locator('.cm-content');
+    const editor = await editorOn(page);
     await expect(editor).toContainText('zoom←0.06');
 
     const canvas = page.locator('canvas').first();

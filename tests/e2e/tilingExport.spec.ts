@@ -9,6 +9,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { choice, pressRun, showMode } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -16,14 +17,10 @@ function runStatus(page: Page) {
   return page.locator('[role="status"][data-status]');
 }
 
-function radio(page: Page, name: string) {
-  return page.getByRole('radio', { name, exact: true });
-}
-
 async function openAndRun(page: Page, preset = 'truchet-grid') {
   await stubTryApl(page);
   await page.goto(`./#/art/${preset}`);
-  await page.getByRole('button', { name: /^Run/ }).click();
+  await pressRun(page);
   await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 }
 
@@ -43,9 +40,9 @@ async function exportAt(page: Page, label: string): Promise<Buffer> {
 }
 
 async function chooseRepeat(page: Page, mode: string, count: string, scale = '100%') {
-  await radio(page, mode).click();
-  await radio(page, count).click();
-  await radio(page, scale).click();
+  await (await choice(page, mode)).click();
+  await (await choice(page, count)).click();
+  await (await choice(page, scale)).click();
 }
 
 async function turnOnRepeatExport(page: Page) {
@@ -156,7 +153,7 @@ test.describe('exporting a repeat', () => {
     await turnOnRepeatExport(page);
     const upright = await exportAt(page, '512 × 512');
 
-    await radio(page, '90°').click();
+    await (await choice(page, '90°')).click();
     const turned = await exportAt(page, '512 × 512');
 
     // The base tile is rotated and then repeated, so the result differs.
@@ -187,7 +184,7 @@ test.describe('exporting a repeat', () => {
     await turnOnRepeatExport(page);
     const atRest = await exportAt(page, '512 × 512');
 
-    await page.getByRole('button', { name: 'Animate palette' }).click();
+    await (await showMode(page, 'Animate')).getByRole('button', { name: 'Animate palette' }).click();
     await page.waitForTimeout(700);
     await page.getByRole('button', { name: 'Pause' }).click();
     const moved = await exportAt(page, '512 × 512');
@@ -225,7 +222,7 @@ test.describe('exporting a repeat', () => {
   test('makes no request to run anything', async ({ page }) => {
     const stub = await stubTryApl(page);
     await page.goto('./#/art/truchet-grid');
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 
     const sent = stub.requests.length;

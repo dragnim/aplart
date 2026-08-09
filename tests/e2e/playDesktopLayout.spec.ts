@@ -16,6 +16,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { runButton } from './workspaceModes';
 
 const SIZES = [
   { name: '1920x1080', width: 1920, height: 1080 },
@@ -250,7 +251,7 @@ for (const size of SIZES) {
         await modeTab(page, mode).click();
         const actions = page.getByRole('group', { name: 'Artwork actions' });
 
-        for (const name of ['Randomise', 'Save image', 'Share']) {
+        for (const name of ['Randomise', 'Reset']) {
           await expect(
             actions.getByRole('button', { name, exact: true }),
             `${name} in ${mode}`,
@@ -264,7 +265,7 @@ for (const size of SIZES) {
         page.getByRole('group', { name: 'Artwork actions' }).getByRole('button', { name: /^Run/ }),
       ).toHaveCount(0);
       await modeTab(page, 'Code').click();
-      await expect(page.getByRole('button', { name: /^Run/ })).toBeVisible();
+      await expect(await runButton(page)).toBeVisible();
     });
   });
 }

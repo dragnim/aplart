@@ -10,6 +10,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { choice, pressRun, showMode } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -17,14 +18,10 @@ function runStatus(page: Page) {
   return page.locator('[role="status"][data-status]');
 }
 
-function radio(page: Page, name: string) {
-  return page.getByRole('radio', { name, exact: true });
-}
-
 async function openAndRun(page: Page) {
   await stubTryApl(page);
   await page.goto('./#/art/mandelbrot-field');
-  await page.getByRole('button', { name: /^Run/ }).click();
+  await pressRun(page);
   await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 }
 
@@ -71,7 +68,7 @@ async function save(page: Page, label = '512 × 512') {
 }
 
 async function chooseAbyss(page: Page) {
-  await radio(page, 'Abyss').click();
+  await (await choice(page, 'Abyss')).click();
   await expect(page.locator('canvas').first()).toHaveAttribute('aria-label', /Abyss palette/);
 }
 
@@ -81,7 +78,7 @@ test.describe('Abyss in the studio', () => {
   test('draws a blue exterior and a black interior, without running anything', async ({ page }) => {
     const stub = await stubTryApl(page);
     await page.goto('./#/art/mandelbrot-field');
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 
     const sent = stub.requests.length;
@@ -129,7 +126,7 @@ test.describe('Abyss in the studio', () => {
     await chooseAbyss(page);
     const atRest = await save(page);
 
-    await page.getByRole('button', { name: 'Animate palette' }).click();
+    await (await showMode(page, 'Animate')).getByRole('button', { name: 'Animate palette' }).click();
     await page.waitForTimeout(700);
     const moving = await save(page);
     expect(Buffer.compare(moving, atRest)).not.toBe(0);
@@ -139,8 +136,10 @@ test.describe('Abyss in the studio', () => {
      * ramp moves — that is the point of animating it — so what is checked is
      * that stopping restores the palette exactly, not that black stayed put.
      */
-    await page.getByRole('button', { name: 'Reset animation' }).click();
-    await expect(page.getByRole('button', { name: 'Animate palette' })).toBeVisible();
+    await (await showMode(page, 'Animate')).getByRole('button', { name: 'Reset animation' }).click();
+    await expect(
+      (await showMode(page, 'Animate')).getByRole('button', { name: 'Animate palette' }),
+    ).toBeVisible();
 
     expect(Buffer.compare(await save(page), atRest)).toBe(0);
   });
@@ -158,8 +157,8 @@ test.describe('Abyss with repeated copies', () => {
     await chooseAbyss(page);
 
     for (const mode of ['Repeat', 'Mirror repeat']) {
-      await radio(page, mode).click();
-      await radio(page, '2 by 2').click();
+      await (await choice(page, mode)).click();
+      await (await choice(page, '2 by 2')).click();
 
       const quadrantsAgree = await page.evaluate(() => {
         const canvas = document.querySelector('canvas');
@@ -200,8 +199,8 @@ test.describe('Abyss with repeated copies', () => {
 
     const single = await save(page);
 
-    await radio(page, 'Repeat').click();
-    await radio(page, '2 by 2').click();
+    await (await choice(page, 'Repeat')).click();
+    await (await choice(page, '2 by 2')).click();
     await page.getByRole('button', { name: 'Export' }).click();
     await page.getByRole('menuitemcheckbox', { name: /Export current tiling/ }).click();
     await page.keyboard.press('Escape');

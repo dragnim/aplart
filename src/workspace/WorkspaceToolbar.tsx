@@ -23,17 +23,18 @@ interface Props {
   readonly onEnterFocus: () => void;
   /** Focus returns here when Focus mode is left. */
   readonly focusButtonRef?: React.Ref<HTMLButtonElement>;
-  readonly onResetArtwork: () => void;
 }
 
-export function WorkspaceToolbar({
-  preset,
-  state,
-  actions,
-  onEnterFocus,
-  focusButtonRef,
-  onResetArtwork,
-}: Props) {
+/*
+ * Three actions, and what they have in common is the artwork as a finished
+ * thing: how to see it, how to send it, how to take it away. Editing it happens
+ * beside it, in the panel of modes and the row of actions beneath them.
+ *
+ * Copy APL went to the Code tab, where the code it copies is. Reset went to the
+ * session actions, where Undo is — it is an editing decision, and it is now one
+ * that can be taken back.
+ */
+export function WorkspaceToolbar({ preset, state, actions, onEnterFocus, focusButtonRef }: Props) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const actionsGroup = useRef<HTMLDivElement>(null);
   const closeActions = useCallback(() => setActionsOpen(false), []);
@@ -67,16 +68,10 @@ export function WorkspaceToolbar({
           <button type="button" className={styles.action} ref={focusButtonRef} onClick={onEnterFocus}>
             Focus mode
           </button>
-          <button type="button" className={styles.action} onClick={actions.copyApl}>
-            Copy APL
-          </button>
           <button type="button" className={styles.action} onClick={actions.share}>
             Share
           </button>
           <ExportMenu actions={actions} triggerClassName={styles.action} />
-          <button type="button" className={styles.action} onClick={onResetArtwork} disabled={!state.modified}>
-            Reset
-          </button>
         </div>
       ) : (
         <div className={styles.actions}>
@@ -96,19 +91,6 @@ export function WorkspaceToolbar({
             </button>
             {actionsOpen && (
               <ul className={styles.menu} role="menu">
-                <li role="none">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={styles.menuItem}
-                    onClick={() => {
-                      setActionsOpen(false);
-                      actions.copyApl();
-                    }}
-                  >
-                    Copy APL
-                  </button>
-                </li>
                 <li role="none">
                   <button
                     type="button"
@@ -154,20 +136,6 @@ export function WorkspaceToolbar({
                     </button>
                   </li>
                 ))}
-                <li role="none">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={styles.menuItem}
-                    disabled={!state.modified}
-                    onClick={() => {
-                      setActionsOpen(false);
-                      onResetArtwork();
-                    }}
-                  >
-                    Reset
-                  </button>
-                </li>
               </ul>
             )}
           </div>

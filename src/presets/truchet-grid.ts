@@ -80,6 +80,63 @@ export const truchetGrid: ArtworkPreset = {
     },
   ],
 
+  /*
+   * How large the tiles are, which arrangement of them, and which shapes are in
+   * play. No quality rule: this artwork has no corner that collapses it, and the
+   * safety is in the ranges instead.
+   *
+   * Scale is the one that needed narrowing. The whole point of a Truchet tiling
+   * is that a path can be followed through it, and above about forty tiles the
+   * arcs are too small to follow — the picture becomes a texture. Below ten
+   * there is not enough tiling to wander through. Tile shapes stops at four
+   * because the renderer has four motifs and the fifth class draws the first
+   * shape again.
+   *
+   * Arrangement is the interesting one to offer. It is a hash seed, so it has no
+   * order at all — every value is as good as every other and neighbouring values
+   * are unrelated — which is exactly what makes it a good thing to sweep: it is
+   * the control that means "another one of these, please".
+   */
+  instantPlay: {
+    controls: [
+      {
+        parameterId: 'size',
+        label: 'Scale',
+        description: 'How many tiles across and down. Fewer tiles means larger curves.',
+        range: { min: 10, max: 40 },
+        endpoints: { low: 'Large', high: 'Small' },
+      },
+      {
+        parameterId: 'classes',
+        label: 'Tile shapes',
+        description: 'Two gives the classic flowing curves. Three and four add diagonals across them.',
+        range: { min: 2, max: 4 },
+        endpoints: { low: 'Curves', high: 'Mixed' },
+      },
+      {
+        parameterId: 'seed',
+        label: 'Arrangement',
+        description: 'Which way the tiles fall. The same arrangement always gives the same tiling.',
+        range: { min: 1, max: 99 },
+        endpoints: { low: 'First', high: 'Last' },
+      },
+    ],
+
+    /*
+     * Four, spread across the two controls that change the character. The
+     * arrangement drifts widely in every one of them, because it has no
+     * neighbourhood to leave: a seed forty away is not a variation of this
+     * tiling, it is another tiling of the same kind, which is what a recipe
+     * wants from its drift.
+     */
+    recipes: [
+      { id: 'flowing-curves', values: { size: 20, classes: 2, seed: 7 }, drift: { seed: 40, size: 4 } },
+      { id: 'cut-diagonals', values: { size: 24, classes: 3, seed: 31 }, drift: { seed: 40, size: 4 } },
+      { id: 'dense-maze', values: { size: 34, classes: 2, seed: 63 }, drift: { seed: 30, size: 5 } },
+      { id: 'broad-mix', values: { size: 14, classes: 4, seed: 22 }, drift: { seed: 40, size: 3 } },
+    ],
+  },
+
   defaultPaletteId: 'mono',
   // Tile motifs rather than coloured cells. A Truchet tiling is a grid of
   // shapes whose edges line up, so the curves run on across tile boundaries;

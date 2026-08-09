@@ -11,7 +11,7 @@
 import { describe, expect, it } from 'vitest';
 import { numberAssignedTo } from '@/editor/parameterBinding';
 import { modularBloom } from '@/presets/modular-bloom';
-import { truchetGrid } from '@/presets/truchet-grid';
+import { mandelbrotField } from '@/presets/mandelbrot-field';
 import { type InstantPlayConfig } from '@/presets/instantPlay';
 import { generateInstantPlayVariation } from '@/workspace/instantPlayVariation';
 import { readPlaySeed, startCreating } from '@/workspace/startCreating';
@@ -98,7 +98,9 @@ describe('startCreating', () => {
   });
 
   it('declines a preset with no curated variations, rather than inventing some', () => {
-    expect(truchetGrid.instantPlay).toBeUndefined();
-    expect(startCreating(truchetGrid, 1)).toBeNull();
+    // Truchet stood here until it was curated. The fractals are the artworks
+    // that still offer none, and a seed aimed at one has to open its default.
+    expect(mandelbrotField.instantPlay).toBeUndefined();
+    expect(startCreating(mandelbrotField, 1)).toBeNull();
   });
 });

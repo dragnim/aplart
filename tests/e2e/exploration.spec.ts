@@ -9,6 +9,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { editorLocator, pressRun } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 const PHONE = { width: 390, height: 844 };
@@ -24,7 +25,7 @@ async function openMandelbrot(page: Page) {
 }
 
 async function runAndWait(page: Page) {
-  await page.getByRole('button', { name: /^Run/ }).click();
+  await pressRun(page);
   await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 }
 
@@ -54,9 +55,19 @@ async function settledSignature(page: Page): Promise<string> {
   return previous;
 }
 
-/** The editor's text, which is where the truth about the view lives. */
+/**
+ * The editor's text, which is where the truth about the view lives.
+ *
+ * Read without navigating. CodeMirror stays mounted behind the other tabs, so
+ * textContent answers from any mode — and that matters here: several of these
+ * tests are about Focus mode, where reaching the editor means opening the
+ * drawer, and a reading that changed the state being asserted would be no
+ * reading at all. innerText would need the panel on screen, and the assertions
+ * are all substrings, so the line breaks it adds are not wanted either.
+ */
 async function code(page: Page): Promise<string> {
-  return (await page.locator('.cm-content').innerText()).replaceAll(' ', ' ');
+  // The non-breaking spaces CodeMirror renders, normalised to ordinary ones.
+  return (await editorLocator(page).textContent())?.replaceAll(' ', ' ') ?? '';
 }
 
 /**

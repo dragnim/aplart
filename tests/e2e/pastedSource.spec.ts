@@ -15,6 +15,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { editorOn, pressRun } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -43,9 +44,9 @@ function runStatus(page: Page) {
 
 /** Pastes the program into whichever artwork is open, and runs it. */
 async function pasteAndRun(page: Page) {
-  await page.locator('.cm-content').fill(JULIA);
-  await expect(page.locator('.cm-content')).toContainText('realC←¯0.8');
-  await page.getByRole('button', { name: /^Run/ }).click();
+  await (await editorOn(page)).fill(JULIA);
+  await expect(await editorOn(page)).toContainText('realC←¯0.8');
+  await pressRun(page);
   await expect(runStatus(page).first()).not.toHaveText(/Running/, { timeout: 30_000 });
 }
 
@@ -67,7 +68,7 @@ test.describe('a pasted program', () => {
     expect(stub.requests.length).toBeGreaterThan(1);
 
     // The source is untouched: what ran is what is on screen.
-    await expect(page.locator('.cm-content')).toContainText('realC←¯0.8');
+    await expect(await editorOn(page)).toContainText('realC←¯0.8');
   });
 
   test('costs the same as the identical program opened as Julia', async ({ page }) => {
@@ -93,7 +94,7 @@ test.describe('a pasted program', () => {
     await page.goto('./#/art/modular-bloom');
 
     // Small: Modular Bloom's own 64×64 result prints, so it is one evaluation.
-    await page.getByRole('button', { name: /^Run/ }).click();
+    await pressRun(page);
     await expect(runStatus(page).first()).not.toHaveText(/Running/, { timeout: 30_000 });
     await expect(page.getByText(/run several times/)).toHaveCount(0);
 

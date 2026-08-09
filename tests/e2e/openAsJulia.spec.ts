@@ -9,6 +9,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
+import { editorLocator, editorOn, pressRun } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -16,11 +17,28 @@ function runStatus(page: Page) {
   return page.locator('[role="status"][data-status]');
 }
 
-const editor = (page: Page) => page.locator('.cm-content');
+/*
+ * The editor's text, read wherever the test happens to be.
+ *
+ * The source is a fact about the workspace rather than about the mode on screen,
+ * and CodeMirror keeps its content mounted behind the other tabs — so this reads
+ * it without navigating. The tests that press Run navigate for that.
+ */
+/**
+ * The editor's text, read wherever the test happens to be.
+ *
+ * The source is a fact about the workspace rather than about the mode on screen,
+ * and CodeMirror keeps its content mounted behind the other tabs — so a
+ * `toContainText`, which reads `textContent`, works from anywhere. Reading
+ * `innerText` does not: that is *rendered* text, and a hidden panel renders
+ * none, so those calls go through `editorOn` and open the mode first. Mandelbrot
+ * has no curated controls and opens on Advanced, which is how this came up.
+ */
+const editor = (page: Page) => editorLocator(page);
 
 async function runMandelbrot(page: Page) {
   await page.goto('./#/art/mandelbrot-field');
-  await page.getByRole('button', { name: /^Run/ }).click();
+  await pressRun(page);
   await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
 }
 
@@ -41,7 +59,7 @@ test.describe('Open as Julia set', () => {
     await runMandelbrot(page);
     await selectPoint(page);
 
-    const mandelbrotSource = await editor(page).innerText();
+    const mandelbrotSource = await (await editorOn(page)).innerText();
     const afterMandelbrot = stub.requests.length;
 
     await page.getByRole('button', { name: 'Open as Julia set' }).click();
@@ -52,7 +70,7 @@ test.describe('Open as Julia set', () => {
     await expect(editor(page)).toContainText('realC←');
     await expect(page.getByText('Edited')).toBeVisible();
 
-    const juliaSource = await editor(page).innerText();
+    const juliaSource = await (await editorOn(page)).innerText();
     const constant = /realC←(¯?[\d.]+)[\s\S]*?imagC←(¯?[\d.]+)/u.exec(juliaSource);
     expect(constant, 'the handed-over constant').not.toBeNull();
 
@@ -69,7 +87,7 @@ test.describe('Open as Julia set', () => {
     await page.goBack();
     await expect(page.getByRole('heading', { level: 1, name: 'Mandelbrot Field' })).toBeVisible();
     await expect(editor(page)).toContainText('centreX←¯0.6');
-    expect(await editor(page).innerText()).toBe(mandelbrotSource);
+    expect(await (await editorOn(page)).innerText()).toBe(mandelbrotSource);
 
     // Forward. The same Julia, from the payload the tab still holds.
     await page.goForward();

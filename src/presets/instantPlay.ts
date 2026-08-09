@@ -14,6 +14,7 @@
  * the workspace.
  */
 
+import { type CreateQualityRule } from './createQuality';
 import { type ArtworkParameter, type ArtworkPreset } from './schema';
 
 /** No more than this many controls may face somebody in Play. */
@@ -59,6 +60,17 @@ export interface InstantPlayRecipe {
 export interface InstantPlayConfig {
   readonly controls: readonly InstantPlayControl[];
   readonly recipes: readonly InstantPlayRecipe[];
+  /**
+   * What this artwork will not let its curated controls produce.
+   *
+   * Optional, and about quality rather than validity: every combination a
+   * control can reach is a legal program, and Advanced and the editor still
+   * offer all of them. A rule is for the presets whose arithmetic has a corner
+   * that collapses the picture — it maps such a combination to the nearest one
+   * that does not, so Create stays dependable without narrowing what is
+   * reachable elsewhere.
+   */
+  readonly quality?: CreateQualityRule;
 }
 
 /** The parameter a Play control refers to, or undefined if it names none. */

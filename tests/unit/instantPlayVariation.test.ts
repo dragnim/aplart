@@ -47,10 +47,16 @@ function parameterFor(parameterId: string): ArtworkParameter {
 
 describe('generateInstantPlayVariation', () => {
   it('declines a preset that has not opted in', () => {
-    const truchet = getPreset('truchet-grid') as ArtworkPreset;
+    /*
+     * A fractal rather than Truchet, which used to be the example here and now
+     * has curated controls of its own. The fractals still have none — their
+     * meaningful parameters are viewport coordinates — and an artwork without
+     * them must produce no variation rather than one invented from raw ranges.
+     */
+    const mandelbrot = getPreset('mandelbrot-field') as ArtworkPreset;
 
-    expect(truchet.instantPlay).toBeUndefined();
-    expect(generateInstantPlayVariation(truchet, 1)).toBeNull();
+    expect(mandelbrot.instantPlay).toBeUndefined();
+    expect(generateInstantPlayVariation(mandelbrot, 1)).toBeNull();
   });
 
   it('gives the same variation for the same seed, every time', () => {

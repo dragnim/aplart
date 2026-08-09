@@ -31,11 +31,17 @@ export function ArtworkCard({ preset, featured = false }: Props) {
       </a>
 
       <div className={styles.body}>
+        {/*
+          The category, and no longer a difficulty beside it.
+
+          Beginner, Intermediate and Advanced described how hard the *program* is
+          to read, which is a judgement about the APL rather than about the
+          artwork — and on a card showing a picture, a title and a description, it
+          was read as how hard the piece is to use. Colour-coded red for the
+          fractals, which is a discouragement nobody meant to write.
+        */}
         <div className={styles.tags}>
           <span className={styles.category}>{preset.category}</span>
-          <span className={styles.difficulty} data-level={preset.difficulty}>
-            {preset.difficulty}
-          </span>
         </div>
 
         <h3 className={styles.title} id={titleId}>

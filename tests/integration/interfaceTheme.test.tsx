@@ -18,6 +18,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { colour, paletteChoice } from '../helpers/workspaceModes';
 import { App } from '@/app/App';
 import { getPalette } from '@/renderer/palettes';
 import { AccentPaletteContext, usePublishAccentPalette } from '@/theme/accentContext';
@@ -235,7 +236,7 @@ describe('following the palette', () => {
     await openedArtwork(/Julia/);
     expect(applied()).toEqual(themeFor('poolrooms'));
 
-    await user.click(screen.getByRole('radio', { name: /Neon/ }));
+    await user.click(paletteChoice(/Neon/));
 
     await waitFor(() => expect(applied()).toEqual(themeFor('neon')));
   });
@@ -247,7 +248,7 @@ describe('following the palette', () => {
     await openedArtwork(/Julia/);
     const before = applied();
 
-    await user.click(screen.getByRole('checkbox', { name: /Invert palette/ }));
+    await user.click(colour().getByRole('checkbox', { name: /Invert palette/ }));
 
     // Inverting changes the picture and not one interface colour.
     expect(applied()).toEqual(before);
@@ -259,7 +260,7 @@ describe('following the palette', () => {
     await go('#/art/julia-set');
     await openedArtwork(/Julia/);
 
-    await user.click(screen.getByRole('radio', { name: /Custom/ }));
+    await user.click(paletteChoice(/Custom/));
     await waitFor(() => expect(shell().dataset.accent).toBe('palette'));
     const seeded = applied();
 
@@ -403,7 +404,7 @@ describe('what applying a theme must not disturb', () => {
     const codeBefore = editor?.textContent ?? '';
     expect(codeBefore).not.toBe('');
 
-    await user.click(screen.getByRole('radio', { name: /Neon/ }));
+    await user.click(paletteChoice(/Neon/));
     await waitFor(() => expect(applied()).toEqual(themeFor('neon')));
 
     // The editor is untouched, so there is nothing for an undo to undo.

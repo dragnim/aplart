@@ -212,6 +212,63 @@ function evaluate(expression: string): NumericMatrix | { readonly error: readonl
     return fromNested(rows);
   }
 
+  /*
+   * Checker Shift.
+   *
+   *   repeat|(⍳size)∘.+offset×⍳size
+   *
+   * Row plus a sheared column, folded by the repeat. Answered here because
+   * "Start creating" draws from four artworks now, and an artwork this stub
+   * cannot evaluate arrives as a VALUE ERROR — which would make the journey
+   * spec pass or fail depending on which one the seed happened to choose.
+   */
+  const repeat = read('repeat');
+  const offset = read('offset');
+  if (size !== null && repeat !== null && repeat !== 0 && offset !== null) {
+    const rows: number[][] = [];
+    for (let row = 1; row <= size; row += 1) {
+      const values: number[] = [];
+      for (let column = 1; column <= size; column += 1) {
+        values.push((row + offset * column) % repeat);
+      }
+      rows.push(values);
+    }
+    return fromNested(rows);
+  }
+
+  /*
+   * Wave Interference.
+   *
+   *   angles←○(¯1+⍳symmetry)÷symmetry
+   *   ⌊0.5+100×⊃+/(1○phase+○2×frequency×((2○angles)×⊂X)+(1○angles)×⊂Y)
+   *
+   * One straight wave per direction, summed. Follows the preset's own
+   * arithmetic rather than returning a fixed picture, so that changing the
+   * frequency or the symmetry genuinely changes what comes back.
+   */
+  const frequency = read('frequency');
+  const symmetry = read('symmetry');
+  if (size !== null && frequency !== null && symmetry !== null && symmetry !== 0) {
+    const phase = readNumber('phase') ?? 0;
+    const angles = Array.from({ length: symmetry }, (_unused, index) => (Math.PI * index) / symmetry);
+
+    const rows: number[][] = [];
+    for (let row = 1; row <= size; row += 1) {
+      const y = (row - 1) / size;
+      const values: number[] = [];
+      for (let column = 1; column <= size; column += 1) {
+        const x = (column - 1) / size;
+        let total = 0;
+        for (const angle of angles) {
+          total += Math.sin(phase + 2 * Math.PI * frequency * (Math.cos(angle) * x + Math.sin(angle) * y));
+        }
+        values.push(Math.floor(0.5 + 100 * total));
+      }
+      rows.push(values);
+    }
+    return fromNested(rows);
+  }
+
   if (size === null || modulus === null) {
     return { error: ['VALUE ERROR: Undefined name: size', ` ${expression}`, '  ∧'] };
   }

@@ -14,6 +14,7 @@ import { MockAplExecutionService } from '@/execution/MockAplExecutionService';
 import { fromNested } from '@/matrix/matrixTypes';
 import { modularBloom } from '@/presets/modular-bloom';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { pressRunWith } from '../helpers/workspaceModes';
 
 /**
  * Chooses the layout, and stubs what jsdom does not implement.
@@ -128,7 +129,7 @@ describe('Focus mode on a wide screen', () => {
       const user = userEvent.setup();
       const service = renderWorkspace();
 
-      await user.click(screen.getByRole('button', { name: /^Run/ }));
+      await pressRunWith(user);
       await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument());
       const runs = service.executionCount;
 
@@ -143,7 +144,7 @@ describe('Focus mode on a wide screen', () => {
       const user = userEvent.setup();
       renderWorkspace();
 
-      await user.click(screen.getByRole('button', { name: /^Run/ }));
+      await pressRunWith(user);
       await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument());
       const drawn = screen.getByRole('img');
       const describedAs = drawn.getAttribute('aria-label');
@@ -171,7 +172,7 @@ describe('Focus mode on a wide screen', () => {
       expect(screen.getByLabelText('Modulus')).toHaveValue('16');
       expect(screen.getByText('Edited')).toBeInTheDocument();
 
-      await user.click(screen.getByRole('button', { name: /^Run/ }));
+      await pressRunWith(user);
       await waitFor(() => expect(service.received.length).toBeGreaterThan(0));
       expect(service.received[0]).toContain('modulus←16');
     });

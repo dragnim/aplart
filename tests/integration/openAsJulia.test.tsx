@@ -27,6 +27,7 @@ import { modularBloom } from '@/presets/modular-bloom';
 import { ADAPTIVE_MARKER } from '@/execution/adaptiveProbe';
 import { decodeShareState } from '@/sharing/decodeShareState';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
+import { advanced, codeEditor, paletteChoice, pressRunWith } from '../helpers/workspaceModes';
 
 /** A square canvas, so the artwork fills it and a press maps to a clean fraction. */
 const CANVAS = { left: 0, top: 0, width: 360, height: 360 };
@@ -95,7 +96,7 @@ function counts(size = SIZE, ceiling = 48): NumericMatrix {
 }
 
 const canvas = () => screen.getByRole('img', { name: /grid/ });
-const source = () => screen.getByRole('textbox', { name: /APL/i }).textContent ?? '';
+const source = () => codeEditor().textContent ?? '';
 const juliaAction = () => screen.queryByRole('button', { name: 'Open as Julia set' });
 
 async function openMandelbrot(matrix = counts()) {
@@ -109,7 +110,7 @@ async function openMandelbrot(matrix = counts()) {
   fireEvent.change(screen.getByLabelText('Centre down'), { target: { value: String(CENTRE_Y) } });
   await waitFor(() => expect(source()).toContain(`centreX←${String(CENTRE_X)}`));
 
-  await user.click(screen.getByRole('button', { name: /^Run/ }));
+  await pressRunWith(user);
   await waitFor(() => expect(screen.getByText(/Finished in/)).toBeInTheDocument());
   return { user, service };
 }
@@ -227,7 +228,7 @@ describe('the same point through every presentation', () => {
      * (6/9, 7/9] → display column 7.
      */
     const { user } = await openMandelbrot();
-    await user.click(screen.getByRole('radio', { name: '90°' }));
+    await user.click(advanced().getByRole('radio', { name: '90°' }));
 
     pressDisplayCell(2, 7);
     await screen.findByText('Row 3, column 2');
@@ -258,8 +259,8 @@ describe('the same point through every presentation', () => {
      * repeat is a way of looking at one matrix, not a larger one.
      */
     const { user } = await openMandelbrot();
-    await user.click(screen.getByRole('radio', { name: 'Repeat' }));
-    await user.click(screen.getByRole('radio', { name: '2 by 2' }));
+    await user.click(advanced().getByRole('radio', { name: 'Repeat' }));
+    await user.click(advanced().getByRole('radio', { name: '2 by 2' }));
 
     const x = CANVAS.width / 2 + ((2 - 0.5) / SIZE) * (CANVAS.width / 2);
     const y = CANVAS.height / 2 + ((3 - 0.5) / SIZE) * (CANVAS.height / 2);
@@ -279,8 +280,8 @@ describe('the same point through every presentation', () => {
      * mirrored within the copy, which is what `unreflect` undoes.
      */
     const { user } = await openMandelbrot();
-    await user.click(screen.getByRole('radio', { name: 'Mirror repeat' }));
-    await user.click(screen.getByRole('radio', { name: '2 by 2' }));
+    await user.click(advanced().getByRole('radio', { name: 'Mirror repeat' }));
+    await user.click(advanced().getByRole('radio', { name: '2 by 2' }));
 
     // Copy at column index 1 is reflected horizontally, so source column 2
     // appears at (SIZE − 2 + 1) = column 8 within that copy.
@@ -302,7 +303,7 @@ describe('when the action is offered', () => {
     const service = new MockAplExecutionService();
     service.register('default', counts());
     render(<WorkspacePage presetId={modularBloom.id} sharedState={null} service={service} />);
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
     await waitFor(() => expect(canvas()).toBeInTheDocument());
 
     pressDisplayCell(3, 2);
@@ -335,9 +336,9 @@ describe('when the action is offered', () => {
     const { user } = await openMandelbrot();
 
     // Chosen through the inspector's own controls rather than a pointer.
-    fireEvent.change(screen.getByLabelText(/^Row/), { target: { value: '5' } });
-    fireEvent.change(screen.getByLabelText(/^Column/), { target: { value: '5' } });
-    await user.click(screen.getByRole('button', { name: /^Inspect$/ }));
+    fireEvent.change(advanced().getByLabelText(/^Row/), { target: { value: '5' } });
+    fireEvent.change(advanced().getByLabelText(/^Column/), { target: { value: '5' } });
+    await user.click(advanced().getByRole('button', { name: /^Inspect$/ }));
     await screen.findByText('Row 5, column 5');
 
     const action = screen.getByRole('button', { name: 'Open as Julia set' });
@@ -372,7 +373,7 @@ describe('which result the coordinate comes from', () => {
     // A second run at a different centre becomes the authority.
     fireEvent.change(screen.getByLabelText('Centre across'), { target: { value: '0' } });
     await waitFor(() => expect(source()).toContain('centreX←0'));
-    await user.click(screen.getByRole('button', { name: /^Run/ }));
+    await pressRunWith(user);
     await waitFor(() => expect(screen.getByText(/Finished in/)).toBeInTheDocument());
 
     pressDisplayCell(5, 5);
@@ -431,8 +432,8 @@ describe('what Julia does with the handoff', () => {
     expect(source()).toContain('size←128');
     expect(source()).toContain('iterations←48');
 
-    expect(screen.getByRole('radio', { name: /Poolrooms/ })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('radio', { name: 'Pixel' })).toHaveAttribute('aria-checked', 'true');
+    expect(paletteChoice(/Poolrooms/)).toHaveAttribute('aria-checked', 'true');
+    expect(advanced().getByRole('radio', { name: 'Pixel' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('is marked Edited, because its APL differs from the preset', () => {

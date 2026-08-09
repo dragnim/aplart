@@ -11,6 +11,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { ADAPTIVE_MARKER } from '@/execution/adaptiveProbe';
 import { stubTryApl } from './stubTryApl';
+import { editorLocator, editorOn, runLocator } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 const SEED = 20_260_805;
@@ -162,7 +163,7 @@ test.describe('the Play workspace', () => {
       const box = await slider(page, label).boundingBox();
       expect(box?.height ?? 0, label).toBeGreaterThanOrEqual(44);
     }
-    for (const name of ['Randomise', 'Undo', 'Save image', 'Share']) {
+    for (const name of ['Randomise', 'Undo', 'Reset']) {
       const box = await sessionActions(page).getByRole('button', { name }).boundingBox();
       expect(box?.height ?? 0, name).toBeGreaterThanOrEqual(floor);
     }
@@ -196,7 +197,7 @@ test.describe('the Play workspace', () => {
 
     // And the real source says so, not only the control.
     await openDisclosure(page);
-    await expect(page.locator('.cm-content')).toContainText(`size←${String(to)}`);
+    await expect(await editorOn(page)).toContainText(`size←${String(to)}`);
   });
 
   test('arrow keys move a control, and each press is its own step', async ({ page }) => {
@@ -242,12 +243,20 @@ test.describe('the Play workspace', () => {
     expect(runs(stub.requests)).toBe(afterRandomise);
   });
 
-  test('Save image writes a PNG of what is on screen', async ({ page }) => {
+  test('Export writes a PNG of what is on screen', async ({ page }) => {
+    /*
+     * This was Save image, which wrote a 1024px PNG through the very function
+     * Export calls — with no say over the size, the caption or whether a repeat
+     * was composed. The claim worth keeping is that a session can get a real
+     * image out of what is on screen, so it is made against the control that
+     * actually does it.
+     */
     await stubTryApl(page);
     await openSession(page);
 
     const download = page.waitForEvent('download');
-    await sessionActions(page).getByRole('button', { name: 'Save image' }).click();
+    await page.getByRole('button', { name: 'Export' }).click();
+    await page.getByRole('menuitem', { name: '1024 × 1024' }).click();
     const path = await (await download).path();
 
     const { readFile } = await import('node:fs/promises');
@@ -264,17 +273,25 @@ test.describe('the Play workspace', () => {
     await openSession(page);
 
     const detail = await valueOf(page, 'Detail');
-    await sessionActions(page).getByRole('button', { name: 'Share' }).click();
+    // Share is a toolbar action: it acts on the artwork as an output.
+    await page.getByRole('button', { name: 'Share' }).click();
 
     const link = await page.evaluate(() => navigator.clipboard.readText());
     expect(link).toContain('#/art/modular-bloom?s=');
 
-    // Opened as a stranger would: the ordinary shared-link workspace, holding the
-    // artwork that was made. A share is not a session, so it waits to be run.
+    /*
+     * Opened as a stranger would: the same workspace, holding the artwork that
+     * was made. A share is still not a session — it carries somebody's work
+     * rather than a request for a fresh one — so it waits to be run rather than
+     * drawing on arrival. What it no longer does is arrive without the curated
+     * controls, which were never the shared link's to withhold.
+     */
     await page.goto(link);
     await expect(page.getByText(/shared with you/)).toBeVisible();
-    await expect(playPanel(page)).toHaveCount(0);
-    await expect(page.locator('.cm-content')).toContainText(`size←${String(detail)}`);
+    // Waiting, not drawn: the link carries somebody's work rather than a request
+    // for a new artwork, so the visitor decides when to run it.
+    await expect(page.getByText('Press Run to draw this artwork.')).toBeVisible();
+    await expect(editorLocator(page)).toContainText(`size←${String(detail)}`);
   });
 
   test('keeps the editor out of the way until it is asked for', async ({ page }) => {
@@ -286,13 +303,19 @@ test.describe('the Play workspace', () => {
      * in a browser: nothing in it should be tabbable while another mode is on
      * show, and all of it should be there the moment that mode is chosen.
      */
-    await expect(page.getByRole('button', { name: /^Run/ })).toBeHidden();
-    await expect(page.locator('.cm-content')).toBeHidden();
+    /*
+     * Passive locators, deliberately. The navigating helpers press the Code tab
+     * before handing back what they found, which is right for a test that wants
+     * to use the editor and exactly wrong for one asking whether it is hidden —
+     * it would open the panel and then assert about the panel it had opened.
+     */
+    await expect(runLocator(page)).toBeHidden();
+    await expect(editorLocator(page)).toBeHidden();
 
     await openDisclosure(page);
 
-    await expect(page.getByRole('button', { name: /^Run/ })).toBeVisible();
-    await expect(page.locator('.cm-content')).toBeVisible();
+    await expect(runLocator(page)).toBeVisible();
+    await expect(editorLocator(page)).toBeVisible();
 
     // The technical parameters are their own mode, one press further on.
     await page.getByRole('tab', { name: 'Advanced', exact: true }).first().click();
@@ -316,12 +339,12 @@ test.describe('the Play workspace', () => {
 
     // Opening the editor and putting the caret in it changes nothing.
     await openDisclosure(page);
-    await page.locator('.cm-content').click();
+    await (await editorOn(page)).click();
     await expect(undo).toBeEnabled();
 
     // Typing does.
     await page.keyboard.type(' ⍝ mine');
-    await expect(page.locator('.cm-content')).toContainText('⍝ mine');
+    await expect(await editorOn(page)).toContainText('⍝ mine');
     await expect(undo).toBeDisabled();
 
     // And a Play control afterwards starts a fresh sequence, which cannot reach
@@ -335,7 +358,7 @@ test.describe('the Play workspace', () => {
 
     await undo.click();
     expect(await valueOf(page, 'Scale')).toBe(edited);
-    await expect(page.locator('.cm-content')).toContainText('⍝ mine');
+    await expect(await editorOn(page)).toContainText('⍝ mine');
     await expect(undo).toBeDisabled();
   });
 
@@ -359,9 +382,15 @@ test.describe('the Play workspace', () => {
 
     await peek.getByRole('button', { name: 'Edit the APL for Scale' }).click();
 
-    // The editor is showing, the line is on screen, and the value itself is
-    // selected — not the whole line, and not merely coloured.
-    await expect(page.locator('.cm-content')).toBeVisible();
+    /*
+     * The editor is showing, the line is on screen, and the value itself is
+     * selected — not the whole line, and not merely coloured.
+     *
+     * A passive locator: "Edit the APL" has already selected the Code mode, and
+     * pressing the tab again to look would move focus to the tab and undo the
+     * very thing being asserted below.
+     */
+    await expect(editorLocator(page)).toBeVisible();
     const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '');
     expect(selected).toBe(String(scale));
 
@@ -378,10 +407,18 @@ test.describe('the Play workspace', () => {
   });
 
   test('opening the editor is not a page, and costs no history', async ({ page }) => {
+    /*
+     * Opened at a known artwork rather than through Start creating, which now
+     * draws from a pool of four and would hand this test a different set of
+     * control names each run. The subject is what opening the editor costs, and
+     * that is the same whichever artwork is open.
+     */
     const stub = await stubTryApl(page);
     await page.goto('./');
-    await page.getByRole('link', { name: 'Start creating' }).click();
-    await expect(artwork(page)).toBeVisible({ timeout: 30_000 });
+    // Modular Bloom's own card, so the control names below are this artwork's
+    // and the history is still gallery-then-artwork, which Back depends on.
+    await page.getByRole('link', { name: 'Open Modular Bloom' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: 'Modular Bloom' })).toBeVisible();
 
     await dragRight(page, slider(page, 'Detail'));
     const undo = sessionActions(page).getByRole('button', { name: /^Undo/ });
@@ -390,7 +427,7 @@ test.describe('the Play workspace', () => {
     const url = page.url();
     const before = runs(stub.requests);
     await editApl(page, 'size');
-    await expect(page.locator('.cm-content')).toBeVisible();
+    await expect(await editorOn(page)).toBeVisible();
 
     // Nothing ran, the address did not move, and the step back survived.
     expect(runs(stub.requests)).toBe(before);
@@ -400,7 +437,9 @@ test.describe('the Play workspace', () => {
     // One press of Back leaves the artwork for the gallery, rather than closing
     // an editor somebody never navigated to.
     await page.goBack();
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Tiny programs.');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(
+      'Infinite patterns from tiny programs.',
+    );
   });
 
   test('lets you type straight away, and says so by dropping Undo', async ({ page }) => {
@@ -415,7 +454,7 @@ test.describe('the Play workspace', () => {
     // The value is selected, so typing replaces it: no clicking, no hunting.
     await page.keyboard.type('9');
 
-    await expect(page.locator('.cm-content')).toContainText('modulus←9');
+    await expect(await editorOn(page)).toContainText('modulus←9');
     await expect(undo).toBeDisabled();
   });
 
@@ -460,7 +499,7 @@ test.describe('the Play workspace', () => {
     await expect(drawer.locator('[data-session-panel]')).toHaveCount(1);
 
     // And every action in it is genuinely pressable where it now sits.
-    for (const name of ['Randomise', 'Save image', 'Share']) {
+    for (const name of ['Randomise', 'Reset']) {
       await expect(sessionActions(page).getByRole('button', { name })).toBeVisible();
     }
     await expect(slider(page, 'Complexity')).toBeVisible();
@@ -475,8 +514,8 @@ test.describe('the Play workspace', () => {
 
     // The drawer is where the editor lives in Focus mode, and there is one editor
     // rather than a second one mounted into the overlay.
-    await expect(page.locator('.cm-content')).toBeVisible();
-    expect(await page.locator('.cm-content').count()).toBe(1);
+    await expect(await editorOn(page)).toBeVisible();
+    expect(await (await editorOn(page)).count()).toBe(1);
 
     const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '');
     expect(selected).toBe(String(await valueOf(page, 'Complexity')));
@@ -536,18 +575,47 @@ test.describe('the Play workspace', () => {
       .not.toContain('cm-content');
   });
 
-  test('leaves an artwork opened from its card exactly as it was', async ({ page }) => {
+  test('opens an artwork from its card in the same workspace, at its own default', async ({ page }) => {
+    /*
+     * This asserted the opposite: that a card-opened artwork had no Create tab
+     * and no curated controls, because the tabbed workspace existed only for a
+     * seeded session. The two are separate now — curated controls are a property
+     * of the artwork, and the workspace is the workspace — so what a card gets
+     * you is the same interface holding the preset's own program rather than a
+     * variation of it, and nothing run until you ask.
+     */
     const stub = await stubTryApl(page);
     await page.goto('./#/art/modular-bloom');
 
-    await expect(playPanel(page)).toHaveCount(0);
+    await expect(playPanel(page)).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Create', exact: true })).toBeVisible();
     await expect(page.getByText('Press Run to draw this artwork.')).toBeVisible();
-    // No editing modes either: the full workspace is the workspace.
-    await expect(page.getByRole('tab', { name: 'Create' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /^Run/ })).toBeVisible();
     expect(stub.requests).toHaveLength(0);
 
-    // And no Peek: the technical controls are named after the code already, so
+    // The preset as it ships, not a curated variation of it.
+    await expect(editorLocator(page)).toContainText('modulus←17');
+  });
+
+  test('leaves Create out of an artwork that has no curated controls', async ({ page }) => {
+    await stubTryApl(page);
+    await page.goto('./#/art/mandelbrot-field');
+    await expect(page.getByRole('heading', { level: 1, name: 'Mandelbrot Field' })).toBeVisible();
+
+    /*
+     * Left out rather than shown empty: a Create tab with nothing behind it
+     * invites a press and answers with a blank panel. Advanced is where this
+     * artwork's real parameters are, so that is where it opens.
+     */
+    await expect(page.getByRole('tab', { name: 'Create', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: 'Advanced', exact: true })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    for (const mode of ['Colour', 'Animate', 'Advanced', 'Code']) {
+      await expect(page.getByRole('tab', { name: mode, exact: true }), mode).toBeVisible();
+    }
+
+    // And no Peek: its technical controls are named after the code already, so
     // there is nothing for a disclosure to explain.
     await expect(page.getByText('How this changes the APL')).toHaveCount(0);
     await expect(page.getByRole('button', { name: /^Edit the APL/ })).toHaveCount(0);
@@ -583,7 +651,7 @@ test.describe('the Play workspace on a phone', () => {
     expect(stub.requests.at(-1)).toContain(`modulus←${String(from + 1)}`);
 
     await page.getByRole('tab', { name: 'Code' }).click();
-    await expect(page.locator('.cm-content')).toContainText(`modulus←${String(from + 1)}`);
+    await expect(await editorOn(page)).toContainText(`modulus←${String(from + 1)}`);
   });
 
   test('Edit the APL moves to the Code tab and reveals the line there', async ({ page }) => {
@@ -597,7 +665,7 @@ test.describe('the Play workspace on a phone', () => {
     // The narrow layout keeps the editor in a tab, so the tab is what has to
     // change — and it is the Code tab that ends up selected.
     await expect(page.getByRole('tab', { name: 'Code' })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.locator('.cm-content')).toBeVisible();
+    await expect(await editorOn(page)).toBeVisible();
 
     const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '');
     expect(selected).toBe(String(detail));
