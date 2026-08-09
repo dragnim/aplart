@@ -77,6 +77,13 @@ export function FocusToolbar({ title, state, actions, drawerOpen, onToggleDrawer
       </div>
 
       <div className={styles.actions}>
+        {/*
+          The way back to the controls when they are hidden, and the way to them
+          when they have never been opened. `aria-expanded` says which of the two
+          it currently is; the drawer carries its own Close for the other
+          direction, so this name can stay the same in both states — which is what
+          voice control and every test that addresses it rely on.
+        */}
         <button type="button" className={styles.action} aria-expanded={drawerOpen} onClick={onToggleDrawer}>
           Controls
         </button>

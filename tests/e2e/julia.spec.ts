@@ -10,7 +10,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
-import { choice, editorOn, pressRun, showMode } from './workspaceModes';
+import { enterFocus, choice, editorOn, pressRun, showMode } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -144,7 +144,7 @@ test.describe('Julia Set', () => {
     await expect((await showMode(page, 'Colour')).getByLabel('Mode')).toHaveValue('bands');
 
     // Focus mode and back.
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await expect(page.locator('canvas').first()).toBeVisible();
     await page.getByRole('button', { name: 'Exit focus' }).click();
     await expect(page.getByRole('button', { name: 'Focus mode' })).toBeVisible();

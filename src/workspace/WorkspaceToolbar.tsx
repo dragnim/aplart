@@ -1,6 +1,13 @@
 /**
- * The workspace header: where you came from, what this is, and what you can
- * do with it.
+ * What you can do with the artwork, in the app bar.
+ *
+ * Only that. This was the workspace's own header — a back link, the artwork's
+ * title, its category, and these three actions — and then briefly the title and
+ * the actions inside the app bar. The title has gone back to the workspace,
+ * immediately above the picture it names, because that is where it belongs: the
+ * wordmark is the site, the title is the artwork, and these are what you can do
+ * to it. Putting the title up here made the bar say two things at once and left
+ * it stranded from the artwork on a wide screen.
  *
  * The share, copy and export behaviour is not implemented here. It arrives as
  * `actions`, shared with the Focus-mode overlay, so the two cannot drift apart
@@ -10,13 +17,11 @@
 import { useCallback, useRef, useState } from 'react';
 import { useMediaQuery } from '@/app/useMediaQuery';
 import { useDismissable } from '@/components/useDismissable';
-import { type ArtworkPreset } from '@/presets/schema';
 import { ExportMenu } from './ExportMenu';
 import { EXPORT_SIZES, type ArtworkActions } from './useArtworkActions';
 import styles from './WorkspaceToolbar.module.css';
 
 interface Props {
-  readonly preset: ArtworkPreset;
   readonly actions: ArtworkActions;
   readonly onEnterFocus: () => void;
   /** Focus returns here when Focus mode is left. */
@@ -32,7 +37,7 @@ interface Props {
  * session actions, where Undo is — it is an editing decision, and it is now one
  * that can be taken back.
  */
-export function WorkspaceToolbar({ preset, actions, onEnterFocus, focusButtonRef }: Props) {
+export function WorkspaceToolbar({ actions, onEnterFocus, focusButtonRef }: Props) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const actionsGroup = useRef<HTMLDivElement>(null);
   const closeActions = useCallback(() => setActionsOpen(false), []);
@@ -41,27 +46,25 @@ export function WorkspaceToolbar({ preset, actions, onEnterFocus, focusButtonRef
   // Enough width for the controls to sit on one line beside the title.
   const roomForRow = useMediaQuery('(min-width: 48rem)');
 
+  /*
+   * And enough for Focus to keep a button of its own.
+   *
+   * Below this the bar cannot hold a wordmark, two controls and a menu on one
+   * row, and it used to answer by growing to two — 113px of chrome on a phone,
+   * which is the opposite of what this bar is for. So Focus folds into the
+   * overflow beside the rest, leaving a wordmark, one control and the site menu.
+   */
+  const roomForFocusButton = useMediaQuery('(min-width: 36rem)');
+
   return (
     <div className={styles.toolbar}>
       {/*
-        The title, and nothing under it.
+        Three widths, one row at every one of them.
 
-        This used to be a band of its own: a back link, the title, and a line
-        reading "Pattern · Original" beneath. The back link went because the
-        wordmark to its left is the way home and the menu to its right holds the
-        Gallery. The category went because the gallery card it came from already
-        says it, and repeating it bought a whole row.
-
-        Edited and Original did not go — that one means something, and it now sits
-        with Undo and Reset in the controls, where what it describes can be acted
-        on.
-      */}
-      <h1 className={styles.title}>{preset.title}</h1>
-
-      {/*
-        Focus mode stays out of the overflow menu at every width. It is the one
-        action here that changes how the artwork is seen rather than what is
-        done with it, and burying it would defeat the point.
+        Wide: all three actions visible. Middle: Focus keeps its button and the
+        rest fold into Actions. Phone: Focus folds in too, leaving a wordmark, one
+        overflow and the site menu — which is the only arrangement that fits 390px
+        without a second row, and a second row is what this bar exists to remove.
       */}
       {roomForRow ? (
         <div className={styles.actions}>
@@ -75,9 +78,17 @@ export function WorkspaceToolbar({ preset, actions, onEnterFocus, focusButtonRef
         </div>
       ) : (
         <div className={styles.actions}>
-          <button type="button" className={styles.action} ref={focusButtonRef} onClick={onEnterFocus}>
-            Focus mode
-          </button>
+          {/*
+            Focus keeps its own button while there is room for one, because it is
+            the action that changes how the artwork is seen rather than what is
+            done with it. On a phone there is no room, and one control that opens
+            everything beats two that between them fill the bar.
+          */}
+          {roomForFocusButton && (
+            <button type="button" className={styles.action} ref={focusButtonRef} onClick={onEnterFocus}>
+              Focus mode
+            </button>
+          )}
 
           <div className={styles.menuGroup} ref={actionsGroup}>
             <button
@@ -91,6 +102,23 @@ export function WorkspaceToolbar({ preset, actions, onEnterFocus, focusButtonRef
             </button>
             {actionsOpen && (
               <ul className={styles.menu} role="menu">
+                {/* Where Focus goes once its own button has had to give way. */}
+                {!roomForFocusButton && (
+                  <li role="none">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={styles.menuItem}
+                      ref={focusButtonRef}
+                      onClick={() => {
+                        setActionsOpen(false);
+                        onEnterFocus();
+                      }}
+                    >
+                      Focus mode
+                    </button>
+                  </li>
+                )}
                 <li role="none">
                   <button
                     type="button"

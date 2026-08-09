@@ -46,7 +46,14 @@
    * reserves so a message cannot shift the page — and the balance of the 208 is
    * the room beneath the square.
    */
-  --play-artwork: calc(100dvh - 13rem);
+  /*
+   * Was 13rem, when a global header sat above a title-and-action band of the
+   * workspace's own. The band has gone into the app bar and only the artwork's
+   * name came back, so the allowance is the compact bar, that one line of title,
+   * and the room beneath the square. Measured, not guessed: 11rem puts the foot
+   * of the picture inside the window at every desktop height checked.
+   */
+  --play-artwork: calc(100dvh - 11rem);
 }
 
 .shareNotice {
@@ -81,7 +88,7 @@
   gap: var(--space-5);
   /* Independent scrolling so a long control list never pushes the artwork
      off screen. */
-  max-height: calc(100dvh - 12rem);
+  max-height: calc(100dvh - 8rem);
   overflow-y: auto;
   overflow-x: hidden;
   /*
@@ -160,7 +167,7 @@
   position: sticky;
   top: var(--space-4);
   aspect-ratio: 1;
-  max-height: calc(100dvh - 12rem);
+  max-height: calc(100dvh - 8rem);
 }
 
 /* ── A Play session ───────────────────────────────────────────────────────
@@ -230,6 +237,102 @@
 
 .playArea {
   min-width: 0;
+}
+
+/*
+ * The artwork's column: its name, then the picture.
+ *
+ * A wrapper rather than a second grid row, so the title inherits the artwork's
+ * track — and therefore its left edge and its width — without either of them
+ * having to know a number the other also knows.
+ */
+.artworkColumn {
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: var(--space-2);
+  min-inline-size: 0;
+  /*
+   * The rows keep their own size; the leftover goes to the bottom.
+   *
+   * The row beside this one is a panel whose height changes with the mode, and
+   * `align-items: stretch` on the grid above makes this column as tall as it. A
+   * grid's default `align-content` behaves as `stretch`, which shares any spare
+   * height between `auto` rows — so a taller panel grew the *title's* row and
+   * pushed the artwork down with it. Measured at 3.6px between Create and
+   * Advanced: small, and exactly the kind of thing that makes a picture appear
+   * to twitch when somebody changes tab.
+   */
+  align-content: start;
+}
+
+/*
+ * Compact, because it is a caption on a picture rather than the headline of a
+ * page. The old workspace set this at --text-2xl above a metadata line and a row
+ * of actions; what is wanted here is the artwork's name, close enough to the
+ * artwork to belong to it.
+ */
+.artworkTitle {
+  margin: 0;
+  font-size: var(--text-lg);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  /*
+   * Exactly one line, reserved.
+   *
+   * The artwork sits directly beneath this, so anything that changes the
+   * heading's height moves the picture. Its height is not as fixed as it looks:
+   * the marker below is an inline-block in the line box, and the line box was
+   * measured growing 3.6px between one mode and another — enough to shift the
+   * artwork down and fail the test that says a tab must move nothing.
+   *
+   * Stating the height removes the question. It is the line-height the type
+   * scale already implies, so nothing is clipped that was not already on one
+   * line.
+   */
+  block-size: calc(var(--text-lg) * 1.2);
+  /* Truncates rather than wrapping to a second line and moving the artwork. */
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * The one place the workspace states its connection to the artwork, and it does
+ * it with a single square rather than by colouring the words.
+ *
+ * A pixel block because that is what the wordmark is made of; the same motif at
+ * a smaller size, once. Colouring the title itself was legible but put a third
+ * strong colour beside the logo and the Run button, and the point is that the
+ * logo stays the signature. The section headings deliberately get nothing:
+ * markers there would decorate the furniture rather than say anything about the
+ * artwork.
+ *
+ * It came here with the title. While the title was in the app bar this had a
+ * second, hanging form for phones, because the Gallery button shared that row
+ * and the block's 0.84em was enough to wrap the longest names. The title has its
+ * own line in the workspace now, so there is nothing to wrap and one form does
+ * every width.
+ *
+ * No space between the block and the first word — margin instead — so a long
+ * title can never leave the marker stranded on a line of its own.
+ */
+.artworkTitle::before {
+  content: '';
+  display: inline-block;
+  width: 0.42em;
+  height: 0.42em;
+  margin-right: 0.42em;
+  vertical-align: 0.06em;
+  background: var(--ui-accent-solid);
+}
+
+/*
+ * Focus mode has its own overlay title, and the artwork fills the window there,
+ * so this one would be a heading floating over the top-left of the picture.
+ */
+.page[data-focus='true'] .artworkTitle {
+  display: none;
 }
 
 /*
@@ -517,7 +620,9 @@
   bottom: 0;
   left: 0;
   z-index: 25;
-  width: clamp(21rem, 30vw, 26rem);
+  /* Narrower than it was (21–26rem): the artwork is the point, and a drawer
+     taking a third of a laptop screen reads as a column rather than an overlay. */
+  width: clamp(19rem, 24vw, 23rem);
   max-height: none;
   padding: var(--space-4);
   /*
@@ -531,6 +636,64 @@
   box-shadow: var(--shadow-lg);
   overflow-y: auto;
   transition: transform var(--motion-slow) var(--ease);
+  /*
+   * Stretched, or the insets above are decoration.
+   *
+   * The same trap the artwork panel documents a few rules up, and this drawer had
+   * it latent all along: a session gives this column `align-self: start`, and an
+   * absolutely positioned box with insets on both sides takes its *content's*
+   * height rather than the space between them unless its self-alignment is
+   * `stretch`. `top` and `bottom` were both set here and neither was doing
+   * anything.
+   *
+   * It stayed invisible while the panel inside carried a `100dvh` ceiling of its
+   * own, because the content could not grow much past the window anyway. Removing
+   * that ceiling — which is what made this drawer the single scrolling context —
+   * let a tall mode grow the box instead: measured at 1965px on an 800px window,
+   * with Randomise, Undo and Reset at y=1964 and no way to reach them, because a
+   * box exactly as tall as its contents has nothing to scroll.
+   */
+  justify-self: stretch;
+  align-self: stretch;
+}
+
+/*
+ * One scrollbar, owned by the drawer.
+ *
+ * There were three, nested: this column, the session panel's ceiling of
+ * `100dvh - 13rem`, and the bordered card of tab content inside that. A wheel
+ * gesture moved whichever the pointer happened to be over, and the Code tab was
+ * an editor scrolling inside a card scrolling inside a drawer — three bars down
+ * one edge of a panel 26rem wide.
+ *
+ * The panel's ceiling and the card's scroller are both removed in Focus mode, so
+ * the content simply grows and the drawer scrolls it. The ordinary workspace
+ * keeps both: there the panel sits beside the artwork in a column that must not
+ * outgrow the window, which is the case they were written for.
+ */
+.page[data-focus='true'] .leftColumn > * {
+  max-block-size: none;
+}
+
+.page[data-focus='true'] .leftColumn [data-panel-content] {
+  overflow: visible;
+  max-block-size: none;
+}
+
+/*
+ * And the three actions stay in reach without a region of their own.
+ *
+ * Stuck to the foot of the drawer's own scroller rather than pinned by a grid
+ * row, which is what made the panel need a ceiling in the first place.
+ */
+.page[data-focus='true'] .leftColumn [data-panel-actions] {
+  position: sticky;
+  inset-block-end: calc(var(--space-4) * -1);
+  z-index: 1;
+  margin-block-start: var(--space-2);
+  padding-block: var(--space-3);
+  background: var(--surface);
+  box-shadow: 0 -8px 12px -8px rgb(0 0 0 / 18%);
 }
 
 .page[data-focus='true'] .leftColumn[data-drawer='closed'] {

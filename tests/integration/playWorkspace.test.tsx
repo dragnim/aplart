@@ -266,7 +266,9 @@ describe('when a session is what opened the workspace', () => {
   it('puts Focus mode, Share and Export in the toolbar, and nothing else', () => {
     openPlay();
 
-    const toolbar = screen.getByRole('link', { name: /Gallery/ }).closest('div')?.parentElement;
+    // Anchored on the toolbar itself. The title is not here any more — it went
+    // back to the workspace, above the artwork it names.
+    const toolbar = screen.getByRole('button', { name: 'Focus mode' }).closest('div[class*="toolbar"]');
     expect(toolbar).not.toBeNull();
 
     const named = within(toolbar as HTMLElement)

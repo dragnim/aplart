@@ -9,7 +9,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
-import { editorLocator, pressRun } from './workspaceModes';
+import { enterFocus, editorLocator, pressRun } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 const PHONE = { width: 390, height: 844 };
@@ -209,7 +209,7 @@ test.describe('exploring the Mandelbrot set', () => {
   test('Escape abandons a drag in progress without leaving Focus mode', async ({ page }) => {
     await openMandelbrot(page);
     await runAndWait(page);
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await page.getByRole('button', { name: 'Controls', exact: true }).click();
 
     const box = await page.locator('canvas').boundingBox();
@@ -269,7 +269,7 @@ test.describe('reading a value off the artwork', () => {
      * — an earlier version of this test pressed the far left of the workspace
      * canvas and got column 3, correctly.
      */
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await page.getByRole('button', { name: 'Controls', exact: true }).click();
     await page.waitForTimeout(500);
 
@@ -285,7 +285,7 @@ test.describe('reading a value off the artwork', () => {
   test('works in Focus mode, where the artwork is letterboxed differently', async ({ page }) => {
     await openMandelbrot(page);
     await runAndWait(page);
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await page.getByRole('button', { name: 'Controls', exact: true }).click();
     await page.waitForTimeout(500);
 

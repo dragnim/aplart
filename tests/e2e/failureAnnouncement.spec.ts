@@ -17,7 +17,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
-import { pressRun } from './workspaceModes';
+import { enterFocus, pressRun } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -83,7 +83,7 @@ test.describe('a failed run', () => {
 
     // Focus mode opens the drawer itself, so the panel and the toolbar are both
     // on screen — the case the toolbar's existing rule already covered.
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await expect(page.locator('[data-focus="true"]')).toBeVisible();
 
     const heard = await heardRegions(page);
@@ -93,7 +93,7 @@ test.describe('a failed run', () => {
 
   test('is announced once in Focus mode, with the drawer shut', async ({ page }) => {
     await runAndFail(page);
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await expect(page.locator('[data-focus="true"]')).toBeVisible();
 
     /*

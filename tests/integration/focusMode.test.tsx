@@ -67,8 +67,23 @@ function drawer() {
   return element;
 }
 
-function enterFocus(user: ReturnType<typeof userEvent.setup>) {
-  return user.click(screen.getByRole('button', { name: 'Focus mode' }));
+/**
+ * Into Focus, from wherever the width has put the control.
+ *
+ * On a phone the app bar cannot hold a wordmark, a title, Focus and a menu on one
+ * row, so Focus folds into the Actions overflow beside them. It is the same
+ * action either way, and a test about Focus mode should not have to care which
+ * width it is being run at.
+ */
+async function enterFocus(user: ReturnType<typeof userEvent.setup>) {
+  const direct = screen.queryByRole('button', { name: 'Focus mode' });
+  if (direct !== null) {
+    await user.click(direct);
+    return;
+  }
+
+  await user.click(screen.getByRole('button', { name: 'Actions' }));
+  await user.click(screen.getByRole('menuitem', { name: 'Focus mode' }));
 }
 
 describe('Focus mode on a wide screen', () => {
@@ -211,6 +226,39 @@ describe('Focus mode on a wide screen', () => {
       // person out of Focus mode in the same keystroke.
       expect(screen.queryByRole('menu')).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Exit focus' })).toBeInTheDocument();
+    });
+
+    it('unwinds one layer per press, in order, and never two at once', async () => {
+      /*
+       * The whole hierarchy in one test, because the fault it guards against is
+       * a keystroke crossing two layers — and that only shows up when the layers
+       * are stacked. A menu inside a drawer inside Focus is three presses out,
+       * and each press must take exactly one.
+       */
+      const user = userEvent.setup();
+      renderWorkspace();
+      await enterFocus(user);
+
+      // The drawer opens with Focus; add a menu on top of it.
+      expect(drawer()).toHaveAttribute('data-drawer', 'open');
+      await user.click(screen.getByRole('button', { name: 'Export' }));
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+
+      // One: the menu. The drawer and Focus are untouched.
+      await user.keyboard('{Escape}');
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+      expect(drawer()).toHaveAttribute('data-drawer', 'open');
+      expect(screen.getByRole('button', { name: 'Exit focus' })).toBeInTheDocument();
+
+      // Two: the drawer. Still in Focus.
+      await user.keyboard('{Escape}');
+      expect(drawer()).toHaveAttribute('data-drawer', 'closed');
+      expect(screen.getByRole('button', { name: 'Exit focus' })).toBeInTheDocument();
+
+      // Three, and only now: Focus itself.
+      await user.keyboard('{Escape}');
+      expect(screen.queryByRole('button', { name: 'Exit focus' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Focus mode' })).toBeInTheDocument();
     });
   });
 

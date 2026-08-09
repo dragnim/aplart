@@ -8,13 +8,27 @@
  * at every width.
  */
 .header {
+  padding-block: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/*
+ * Full width, and deliberately not on the workspace's measure.
+ *
+ * It was briefly centred on `--layout-max` so that the artwork's title, which
+ * used to live here, would line up with the artwork. The title has gone back to
+ * the workspace instead — which is the better answer to that problem, and it
+ * leaves this free to be what it should be: the wordmark anchored to the corner
+ * of the window, in the same place on every route whatever the page beneath it
+ * is doing.
+ */
+.inner {
   display: flex;
   align-items: center;
   gap: var(--space-4);
   min-block-size: var(--tap-target);
-  padding: var(--space-2) var(--space-4);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  padding-inline: var(--space-4);
 }
 
 /*

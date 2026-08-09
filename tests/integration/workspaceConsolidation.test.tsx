@@ -161,7 +161,9 @@ describe('where the actions live', () => {
 
     // Anchored on the title rather than on the old back link: the way home is
     // the wordmark and the site menu in the app bar now, not a button here.
-    const toolbar = screen.getByRole('heading', { level: 1 }).parentElement;
+    // Anchored on the toolbar itself. The title is not here any more — it went
+    // back to the workspace, above the artwork it names.
+    const toolbar = screen.getByRole('button', { name: 'Focus mode' }).closest('div[class*="toolbar"]');
     const named = within(toolbar as HTMLElement)
       .getAllByRole('button')
       .map((button) => button.textContent?.trim());

@@ -135,17 +135,29 @@ for (const size of SIZES) {
       expect(panelBox.x).toBeGreaterThanOrEqual((picture?.x ?? 0) + (picture?.width ?? 0) - 1);
 
       /*
-       * And the composition lines up with the page's own margins.
+       * And the composition uses the whole of its row, edge to edge.
        *
-       * The title is the reference because it is what the eye compares the
-       * artwork against: they sit one above the other, and the artwork drifting
-       * right of it is exactly what the bias looked like.
+       * The reference was the artwork's title, back when the title sat directly
+       * above the picture in a band of its own. It is in the app bar now, beside
+       * the wordmark, so it says nothing about where the row begins. The row
+       * itself does: the artwork starts at its left edge and the panel finishes
+       * at its right, and any width left over between them is the bias this
+       * guards against.
        */
-      const title = await page.getByRole('heading', { level: 1 }).boundingBox();
-      expect(Math.round((picture?.x ?? 0) - (title?.x ?? 0))).toBeLessThanOrEqual(1);
+      // Walked up from the canvas to the grid itself, because a CSS-module class
+      // cannot be selected by name from here and every ancestor is a `div`.
+      const row = await page.evaluate(() => {
+        let node = document.querySelector('canvas')?.parentElement ?? null;
+        while (node !== null && ![...node.classList].some((name) => name.includes('columns'))) {
+          node = node.parentElement;
+        }
+        const box = node?.getBoundingClientRect();
+        return box === undefined ? null : { x: box.x, width: box.width };
+      });
+      expect(Math.round((picture?.x ?? 0) - (row?.x ?? 0))).toBeLessThanOrEqual(1);
 
-      // The other edge likewise: the panel finishes where the page's actions do.
-      const actions = await page.getByRole('button', { name: 'Export' }).boundingBox();
+      // The other edge likewise: the panel finishes where the row does.
+      const actions = row;
       const panelRight = panelBox.x + panelBox.width;
       const actionsRight = (actions?.x ?? 0) + (actions?.width ?? 0);
       expect(Math.abs(panelRight - actionsRight)).toBeLessThanOrEqual(1);

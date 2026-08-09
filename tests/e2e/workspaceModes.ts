@@ -147,3 +147,22 @@ export async function paletteChoice(page: Page, name: RegExp | string): Promise<
 export async function advanced(page: Page): Promise<Locator> {
   return showMode(page, 'Advanced');
 }
+
+/**
+ * Into Focus mode, from wherever this width has put the control.
+ *
+ * The app bar cannot hold a wordmark, a title, Focus and a menu on one row on a
+ * phone, so below 36rem Focus folds into the Actions overflow beside them. It is
+ * the same action either way, and a test about Focus should not have to know
+ * which width it is running at.
+ */
+export async function enterFocus(page: Page): Promise<void> {
+  const direct = page.getByRole('button', { name: 'Focus mode' });
+  if ((await direct.count()) > 0) {
+    await direct.first().click();
+    return;
+  }
+
+  await page.getByRole('button', { name: 'Actions' }).click();
+  await page.getByRole('menuitem', { name: 'Focus mode' }).click();
+}

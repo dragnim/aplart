@@ -10,7 +10,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
-import { paletteChoice, pressRun, showMode } from './workspaceModes';
+import { enterFocus, paletteChoice, pressRun, showMode } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -98,7 +98,7 @@ test.describe('palette-responsive branding', () => {
 
     // 6 and 7. Focus mode keeps the theme, and runs nothing.
     const before = await tokens(page);
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await expect(page.getByRole('button', { name: 'Exit focus' })).toBeVisible();
 
     expect(await tokens(page)).toEqual(before);
@@ -112,8 +112,10 @@ test.describe('palette-responsive branding', () => {
     expect(stub.requests.length).toBe(requestsAfterRun);
 
     // 8 and 9. Help brings back every default.
-    // Scoped to the header: the footer links to Help as well.
-    await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Help' }).click();
+    // Through the site menu, which is where the header's navigation went when the
+    // bar was compacted. The footer links to Help as well, hence the scoping.
+    await page.getByRole('button', { name: 'Site menu' }).click();
+    await page.getByRole('list', { name: 'Site' }).getByRole('link', { name: 'Help' }).click();
     await expect(page.getByRole('heading', { level: 1, name: /Help/ })).toBeVisible();
 
     /*

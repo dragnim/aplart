@@ -4,8 +4,8 @@
  * It was a row of its own beneath the site header, and a second row of actions
  * beneath that — ninety-six pixels of chrome above a picture that has to fit the
  * window, every one of them out of the square. Both are gone into the one bar,
- * and this is what the workspace puts there: its title at the left of the space,
- * its three actions at the right.
+ * and this is what the workspace puts there: its three
+ * actions, held to the right of the bar.
  *
  * No padding and no wrapping. The bar owns its own height, and a row that could
  * wrap would take back exactly what this change was made to reclaim.
@@ -19,104 +19,10 @@
 }
 
 /*
- * The one place the workspace states its connection to the artwork, and it does
- * it with a single square rather than by colouring the words.
- *
- * A pixel block because that is what the wordmark is made of; the same motif at
- * a smaller size, once. Colouring the title itself was legible but put a third
- * strong colour beside the logo and the Run button, and the point of this stage
- * is that the logo stays the signature. The section headings below deliberately
- * get nothing: markers there would decorate the furniture rather than say
- * anything about the artwork.
- *
- * No space between the block and the first word — margin instead — so a long
- * title can never leave the marker stranded on a line of its own.
+ * The title, its marker and the category line have gone. The title moved to
+ * WorkspacePage, above the artwork it names; the category was already on the
+ * gallery card that opened the piece. What is left here is three actions.
  */
-.title {
-  /*
-   * The containing block for the hanging form of the marker below. Without it the
-   * marker measures correctly and paints against some distant positioned ancestor
-   * instead, which is exactly what happened the first time.
-   */
-  position: relative;
-  /*
-   * Bar-sized, not page-sized. It was the page's heading at --text-2xl above its
-   * own row; in a bar beside a wordmark it is a label, and a label that big
-   * would compete with the mark it sits next to.
-   */
-  font-size: var(--text-lg);
-  letter-spacing: -0.01em;
-  /*
-   * Truncates rather than pushing the actions and the menu off the end. This is
-   * the one thing in the bar that has no natural width, so it is the one thing
-   * that gives.
-   */
-  flex: 0 1 auto;
-  min-inline-size: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* The actions sit at the far end, whatever the title does. */
-.actions {
-  margin-inline-start: auto;
-}
-
-.title::before {
-  content: '';
-  display: inline-block;
-  width: 0.42em;
-  height: 0.42em;
-  margin-right: 0.42em;
-  vertical-align: 0.06em;
-  background: var(--ui-accent-solid);
-}
-
-/*
- * On a phone the block leaves the line and hangs beside it.
- *
- * The Gallery button shares this row, so the longest names — "Wave Interference",
- * "Sierpiński Array" — only just fit on one line at 390px. In the flow the block
- * costs that line 0.84em including its margin, which is enough to push them onto a
- * second: WebKit fits the title without it and wraps with it, which is what the
- * test below caught.
- *
- * Out of flow it costs the line nothing and cannot cause a wrap, while staying
- * exactly as visible and still attached to the heading it belongs to. It hangs in
- * the gap the row already keeps between the button and the title: 0.55em of a
- * 1.75rem heading is 0.96rem, always inside that 1rem gap whatever the root font
- * size, so it overlaps neither the button to its left nor the words to its right.
- *
- * Only here. On a wider screen the block stays in the flow, where the title text
- * is indented past it and aligned as it has been.
- */
-@media (max-width: 30rem) {
-  .title::before {
-    position: absolute;
-    left: -0.55em;
-    top: 0.4em;
-    margin-right: 0;
-  }
-}
-
-.meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-1);
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-}
-
-.category {
-  text-transform: capitalize;
-}
-
-.category::after {
-  content: '·';
-  margin-left: var(--space-2);
-}
 
 .actions {
   display: flex;

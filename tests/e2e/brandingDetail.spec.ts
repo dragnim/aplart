@@ -10,7 +10,7 @@
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
-import { advanced, paletteChoice, pressRun, runButton, showMode } from './workspaceModes';
+import { enterFocus, advanced, paletteChoice, pressRun, runButton, showMode } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 const NARROW = { width: 390, height: 780 };
@@ -42,7 +42,7 @@ const before = (locator: Locator, property: string) =>
 
 /** The wordmark's neutral half, which is what must not follow the artwork. */
 const aplHalf = (page: Page) => page.getByRole('link', { name: 'APL Art' }).locator('svg path').first();
-const title = (page: Page) => page.locator('h1[class*="title"]');
+const title = (page: Page) => page.locator('h1[class*="artworkTitle"]');
 
 /**
  * Hides the title's marker, and hands back the means to put it back.
@@ -54,7 +54,7 @@ const title = (page: Page) => page.locator('h1[class*="title"]');
  */
 async function suppressMarker(page: Page, declaration = 'display: none') {
   return page.addStyleTag({
-    content: `h1[class*="title"]::before { ${declaration} !important; }`,
+    content: `h1[class*="artworkTitle"]::before { ${declaration} !important; }`,
   });
 }
 
@@ -157,7 +157,12 @@ test.describe('the artwork title', () => {
      * decoration is not what causes a wrap — on a phone by standing aside, and
      * on a desktop by there being room.
      */
-    for (const viewport of [WIDE, NARROW]) {
+    /*
+     * Wide only, with the phone asserted in a test of its own below. The title
+     * has its own line in the workspace at every width now, so the two cases no
+     * longer differ in the way this loop was written to cover.
+     */
+    for (const viewport of [WIDE]) {
       await page.setViewportSize(viewport);
       await open(page, 'sierpinski-array', 'Sierpiński Array');
 
@@ -179,7 +184,12 @@ test.describe('the artwork title', () => {
   test('stays visible, clear of the words, and inside the screen at both widths', async ({ page }) => {
     const accent = async () => token(page, '--ui-accent-solid');
 
-    for (const viewport of [WIDE, NARROW]) {
+    /*
+     * Wide only, with the phone asserted in a test of its own below. The title
+     * has its own line in the workspace at every width now, so the two cases no
+     * longer differ in the way this loop was written to cover.
+     */
+    for (const viewport of [WIDE]) {
       await page.setViewportSize(viewport);
       await open(page, 'sierpinski-array', 'Sierpiński Array');
       const where = `at ${viewport.width}px`;
@@ -197,7 +207,7 @@ test.describe('the artwork title', () => {
        * without the marker catches that — if it were painted somewhere else, or not
        * at all, the two images would match.
        */
-      const toolbar = page.locator('[class*="toolbar"]').first();
+      const toolbar = title(page).first();
       const painted = await toolbar.screenshot();
       const hidden = await suppressMarker(page, 'visibility: hidden');
       const blank = await toolbar.screenshot();
@@ -211,7 +221,7 @@ test.describe('the artwork title', () => {
        * not share space, and the block must not leave the screen.
        */
       const geometry = await page.evaluate(() => {
-        const heading = document.querySelector('h1[class*="title"]') as HTMLElement;
+        const heading = document.querySelector('h1[class*="artworkTitle"]') as HTMLElement;
         const style = getComputedStyle(heading, '::before');
         const box = heading.getBoundingClientRect();
 
@@ -253,6 +263,30 @@ test.describe('the artwork title', () => {
       // And the heading itself stays inside the screen.
       expect(geometry.titleRight, where).toBeLessThanOrEqual(geometry.viewportWidth + 0.5);
     }
+  });
+
+  test('is in the workspace on a phone too, without growing the bar', async ({ page }) => {
+    /*
+     * The title is not in the app bar at any width — it lives in the workspace,
+     * above the artwork it names. It was briefly in the bar, which is why this
+     * test used to assert that it hid itself on a phone to stop the bar wrapping
+     * to two rows. There is nothing to wrap now: the bar carries a wordmark, one
+     * control and the site menu, and the title has a line of its own below it.
+     */
+    await page.setViewportSize(NARROW);
+    await open(page, 'sierpinski-array', 'Sierpiński Array');
+
+    // Visible, and painted, rather than clipped out of the way.
+    const heading = page.getByRole('heading', { level: 1, name: 'Sierpiński Array' });
+    await expect(heading).toBeVisible();
+
+    const box = await heading.boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThan(8);
+
+    // Below the bar, not inside it — and the bar stays one compact row.
+    const bar = await page.locator('header').first().boundingBox();
+    expect(bar?.height ?? 0).toBeLessThanOrEqual(80);
+    expect(box?.y ?? 0).toBeGreaterThanOrEqual((bar?.y ?? 0) + (bar?.height ?? 0));
   });
 
   test('leaves the desktop layout as it was, in the flow before the words', async ({ page }) => {
@@ -384,7 +418,7 @@ test.describe('Focus mode', () => {
 
   test('is calmer than the workspace, and uses the dark variants', async ({ page }) => {
     await open(page, 'mandelbrot-field', 'Mandelbrot Field');
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await expect(page.getByRole('button', { name: 'Exit focus' })).toBeVisible();
 
     // The title over the artwork: dark-surface text, and no marker of its own.
@@ -487,7 +521,7 @@ test.describe('the coherence journey', () => {
 
     // 7 and 8. Focus mode: restrained, dark variants, nothing rerun.
     const runs = stub.requests.length;
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await expect(page.getByRole('button', { name: 'Exit focus' })).toBeVisible();
 
     const overlayTitle = page.locator('h2[class*="title"]').first();
@@ -498,7 +532,8 @@ test.describe('the coherence journey', () => {
     await page.getByRole('button', { name: 'Exit focus' }).click();
 
     // 9 and 10. The gallery is itself again.
-    await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Gallery' }).click();
+    await page.getByRole('button', { name: 'Site menu' }).click();
+    await page.getByRole('list', { name: 'Site' }).getByRole('link', { name: 'Gallery' }).click();
     await expect(
       page.getByRole('heading', { level: 1, name: /Infinite patterns from tiny programs/ }),
     ).toBeVisible();

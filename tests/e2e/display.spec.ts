@@ -11,7 +11,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
-import { choice, pressRun, showMode } from './workspaceModes';
+import { enterFocus, choice, pressRun, showMode } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -151,7 +151,7 @@ test.describe('Pixel and Smooth on screen', () => {
     await openAndRun(page);
     await choose(page, 'Smooth');
 
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await expect(page.locator('canvas').first()).toHaveAttribute('aria-label', /smooth interpolation/);
 
     // Exit explicitly: Escape closes the drawer before it leaves Focus mode, so

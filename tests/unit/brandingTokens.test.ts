@@ -55,20 +55,28 @@ describe('the header', () => {
   });
 
   it('still marks the current page with the derived border', () => {
-    expect(block(css, ".navLink[aria-current='page']")).toContain('var(--ui-accent-border)');
+    /*
+     * In the site menu now rather than in a row of header links: Gallery, About
+     * and Help moved there when the bar was compacted. The marker moved with
+     * them and is still derived rather than hard-coded, which is the thing this
+     * test exists to hold — the rule is a rail down the side instead of an
+     * underline, because a menu item is taller than it is wide.
+     */
+    const menu = read('components/SiteHeader', 'SiteMenu.module.css');
+    expect(block(menu, ".item[aria-current='page']")).toContain('var(--ui-accent-border)');
   });
 });
 
 describe('the artwork title', () => {
-  const css = read('workspace', 'WorkspaceToolbar.module.css');
+  const css = read('workspace', 'WorkspacePage.module.css');
 
   it('is neutral text with one palette-responsive block before it', () => {
-    expect(block(css, '.title')).not.toContain('--ui-accent');
-    expect(block(css, '.title::before')).toContain('background: var(--ui-accent-solid)');
+    expect(block(css, '.artworkTitle')).not.toContain('--ui-accent');
+    expect(block(css, '.artworkTitle::before')).toContain('background: var(--ui-accent-solid)');
   });
 
   it('binds the block to the first word, so a long title cannot strand it', () => {
-    const marker = block(css, '.title::before');
+    const marker = block(css, '.artworkTitle::before');
 
     // Margin rather than a space: there is no break opportunity to exploit.
     expect(marker).toContain('margin-right');
@@ -95,11 +103,11 @@ describe('the workspace section headings', () => {
   });
 
   it('leave the artwork title as the only heading below the wordmark that carries it', () => {
-    const toolbar = read('workspace', 'WorkspaceToolbar.module.css');
+    const styles = read('workspace', 'WorkspacePage.module.css');
 
     // The solid is the strongest accent, and the title's block is now the one
     // place in the workspace that uses it.
-    expect(block(toolbar, '.title::before')).toContain('--ui-accent-solid');
+    expect(block(styles, '.artworkTitle::before')).toContain('--ui-accent-solid');
   });
 
   it('stop there: nothing below them, and nothing in Focus mode', () => {

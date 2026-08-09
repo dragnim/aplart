@@ -14,7 +14,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
-import { advanced, artworkActions, editorOn, pressRun, showMode } from './workspaceModes';
+import { advanced, artworkActions, editorOn, enterFocus, pressRun, showMode } from './workspaceModes';
 
 /** WCAG 2.2 AA is the stated target. */
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
@@ -134,7 +134,7 @@ test.describe('accessibility of the workspace', () => {
       timeout: 20_000,
     });
 
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await expect(page.locator('#focus-drawer')).toHaveAttribute('data-drawer', 'open');
     await audit(page);
 
@@ -226,7 +226,7 @@ test.describe('accessibility of a Play session', () => {
 
   test('has no violations in Focus mode', async ({ page }) => {
     await openSession(page);
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await expect(page.getByRole('region', { name: 'Make it yours' })).toBeVisible();
     await audit(page);
   });
@@ -264,7 +264,7 @@ test.describe('accessibility on a narrow viewport', () => {
     await page.goto('./#/art/modular-bloom');
     await page.getByRole('tab', { name: 'Code' }).click();
 
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await expect(page.locator('#focus-drawer')).toHaveAttribute('data-drawer', 'open');
     await audit(page);
 

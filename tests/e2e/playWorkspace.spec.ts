@@ -11,7 +11,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { ADAPTIVE_MARKER } from '@/execution/adaptiveProbe';
 import { stubTryApl } from './stubTryApl';
-import { editorLocator, editorOn, runLocator } from './workspaceModes';
+import { enterFocus, editorLocator, editorOn, runLocator } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 const SEED = 20_260_805;
@@ -461,7 +461,7 @@ test.describe('the Play workspace', () => {
     await stubTryApl(page);
     await openSession(page);
 
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
 
     await expect(playPanel(page)).toBeVisible();
     await expect(slider(page, 'Detail')).toBeVisible();
@@ -485,7 +485,7 @@ test.describe('the Play workspace', () => {
      */
     await stubTryApl(page);
     await openSession(page);
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
 
     /*
      * The drawer *is* the panel now, rather than something the panel has to keep
@@ -508,7 +508,7 @@ test.describe('the Play workspace', () => {
     await stubTryApl(page);
     await openSession(page);
 
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await editApl(page, 'multiplier');
 
     // The drawer is where the editor lives in Focus mode, and there is one editor

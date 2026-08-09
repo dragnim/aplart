@@ -10,7 +10,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
-import { choice, pressRun, showMode } from './workspaceModes';
+import { enterFocus, choice, pressRun, showMode } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -114,7 +114,7 @@ test.describe('Abyss in the studio', () => {
     await openAndRun(page);
     await chooseAbyss(page);
 
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await expect(page.locator('canvas').first()).toHaveAttribute('aria-label', /Abyss palette/);
 
     await page.keyboard.press('Escape');

@@ -35,6 +35,17 @@ export function SiteHeader({ current }: Props) {
   return (
     <header className={styles.header}>
       {/*
+        The bar's contents sit on the workspace's own measure.
+
+        The rule and the background run the full width of the window, because a
+        bar that stopped short would read as a card. What is *in* it is held to
+        the same centred measure every route uses, so the wordmark starts where
+        the artwork starts and the menu ends where the controls end. Without it
+        the title sat against the left edge of the window while the artwork began
+        two hundred pixels further in on a wide monitor — one bar, two grids.
+      */}
+      <div className={styles.inner}>
+        {/*
         The wordmark alone. There used to be a rounded square holding a ⍴ beside
         it, from when the wordmark was plain text and the header needed something
         of its own; the pixel logo says the same thing better, and two marks
@@ -46,13 +57,14 @@ export function SiteHeader({ current }: Props) {
         thing tests and assistive technology both have to disambiguate from the
         artwork itself.
       */}
-      <a className={styles.brand} href="#/" aria-label="APL Art">
-        <AplArtLogo className={styles.wordmark} decorative />
-      </a>
+        <a className={styles.brand} href="#/" aria-label="APL Art">
+          <AplArtLogo className={styles.wordmark} decorative />
+        </a>
 
-      <div className={styles.slot} id={APP_BAR_SLOT_ID} />
+        <div className={styles.slot} id={APP_BAR_SLOT_ID} />
 
-      <SiteMenu current={current} />
+        <SiteMenu current={current} />
+      </div>
     </header>
   );
 }

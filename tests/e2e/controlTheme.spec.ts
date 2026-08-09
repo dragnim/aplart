@@ -10,7 +10,7 @@
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
-import { advanced, paletteChoice, runLocator, showMode } from './workspaceModes';
+import { enterFocus, advanced, paletteChoice, runLocator, showMode } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 const NARROW = { width: 390, height: 780 };
@@ -439,7 +439,7 @@ test.describe('the whole control journey', () => {
 
     // 7 and 8. Focus mode: the toolbar over the artwork uses dark variants, and
     // the drawer's own controls stay on the light tokens because the drawer is light.
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     const controls = page.getByRole('button', { name: 'Controls', exact: true });
     await expect(controls).toBeVisible();
 
@@ -453,12 +453,20 @@ test.describe('the whole control journey', () => {
     await page.getByRole('button', { name: 'Exit focus' }).click();
 
     // 9 and 10. The gallery returns to APL Art's own colours.
-    await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Gallery' }).click();
+    await page.getByRole('button', { name: 'Site menu' }).click();
+    await page.getByRole('list', { name: 'Site' }).getByRole('link', { name: 'Gallery' }).click();
     await expect(
       page.getByRole('heading', { level: 1, name: /Infinite patterns from tiny programs/ }),
     ).toBeVisible();
 
     expect(await page.locator('[data-accent]').getAttribute('data-accent')).toBe('default');
+    /*
+     * The current-page marker is inside the site menu now, so it has to be
+     * opened to be read. That is the point of the menu — the destinations are
+     * one press away rather than permanently across the top — and the marker
+     * still derives from the palette, which is what this is checking.
+     */
+    await page.getByRole('button', { name: 'Site menu' }).click();
     const current = page.locator('[aria-current="page"]');
     expect(await css(current, 'box-shadow')).toContain(await token(page, '--ui-accent-border'));
   });

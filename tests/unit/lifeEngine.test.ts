@@ -152,6 +152,18 @@ describe('nothing but the rules', () => {
      */
     let world = openingSeed(60, 40);
 
+    /*
+     * Every cell of every generation is checked, and exactly one assertion is
+     * made about the result.
+     *
+     * The obvious form — `expect` inside the innermost loop — is half a million
+     * assertions for this fixture, which is slow enough to time the test out
+     * under a full-suite run. Collecting the disagreements and asserting on the
+     * collection costs nothing per cell and says more when it fails: the first
+     * few offenders with their coordinates, rather than the first one.
+     */
+    const wrong: string[] = [];
+
     for (let generation = 0; generation < 200; generation += 1) {
       const before = world;
       world = step(before);
@@ -160,10 +172,14 @@ describe('nothing but the rules', () => {
         for (let x = 0; x < before.width; x += 1) {
           const count = neighbours(before, x, y);
           const expected = isAlive(before, x, y) ? count === 2 || count === 3 : count === 3;
-          expect(isAlive(world, x, y), `cell ${String(x)},${String(y)}`).toBe(expected);
+          if (isAlive(world, x, y) !== expected) {
+            wrong.push(`generation ${String(generation + 1)}, cell ${String(x)},${String(y)}`);
+          }
         }
       }
     }
+
+    expect(wrong.slice(0, 5)).toEqual([]);
   });
 
   it('counts generations truthfully, one per step', () => {

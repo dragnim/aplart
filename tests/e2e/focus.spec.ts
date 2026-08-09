@@ -10,7 +10,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
-import { editorOn, pressRun } from './workspaceModes';
+import { enterFocus, editorOn, pressRun } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 const PHONE = { width: 390, height: 844 };
@@ -120,7 +120,7 @@ test.describe('Focus mode', () => {
     await runAndWait(page);
 
     const before = await page.locator('canvas').boundingBox();
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await expect(page.getByRole('button', { name: 'Exit focus' })).toBeVisible();
 
     // The whole point of the mode: nearly the full height of the window.
@@ -137,7 +137,7 @@ test.describe('Focus mode', () => {
     await open(page, 'modular-bloom', 'Modular Bloom');
     await runAndWait(page);
 
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     // Entering does resize the canvas. That has to be over before the baseline
     // is taken, or this measures the entry rather than the drawer.
     await fillsTheWindow(page, WIDE);
@@ -162,7 +162,7 @@ test.describe('Focus mode', () => {
 
     const inWorkspace = await exportOriginal(page, testInfo.outputPath('workspace.png'));
 
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await page.setViewportSize({ width: 900, height: 1200 });
     await page.waitForTimeout(500);
 
@@ -180,7 +180,7 @@ test.describe('Focus mode', () => {
 
     const inWorkspace = await exportOriginal(page, testInfo.outputPath('tiles-workspace.png'));
 
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await page.setViewportSize({ width: 1000, height: 700 });
     await settled(page);
 
@@ -196,7 +196,7 @@ test.describe('Focus mode', () => {
     await stubTryApl(page);
     await open(page, 'modular-bloom', 'Modular Bloom');
 
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     const drawer = page.locator('#focus-drawer');
     await expect(drawer).toHaveAttribute('data-drawer', 'open');
 
@@ -211,7 +211,7 @@ test.describe('Focus mode', () => {
   test('announces the run status from one place at a time', async ({ page }) => {
     await stubTryApl(page);
     await open(page, 'modular-bloom', 'Modular Bloom');
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
 
     const overlayStatus = page.locator('[role="status"][data-state]');
     const runPanelStatus = page.locator('[role="status"][data-status]');
@@ -230,7 +230,7 @@ test.describe('Focus mode', () => {
     await open(page, 'modular-bloom', 'Modular Bloom');
 
     await (await editorOn(page)).fill('size←12\nmodulus←5\nmultiplier←1\nmodulus|multiplier×∘.×⍨⍳size');
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
 
     // Same editor, so the edit is still there and undo still knows about it.
     await expect(await editorOn(page)).toContainText('modulus←5');
@@ -252,7 +252,7 @@ test.describe('Focus mode on a phone', () => {
     await page.getByRole('tab', { name: 'Code' }).click();
     await runAndWait(page);
 
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     const sheet = page.locator('#focus-drawer');
     await expect(sheet).toHaveAttribute('data-drawer', 'open');
 
@@ -275,7 +275,7 @@ test.describe('Focus mode on a phone', () => {
     await open(page, 'modular-bloom', 'Modular Bloom');
     await expect(page.getByRole('tab', { name: 'Artwork' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     await expect(page.getByRole('tab', { name: 'Artwork' })).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Exit focus' }).click();

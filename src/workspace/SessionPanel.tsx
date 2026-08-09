@@ -130,7 +130,7 @@ export function SessionPanel({ tab, onTabChange, tabs, panels, actions }: Props)
         ))}
       </div>
 
-      <div className={styles.content}>
+      <div className={styles.content} data-panel-content="">
         {tabs.map((name) => (
           <div
             key={name}
@@ -148,7 +148,9 @@ export function SessionPanel({ tab, onTabChange, tabs, panels, actions }: Props)
         ))}
       </div>
 
-      <div className={styles.actions}>{actions}</div>
+      <div className={styles.actions} data-panel-actions="">
+        {actions}
+      </div>
     </div>
   );
 }

@@ -31,10 +31,12 @@ test.describe('site navigation', () => {
   test('the main navigation reaches About and Help', async ({ page }) => {
     await page.goto('./');
 
-    await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'About' }).click();
+    await page.getByRole('button', { name: 'Site menu' }).click();
+    await page.getByRole('list', { name: 'Site' }).getByRole('link', { name: 'About' }).click();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('About APL Art');
 
-    await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Help' }).click();
+    await page.getByRole('button', { name: 'Site menu' }).click();
+    await page.getByRole('list', { name: 'Site' }).getByRole('link', { name: 'Help' }).click();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Help');
   });
 

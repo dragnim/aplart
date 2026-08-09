@@ -1663,12 +1663,7 @@ function Workspace({
          * are drawn.
          */
         <AppBarPortal>
-          <WorkspaceToolbar
-            preset={preset}
-            actions={actions}
-            onEnterFocus={enterFocus}
-            focusButtonRef={focusTrigger}
-          />
+          <WorkspaceToolbar actions={actions} onEnterFocus={enterFocus} focusButtonRef={focusTrigger} />
         </AppBarPortal>
       )}
 
@@ -1702,11 +1697,38 @@ function Workspace({
             between positions — which would remount the editor and lose its undo
             history.
           */}
-          {artworkPanel}
+          {/*
+            The title sits with the artwork, in the artwork's own column.
+
+            It was briefly in the app bar. That put it beside the wordmark at the
+            corner of the window while the artwork began wherever the centred
+            measure started — two hundred pixels away on a wide monitor — so the
+            name and the thing it named had nothing to do with each other. The
+            wordmark is the site; this is the artwork; the bar's actions are what
+            can be done to it.
+
+            Wrapped with the picture rather than placed in a row of its own, so it
+            takes the artwork's track and therefore the artwork's left edge, at
+            every width, with no arithmetic to keep in step.
+          */}
+          <div className={styles.artworkColumn}>
+            <h1 className={styles.artworkTitle}>{preset.title}</h1>
+            {artworkPanel}
+          </div>
           {secondaryColumn}
         </div>
       ) : (
         <div className={styles.stacked} data-play="true">
+          {/*
+            The artwork's name, above the tabs rather than inside the Artwork one.
+
+            It names the page, not one of its three views, so it would be wrong to
+            have it appear and disappear as somebody moved between them — and a
+            page with no level-one heading is a page a screen reader cannot
+            summarise. One compact line; the tab bar beneath it does the rest.
+          */}
+          <h1 className={styles.artworkTitle}>{preset.title}</h1>
+
           {/* The artwork sits behind the sheet in Focus mode, always visible. */}
           <div className={styles.focusBackdrop}>{focus ? artworkPanel : null}</div>
 

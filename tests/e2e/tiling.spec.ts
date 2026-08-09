@@ -9,7 +9,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 import { stubTryApl } from './stubTryApl';
-import { choice, advanced, pressRun } from './workspaceModes';
+import { enterFocus, choice, advanced, pressRun } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
 
@@ -112,7 +112,7 @@ test.describe('repeating the artwork', () => {
      * here would close it. Asked rather than assumed, because either default is
      * reasonable and a test that hard-codes one breaks when it changes.
      */
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     const drawer = page.locator('[data-drawer]').first();
     if ((await drawer.getAttribute('data-drawer')) !== 'open') {
       await page.getByRole('button', { name: 'Controls' }).click();
@@ -285,7 +285,7 @@ test.describe('mirroring the repeat', () => {
 
   test('works in Focus mode and is announced as mirrored', async ({ page }) => {
     await openAndRun(page);
-    await page.getByRole('button', { name: 'Focus mode' }).click();
+    await enterFocus(page);
     const drawer = page.locator('[data-drawer]').first();
     if ((await drawer.getAttribute('data-drawer')) !== 'open') {
       await page.getByRole('button', { name: 'Controls' }).click();
