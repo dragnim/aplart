@@ -13,6 +13,7 @@ import {
   clear,
   createWorld,
   isAlive,
+  MAX_AGE,
   neighbours,
   population,
   setCell,
@@ -107,6 +108,92 @@ describe('the rules', () => {
 
       expect(isAlive(step(world), 4, 1), `${String(count)} neighbours`).toBe(count === 3);
     }
+  });
+});
+
+/*
+ * The standing constraint on this demo, written as tests because a comment
+ * cannot fail. Every one of these would still pass if the world were quietly
+ * helped along, so each states the unhelpful outcome and insists on it.
+ */
+describe('nothing but the rules', () => {
+  it('lets a world die out, and leaves it dead', () => {
+    // Two cells: too few neighbours, so both go, and nothing arrives to replace
+    // them. Extinction is a real outcome of Conway's rules and is not a fault.
+    let world = worldFrom(['.....', '.OO..', '.....']);
+
+    world = step(world);
+    expect(population(world)).toBe(0);
+
+    for (let generation = 0; generation < 50; generation += 1) world = step(world);
+    expect(population(world)).toBe(0);
+    // The clock keeps running honestly over an empty world.
+    expect(world.generation).toBe(51);
+  });
+
+  it('leaves a still life alone for a thousand generations', () => {
+    // Nothing steps in when the world stops being interesting.
+    let world = createWorld(20, 20);
+    stamp(world, BLOCK, 8, 8);
+    const before = pictureOf(world);
+
+    for (let generation = 0; generation < 1000; generation += 1) world = step(world);
+
+    expect(pictureOf(world)).toEqual(before);
+    expect(population(world)).toBe(4);
+  });
+
+  it('never introduces a cell that the rules did not produce', () => {
+    /*
+     * Checked cell by cell against the rule, on a field busy enough to have
+     * births, deaths and survivals happening at once. Any injected cell — a
+     * floor under the population, a sprinkle to keep things moving — shows up
+     * here as a living cell whose neighbour count does not permit it.
+     */
+    let world = openingSeed(60, 40);
+
+    for (let generation = 0; generation < 200; generation += 1) {
+      const before = world;
+      world = step(before);
+
+      for (let y = 0; y < before.height; y += 1) {
+        for (let x = 0; x < before.width; x += 1) {
+          const count = neighbours(before, x, y);
+          const expected = isAlive(before, x, y) ? count === 2 || count === 3 : count === 3;
+          expect(isAlive(world, x, y), `cell ${String(x)},${String(y)}`).toBe(expected);
+        }
+      }
+    }
+  });
+
+  it('counts generations truthfully, one per step', () => {
+    let world = openingSeed(40, 30);
+    expect(world.generation).toBe(0);
+
+    for (let generation = 1; generation <= 25; generation += 1) {
+      world = step(world);
+      expect(world.generation).toBe(generation);
+    }
+  });
+
+  it('reaches the same world whether or not the ages say anything', () => {
+    /*
+     * Age is what the renderer colours by, and it must be nothing else. The same
+     * cells with every age driven to the ceiling have to produce the same next
+     * generation — if they ever did not, the picture would be deciding the
+     * simulation.
+     */
+    const plain = openingSeed(50, 40);
+    const aged: LifeWorld = { ...plain, ages: plain.ages.map(() => MAX_AGE) as Uint16Array };
+
+    let fromPlain = plain;
+    let fromAged = aged;
+    for (let generation = 0; generation < 120; generation += 1) {
+      fromPlain = step(fromPlain);
+      fromAged = step(fromAged);
+    }
+
+    expect([...fromAged.cells]).toEqual([...fromPlain.cells]);
   });
 });
 

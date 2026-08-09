@@ -7,17 +7,48 @@
  * `lifeEngine.test.ts` holds this one to the rules directly, on the small
  * patterns whose behaviour is known.
  *
- * Toroidal because the APL is. John Scholes's own notes say of his formulation
- * that "the use of ⊖ and ⌽ render opposite edges of the creatures' rectangular
- * universe adjacent. In effect, they live on the surface of a torus" — so
- * wrapping is not a liberty taken for the sake of a full screen, it is what the
- * expression on the panel does.
+ * ## The rule this file may implement
  *
- * Ages are kept alongside the cells. The rules do not use them; only the colour
- * does, so that a newly born cell can arrive bright and cool as it survives.
+ * B3/S23, and nothing else. A standing constraint on the whole demo, worth
+ * writing down here because every tempting change to it arrives disguised as an
+ * improvement:
+ *
+ *   - No cells are ever introduced after generation 0 to keep the screen busy.
+ *   - A world that settles into still lifes, starts oscillating, or dies out
+ *     completely is left alone. Those are real outcomes of the rules and the
+ *     point of watching is to see them.
+ *   - Nothing restarts itself.
+ *   - Cells have no lifespan. `MAX_AGE` below is a ceiling on a *counter*, not
+ *     on a cell: a cell at the ceiling goes on living exactly as long as the
+ *     rules say it does.
+ *
+ * Curating what generation 0 contains is a different matter and is allowed —
+ * choosing the R-pentomino is choosing an interesting question to ask, not
+ * changing the answer. After that, the rules alone.
+ *
+ * ## The boundary
+ *
+ * Toroidal, and that is this implementation's choice rather than part of
+ * Conway's rules — which say nothing about edges. It is made to match the APL
+ * on the panel: John Scholes's own notes say of his formulation that "the use of
+ * ⊖ and ⌽ render opposite edges of the creatures' rectangular universe adjacent.
+ * In effect, they live on the surface of a torus". So wrapping here is fidelity
+ * to the expression being presented, not a liberty taken for the sake of a full
+ * screen — and it should not be described as something Life requires.
+ *
+ * ## Ages
+ *
+ * Kept alongside the cells and read only by the renderer, so that a newly born
+ * cell can arrive bright and cool as it survives. `step` writes them and never
+ * consults them; the colour of a cell cannot affect whether it lives.
  */
 
-/** How old a cell may get before it stops looking any older. */
+/**
+ * How old a cell may get before it stops looking any older.
+ *
+ * A rendering limit, not a lifespan. Past this the colour simply stops changing;
+ * the cell itself is untouched, and only the rules decide whether it survives.
+ */
 export const MAX_AGE = 24;
 
 export interface LifeWorld {
@@ -75,6 +106,10 @@ export function neighbours(world: LifeWorld, x: number, y: number): number {
  * Standard Conway: a dead cell with exactly three living neighbours is born, a
  * living cell with two or three survives, everything else dies. Written as the
  * rule rather than as a table so that it reads as the rule.
+ *
+ * The whole of the transformation is `lives`, below. There is no clause for a
+ * world that has gone quiet, no floor under the population, and no way for a
+ * cell's age to reach this decision.
  */
 export function step(world: LifeWorld): LifeWorld {
   const { width, height } = world;

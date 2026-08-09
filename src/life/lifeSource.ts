@@ -22,6 +22,11 @@
  * transformation — same rules, same toroidal boundary — because a generation
  * every few milliseconds cannot be a network round trip. It is held to the rules
  * by `lifeEngine.test.ts` rather than by assertion.
+ *
+ * The notes below keep two claims apart, because conflating them would teach
+ * somebody something false: B3/S23 is Conway's Game of Life and is not up for
+ * negotiation, while the torus is one choice of boundary among several and is
+ * made here because it is the one Scholes's expression makes.
  */
 
 /** The definition as published in the dfns workspace. */
@@ -43,7 +48,8 @@ export const LIFE_APL = `⍝ Conway's Game of Life
 life←{↑1 ⍵∨.∧3 4=+/,¯1 0 1∘.⊖¯1 0 1∘.⌽⊂⍵}
 
 ⍝ One generation of a world:  world←life world
-⍝ Opposite edges are adjacent, so the world is a torus.`;
+⍝ Conway's rules: born on 3 neighbours, survives on 2 or 3.
+⍝ The rotations join opposite edges, so this world is a torus.`;
 
 /** How the panel labels each block, so the quotation is never mistaken for ours. */
 export const ATTRIBUTION = {
@@ -53,8 +59,20 @@ export const ATTRIBUTION = {
   formulation: 'APL formulation by John Scholes',
   workspaceNote: 'As published in the dfns workspace.',
   videoNote: 'As developed in the 2009 Dyalog video.',
+
+  /*
+   * The rules and the boundary are two separate claims, and the panel keeps them
+   * separate. B3/S23 is Conway's Game of Life; a torus is one choice of edge
+   * among several, and the one this page makes because it is the one the
+   * expression above makes. Running them together would teach somebody reading
+   * this that Life wraps, which is not true of Life — only of this world.
+   */
+  rulesNote:
+    'Conway’s rules, exactly: a dead cell with three living neighbours is born, a living cell with two or three survives, and every other cell dies. That is the whole of it. Nothing is added to the world after the first generation, and nothing steps in when it grows quiet.',
   boundaryNote:
-    'The rotations make opposite edges adjacent, so the world is a torus — the same boundary this simulation uses.',
+    'Conway’s rules say nothing about edges, and different implementations answer that differently — an unbounded plane, a wall, or a wrap. Scholes’s rotations make opposite edges adjacent, so his world is a torus: a glider leaving the right-hand side arrives at the left. This one wraps too, to match the expression above.',
+  colourNote:
+    'The colours show how long each cell has been alive — newly born cells arrive brightest. That is only a way of seeing the world. The rules never read it, and it never changes what happens next.',
   engineNote:
-    'The animation runs an equivalent implementation in your browser, so a generation costs no network request. Same rules, same torus.',
+    'The animation runs an equivalent implementation in your browser, so a generation costs no network request. Same rules, same torus, no shortcuts.',
 } as const;

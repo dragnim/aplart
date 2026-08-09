@@ -120,12 +120,22 @@ describe('the controls', () => {
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
   });
 
-  it('empties the world when cleared', async () => {
+  it('empties the world when cleared, and leaves it empty', async () => {
     const user = userEvent.setup();
     render(<LifePage />);
 
     await user.click(screen.getByRole('button', { name: 'Clear' }));
     expect(readout().alive).toBe(0);
+
+    /*
+     * An empty world is an authentic state, and the page must sit in it rather
+     * than reseeding itself to have something to show. Stepping an empty world
+     * advances the clock and nothing else.
+     */
+    await user.click(screen.getByRole('button', { name: 'Step' }));
+    await user.click(screen.getByRole('button', { name: 'Step' }));
+    expect(readout().alive).toBe(0);
+    expect(readout().generation).toBeGreaterThan(0);
   });
 
   it('fills it again with something chaotic when randomised', async () => {
@@ -231,6 +241,26 @@ describe('View APL', () => {
     await user.click(within(panel).getByRole('button', { name: 'Copy APL' }));
     await waitFor(() => expect(copied).toContain('life←{'));
     expect(await within(panel).findByText('APL copied.')).toBeInTheDocument();
+  });
+
+  it('states Conway’s rules, and does not claim Life wraps', async () => {
+    /*
+     * Two separate claims, and the panel is what teaches somebody the
+     * difference: B3/S23 is Conway's Game of Life, while the torus is this
+     * implementation's boundary, chosen to match the expression above it.
+     */
+    const user = userEvent.setup();
+    render(<LifePage />);
+    await user.click(screen.getByRole('button', { name: 'View APL' }));
+    const panel = screen.getByRole('dialog', { name: /APL behind this artwork/u });
+
+    expect(panel).toHaveTextContent(/three living neighbours is born/u);
+    expect(panel).toHaveTextContent(/two or three survives/u);
+    expect(panel).toHaveTextContent(/rules say nothing about edges/u);
+    // Attributed to the formulation being shown, not to Life in general.
+    expect(panel).toHaveTextContent(/Scholes’s rotations make opposite edges adjacent/u);
+    // And the colour is declared to be only a way of seeing.
+    expect(panel).toHaveTextContent(/never changes what happens next/u);
   });
 
   it('is out of the way, and out of the tab order, until it is asked for', () => {

@@ -103,9 +103,11 @@ export function LifeCodePanel({ open, apl, onClose }: Props) {
 
       <section className={styles.block} aria-labelledby="life-code-notes">
         <h3 className={styles.blockHeading} id="life-code-notes">
-          Two things worth knowing
+          What the rules are, and where this world ends
         </h3>
+        <p className={styles.note}>{ATTRIBUTION.rulesNote}</p>
         <p className={styles.note}>{ATTRIBUTION.boundaryNote}</p>
+        <p className={styles.note}>{ATTRIBUTION.colourNote}</p>
         <p className={styles.note}>{ATTRIBUTION.engineNote}</p>
       </section>
 
