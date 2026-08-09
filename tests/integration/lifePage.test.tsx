@@ -39,12 +39,13 @@ beforeEach(() => {
 });
 
 describe('opening the page', () => {
-  it('arrives at a world that is already alive and already running', () => {
+  it('arrives at five cells, already running', () => {
     render(<LifePage />);
 
     // No Run, no empty canvas, no form: the address was the whole request.
     expect(screen.queryByRole('button', { name: /^Run/ })).toBeNull();
-    expect(readout().alive).toBeGreaterThan(200);
+    // Small on purpose. What makes the page is what these five turn into.
+    expect(readout()).toEqual({ generation: 0, alive: 5 });
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
   });
 
@@ -54,6 +55,14 @@ describe('opening the page', () => {
     expect(screen.getByRole('img')).toHaveAccessibleName(
       /Conway's Game of Life on a \d+ by \d+ toroidal grid/u,
     );
+  });
+
+  it('opens in Sunset, with the other palettes still on offer', () => {
+    render(<LifePage />);
+
+    const palette = screen.getByLabelText('Palette');
+    expect(palette).toHaveValue('sunset');
+    expect(within(palette).getAllByRole('option').length).toBeGreaterThan(4);
   });
 
   it('credits the formulation on the bar without making a fuss of it', () => {
@@ -67,12 +76,20 @@ describe('opening the page', () => {
 });
 
 describe('reduced motion', () => {
-  it('opens on the composition, but paused rather than moving', () => {
+  it('opens on a world that has already grown, and holds it still', () => {
     reducedMotion = true;
     render(<LifePage />);
 
-    // The attractive state is still there; it simply is not animating.
-    expect(readout().alive).toBeGreaterThan(200);
+    /*
+     * Five motionless cells would be a picture of nothing. Somebody who has
+     * asked not to be moved at gets the state everybody else watches arrive —
+     * the same seed, wound on, and then left alone.
+     */
+    const opening = readout();
+    expect(opening.generation).toBe(400);
+    // How many survive depends on how big the window is — jsdom's is small, and
+    // a small torus meets its own debris sooner. What matters is that it grew.
+    expect(opening.alive).toBeGreaterThan(40);
     expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
   });
 });
@@ -115,15 +132,14 @@ describe('the controls', () => {
     const user = userEvent.setup();
     render(<LifePage />);
 
-    const opening = readout().alive;
     await user.click(screen.getByRole('button', { name: 'Randomise' }));
 
-    // A random field is far denser than the composition, which is the point of
-    // offering both.
-    expect(readout().alive).toBeGreaterThan(opening);
+    // The opposite of the opening, which is the point of offering both: a
+    // screenful of noise rather than five cells with somewhere to go.
+    expect(readout().alive).toBeGreaterThan(500);
   });
 
-  it('puts the deliberate composition back when reset', async () => {
+  it('puts the seed back when reset', async () => {
     const user = userEvent.setup();
     render(<LifePage />);
     const opening = readout().alive;

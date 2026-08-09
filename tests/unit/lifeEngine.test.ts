@@ -19,7 +19,7 @@ import {
   step,
   type LifeWorld,
 } from '@/life/lifeEngine';
-import { BLINKER, BLOCK, GLIDER, openingComposition, randomField, stamp } from '@/life/patterns';
+import { BLINKER, BLOCK, GLIDER, OPENING_SEED, openingSeed, randomField, stamp } from '@/life/patterns';
 
 /** A world drawn as a picture, so a test reads like the thing it is testing. */
 function worldFrom(rows: readonly string[]): LifeWorld {
@@ -182,58 +182,75 @@ describe('editing', () => {
   });
 
   it('empties the world without changing its shape', () => {
-    const world = clear(openingComposition(60, 40));
+    const world = clear(openingSeed(60, 40));
     expect(population(world)).toBe(0);
     expect(world.width).toBe(60);
     expect(world.height).toBe(40);
   });
 });
 
-describe('the opening composition', () => {
+describe('the opening seed', () => {
   it('is the same every time, whatever else is going on', () => {
-    const first = openingComposition(120, 80);
-    const second = openingComposition(120, 80);
+    const first = openingSeed(120, 80);
+    const second = openingSeed(120, 80);
     expect([...first.cells]).toEqual([...second.cells]);
   });
 
-  it('fills the field without being noise', () => {
-    const world = openingComposition(160, 100);
-    const density = population(world) / world.cells.length;
-
+  it('is five cells, in the middle, and nothing else', () => {
     /*
-     * Somewhere between empty and soup. The first attempt at this composition
-     * placed a dozen creatures in fractions of the field and came out at about
-     * one per cent — on a full screen that is a few specks in the dark. A random
-     * field runs at twenty-eight per cent and reads as static. This wants to be
-     * unmistakably made of structures and still fill the screen.
+     * The whole premise of the page. If this ever grows into a composition
+     * again, the demo has stopped being about something tiny becoming complex.
      */
-    expect(density).toBeGreaterThan(0.03);
-    expect(density).toBeLessThan(0.15);
+    const world = openingSeed(120, 80);
+    expect(population(world)).toBe(5);
+
+    // Centred, so it has the whole world to spread into rather than an edge.
+    expect(isAlive(world, 59, 40)).toBe(true);
+    expect(isAlive(world, 58, 39)).toBe(true);
   });
 
-  it('is still busy and still changing after a hundred generations', () => {
+  it('is the R-pentomino, in its published orientation', () => {
+    expect(OPENING_SEED.name).toBe('R-pentomino');
+
+    const world = openingSeed(5, 5);
+    expect(pictureOf(world)).toEqual(['.....', '..OO.', '.OO..', '..O..', '.....']);
+  });
+
+  it('grows by two orders of magnitude within a few hundred generations', () => {
     /*
-     * The claim the opening screen makes is that something is happening — not
-     * that it grows. The dense composition collides with itself early on and the
-     * population falls before the guns make it up again, so the honest test is
-     * that the field neither empties nor settles: plenty still alive, and the
-     * next generation still different from this one.
+     * The measured curve, held to. Five cells past a hundred by generation 100
+     * and several hundred by generation 600 is what makes the opening land; a
+     * change that quietly flattened it would still pass every other test here.
      */
-    let world = openingComposition(160, 100);
+    let world = openingSeed(160, 100);
+    expect(population(world)).toBe(5);
 
     for (let generation = 0; generation < 100; generation += 1) world = step(world);
+    expect(population(world)).toBeGreaterThan(100);
 
-    expect(population(world)).toBeGreaterThan(300);
+    for (let generation = 0; generation < 500; generation += 1) world = step(world);
+    expect(population(world)).toBeGreaterThan(150);
+  });
+
+  it('is still moving long after it has spread', () => {
+    // A demo that has stopped is a demo that looks broken.
+    let world = openingSeed(109, 64);
+    for (let generation = 0; generation < 1200; generation += 1) world = step(world);
+
+    expect(population(world)).toBeGreaterThan(50);
 
     const next = step(world);
     const changed = [...world.cells].filter((cell, index) => cell !== next.cells[index]).length;
-    expect(changed, 'the world is still moving').toBeGreaterThan(50);
+    expect(changed, 'the world is still moving').toBeGreaterThan(10);
   });
 
-  it('places every structure inside the field', () => {
-    const world = openingComposition(120, 80);
-    expect(world.cells.length).toBe(120 * 80);
-    expect(population(world)).toBeGreaterThan(0);
+  it('can be wound on, for a still picture of a world that grew', () => {
+    const still = openingSeed(109, 64, 400);
+
+    expect(still.generation).toBe(400);
+    expect(population(still)).toBeGreaterThan(150);
+    // Deterministic there too: the same wind-on gives the same picture.
+    expect([...still.cells]).toEqual([...openingSeed(109, 64, 400).cells]);
   });
 });
 

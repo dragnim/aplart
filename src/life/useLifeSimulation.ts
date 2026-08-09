@@ -9,7 +9,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { clear, setCell, step, type LifeWorld } from './lifeEngine';
-import { openingComposition, randomField } from './patterns';
+import { openingSeed, randomField } from './patterns';
+
+/**
+ * How far on the world is wound for somebody who has asked not to be moved at.
+ *
+ * A still picture of five cells is not a picture of anything. Reduced motion
+ * should mean *this world, not animating* — so it opens on the same seed after
+ * it has grown, which is the state everybody else reaches in half a minute.
+ */
+const STILL_GENERATION = 400;
 
 /** Generations a second, by name, so the control offers places rather than numbers. */
 export const SPEEDS = [
@@ -71,7 +80,9 @@ export function useLifeSimulation(options: {
   /** Start paused, for somebody who has asked not to be moved at. */
   readonly startPaused: boolean;
 }): LifeSimulation {
-  const [world, setWorld] = useState<LifeWorld>(() => openingComposition(options.width, options.height));
+  const [world, setWorld] = useState<LifeWorld>(() =>
+    openingSeed(options.width, options.height, options.startPaused ? STILL_GENERATION : 0),
+  );
   const [running, setRunning] = useState(!options.startPaused);
   const [speed, setSpeed] = useState<SpeedId>('steady');
 
@@ -129,7 +140,7 @@ export function useLifeSimulation(options: {
   }, []);
 
   const reset = useCallback(() => {
-    setWorld((current) => openingComposition(current.width, current.height));
+    setWorld((current) => openingSeed(current.width, current.height));
   }, []);
 
   const emptyOut = useCallback(() => {
@@ -141,9 +152,21 @@ export function useLifeSimulation(options: {
   }, []);
 
   const resize = useCallback((width: number, height: number) => {
-    setWorld((current) =>
-      current.width === width && current.height === height ? current : reshape(current, width, height),
-    );
+    setWorld((current) => {
+      if (current.width === width && current.height === height) return current;
+
+      /*
+       * A world that has not started yet is re-seeded rather than carried over.
+       *
+       * Reshaping keeps cells where they were, which is right for a world
+       * somebody has been watching and wrong for the opening: the seed is placed
+       * in the middle of the field, and the first measurement of the window
+       * happens a frame after the first render. Carried across, five cells would
+       * open a little off centre for ever.
+       */
+      if (current.generation === 0) return openingSeed(width, height);
+      return reshape(current, width, height);
+    });
   }, []);
 
   return {

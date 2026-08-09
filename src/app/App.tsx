@@ -186,7 +186,14 @@ export function App() {
      */
     <InterfaceAccentBoundary
       className={styles.shell}
-      presetId={route.name === 'artwork' ? route.presetId : null}
+      /*
+       * Life counts as an artwork here even though it is not in the registry:
+       * it publishes a palette like one, and without a name to publish under,
+       * the boundary discards it and the page's own colours never reach the
+       * interface. `getPreset('life')` finds nothing, which is right — there is
+       * no declared palette to start from, only the one the page announces.
+       */
+      presetId={route.name === 'artwork' ? route.presetId : route.name === 'life' ? 'life' : null}
     >
       <a className="skip-link" href="#main">
         Skip to main content

@@ -5,14 +5,11 @@
  * matter of drawing it rather than of counting coordinates. `.` is empty and
  * anything else is alive, which keeps the shapes legible in the source.
  *
- * The opening composition is deliberate rather than random. Fifty per cent noise
- * settles into a grey mush within a few hundred generations and says nothing
- * about the rules; a field of known structures has gliders crossing it, pulsars
- * beating, and a gun producing a stream — different things happening in
- * different places, immediately, and all of it recognisably Life.
+ * The opening is deliberate rather than random, and it is small. See
+ * `openingSeed` for why five cells beat a screenful of them.
  */
 
-import { indexOf, type LifeWorld } from './lifeEngine';
+import { indexOf, step, type LifeWorld } from './lifeEngine';
 
 export interface LifePattern {
   readonly id: string;
@@ -80,8 +77,29 @@ export const GOSPER_GLIDER_GUN = pattern(
   ],
 );
 
+/*
+ * The methuselahs: tiny seeds that take a very long time to settle.
+ *
+ * Both are quoted in their standard published orientation. They are the two
+ * shapes the opening was chosen between — see `openingSeed`.
+ */
+export const R_PENTOMINO = pattern(
+  'r-pentomino',
+  'R-pentomino',
+  'Five cells. Runs for over a thousand generations.',
+  ['.OO', 'OO.', '.O.'],
+);
+
+export const ACORN = pattern('acorn', 'Acorn', 'Seven cells, and thousands of generations.', [
+  '.O.....',
+  '...O...',
+  'OO..OOO',
+]);
+
 /** Everything a pattern chooser could offer, in the order it should offer them. */
 export const PATTERNS: readonly LifePattern[] = [
+  R_PENTOMINO,
+  ACORN,
   GLIDER,
   LIGHTWEIGHT_SPACESHIP,
   PULSAR,
@@ -101,20 +119,34 @@ export function stamp(world: LifeWorld, item: LifePattern, atX: number, atY: num
   });
 }
 
+/** The shape everything starts from: five cells, in the middle, every time. */
+export const OPENING_SEED = R_PENTOMINO;
+
 /**
- * The opening screen.
+ * The opening screen: one small creature, alone in the dark.
  *
- * Placed in fractions of the field rather than in cells, so the same
- * composition arrives whatever size the window is — the gun is always near the
- * top left with room to fire across the width, the pulsars sit apart from each
- * other, and the gliders start where they will cross open space rather than
- * immediately colliding with something.
+ * This replaced a screenful of pulsars, spaceships and a glider gun. That was
+ * impressive on arrival and wrong on reflection — it opened at its most complex
+ * and had nowhere to go, and it said nothing about the idea the whole site is
+ * built on. Five cells that turn into several hundred says it in about thirty
+ * seconds, and nobody has to be told what happened.
  *
- * Deterministic: no randomness anywhere in here, so the first thing anybody sees
- * is the same first thing everybody sees.
+ * The R-pentomino was measured against the other small candidates on the grids
+ * this page actually uses. Diehard empties the screen after 130 generations;
+ * the pi-heptomino and the thunderbird have settled by 250; the acorn is a
+ * close second, and larger. The R-pentomino is the smallest of them, the most
+ * famous, and the strongest curve: five cells, past a hundred by generation 100,
+ * several hundred by generation 600, and still moving thousands of generations
+ * later once the debris has been round the torus and met itself.
+ *
+ * `advance` runs it on before anybody sees it, for the one case that needs a
+ * still picture rather than a moving one — see the reduced-motion opening.
+ *
+ * Deterministic throughout: no randomness anywhere in here, so the first thing
+ * anybody sees is the same first thing everybody sees.
  */
-export function openingComposition(width: number, height: number): LifeWorld {
-  const world = {
+export function openingSeed(width: number, height: number, advance = 0): LifeWorld {
+  let world: LifeWorld = {
     width,
     height,
     cells: new Uint8Array(width * height),
@@ -122,84 +154,16 @@ export function openingComposition(width: number, height: number): LifeWorld {
     generation: 0,
   };
 
-  /*
-   * Laid out in cells rather than in fractions of the window.
-   *
-   * A composition placed proportionally spreads itself thinner the larger the
-   * screen, which is exactly backwards: a wide window should hold *more* of the
-   * world, not the same handful of creatures further apart. So the field is
-   * filled on a fixed pitch and simply runs out when it reaches the edge.
-   */
-  const fits = (x: number, y: number, item: LifePattern) =>
-    x >= 0 && y >= 0 && x + (item.rows[0] ?? '').length < width && y + item.rows.length < height;
+  // Middle of the field, so it has the whole world to spread into.
+  const rows = OPENING_SEED.rows;
+  stamp(
+    world,
+    OPENING_SEED,
+    Math.floor((width - (rows[0] ?? '').length) / 2),
+    Math.floor((height - rows.length) / 2),
+  );
 
-  const place = (item: LifePattern, x: number, y: number) => {
-    if (fits(x, y, item)) stamp(world, item, x, y);
-  };
-
-  /*
-   * Bands, because the first dense attempt destroyed itself.
-   *
-   * Filling the field evenly with everything put spaceships and gliders directly
-   * into the pulsars, and within a second of real time the composition had
-   * collided into debris — busy, but no longer anything anybody had designed.
-   *
-   * So the still things and the moving things get their own horizontal bands.
-   * Oscillators are stable for ever and are the visual backbone; travellers need
-   * a clear lane to travel down. They meet eventually — the world is a torus and
-   * everything comes round — but by then the piece has had its opening, and what
-   * follows is Life rather than a wreck.
-   */
-  const band = (from: number, to: number) => ({
-    top: Math.round(height * from),
-    bottom: Math.round(height * to),
-  });
-
-  const lane = band(0.44, 0.58);
-
-  /*
-   * The lattice runs the whole height and simply steps over the lane.
-   *
-   * Giving the oscillators bands of their own left a dead strip wherever a row
-   * of pulsars did not quite fit the band it had been given — a wide empty gap
-   * across the screen, which is worse than either thing it was separating. One
-   * lattice with a hole in it has no such seams.
-   *
-   * Pitch sixteen against a pulsar thirteen across leaves three cells between
-   * neighbours: more than the one cell a neighbourhood reaches, so the lattice
-   * beats for ever instead of eating itself.
-   */
-  for (let row = 0, y = 1; y + 14 < height; row += 1, y += 16) {
-    const clearsLane = y + 14 < lane.top || y > lane.bottom;
-    if (!clearsLane) continue;
-
-    for (let x = 2 + (row % 2) * 8; x + 14 < width; x += 16) {
-      place(PULSAR, x, y);
-    }
-  }
-
-  /*
-   * The lane: ranks rather than singles, because a formation crossing the screen
-   * reads as movement from across a room where one small creature does not.
-   */
-  for (let rank = 0, y = lane.top + 2; y + 5 <= lane.bottom; rank += 1, y += 8) {
-    const item = rank % 2 === 0 ? LIGHTWEIGHT_SPACESHIP : GLIDER;
-    for (let x = 6 + rank * 7; x + 6 < width; x += 22) place(item, x, y);
-  }
-
-  /*
-   * One gun, in the travelling band where it has room to fire.
-   *
-   * It is what stops the field ever settling: long after the opening structures
-   * have found their equilibrium, gliders are still arriving from it.
-   */
-  place(GOSPER_GLIDER_GUN, 4, lane.top + 1);
-
-  // A few blocks along the quiet edges of the travelling band, as punctuation.
-  for (let x = 30; x + 2 < width; x += 47) {
-    place(BLOCK, x, lane.top - 4);
-    place(TOAD, x + 12, lane.bottom + 2);
-  }
+  for (let generation = 0; generation < advance; generation += 1) world = step(world);
 
   return world;
 }

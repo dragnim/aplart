@@ -26,16 +26,23 @@ import styles from './LifePage.module.css';
 /**
  * How large a cell is on screen.
  *
- * Nine pixels. Seven fitted more world on the screen and turned every creature
- * into a speck: a pulsar is thirteen cells across, and at seven pixels that is a
- * smudge the size of a full stop. Nine is where a glider still reads as a glider
- * from across a room, and an ordinary window still holds a world wide enough for
- * a spaceship to travel it.
+ * Fourteen pixels, up from nine. The page used to open on a screenful of
+ * structures, where the job of a cell was to be small enough that a world fitted
+ * around them. It now opens on five cells in the middle of the dark, where the
+ * job of a cell is to be seen — and five cells at nine pixels is a full stop.
+ *
+ * The cost is a smaller world, and it was measured rather than guessed: at this
+ * size an ordinary window holds about 109 by 64, which is enough for the seed to
+ * grow for several minutes before the debris has been round the torus and met
+ * itself, and small enough that when it does, it stays busy.
  */
-const CELL = 9;
+const CELL = 14;
 
-/** Palettes worth putting a living world in, brightest ends first. */
-const LIFE_PALETTES = ['ember', 'neon', 'poolrooms', 'sunset', 'heat', 'forest', 'blueprint'] as const;
+/** The gap between cells, so a crowd reads as cells rather than as a wash. */
+const GUTTER = 2;
+
+/** Palettes worth putting a living world in. */
+const LIFE_PALETTES = ['sunset', 'ember', 'neon', 'poolrooms', 'heat', 'forest', 'blueprint'] as const;
 
 /** The grid a viewport of this size holds. */
 function gridFor(width: number, height: number): { columns: number; rows: number } {
@@ -61,7 +68,7 @@ export function LifePage() {
     startPaused: reducedMotion,
   });
 
-  const [paletteId, setPaletteId] = useState<string>('ember');
+  const [paletteId, setPaletteId] = useState<string>('sunset');
   const [showCode, setShowCode] = useState(false);
   const palette = useMemo(() => getPalette(paletteId), [paletteId]);
 
@@ -137,7 +144,7 @@ export function LifePage() {
         const age = Math.min(MAX_AGE, world.ages[index] as number);
         const shade = Math.max(dimmest, brightest - age);
         const colour = ramp[shade] as string;
-        buckets.get(colour)?.rect(x * CELL, y * CELL, CELL - 1, CELL - 1);
+        buckets.get(colour)?.rect(x * CELL, y * CELL, CELL - GUTTER, CELL - GUTTER);
       }
     }
 

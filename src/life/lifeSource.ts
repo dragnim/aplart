@@ -47,7 +47,9 @@ life←{↑1 ⍵∨.∧3 4=+/,¯1 0 1∘.⊖¯1 0 1∘.⌽⊂⍵}
 
 /** How the panel labels each block, so the quotation is never mistaken for ours. */
 export const ATTRIBUTION = {
-  title: "Conway's Game of Life",
+  // The typographic apostrophe, as on the bar. The one in the APL below is an
+  // ASCII quote because it is inside a comment in a source listing.
+  title: 'Conway’s Game of Life',
   formulation: 'APL formulation by John Scholes',
   workspaceNote: 'As published in the dfns workspace.',
   videoNote: 'As developed in the 2009 Dyalog video.',

@@ -96,9 +96,9 @@ export function LifeCodePanel({ open, apl, onClose }: Props) {
           Where it comes from
         </h3>
         <p className={styles.note}>{ATTRIBUTION.workspaceNote}</p>
-        <pre className={styles.apl}>{SCHOLES_WORKSPACE}</pre>
+        <pre className={`${styles.apl} ${styles.quotation}`}>{SCHOLES_WORKSPACE}</pre>
         <p className={styles.note}>{ATTRIBUTION.videoNote}</p>
-        <pre className={styles.apl}>{SCHOLES_VIDEO}</pre>
+        <pre className={`${styles.apl} ${styles.quotation}`}>{SCHOLES_VIDEO}</pre>
       </section>
 
       <section className={styles.block} aria-labelledby="life-code-notes">
