@@ -159,7 +159,9 @@ describe('where the actions live', () => {
   it('puts exactly Focus mode, Share and Export in the toolbar', () => {
     open(mandelbrotField.id);
 
-    const toolbar = screen.getByRole('link', { name: /Gallery/ }).closest('div')?.parentElement;
+    // Anchored on the title rather than on the old back link: the way home is
+    // the wordmark and the site menu in the app bar now, not a button here.
+    const toolbar = screen.getByRole('heading', { level: 1 }).parentElement;
     const named = within(toolbar as HTMLElement)
       .getAllByRole('button')
       .map((button) => button.textContent?.trim());

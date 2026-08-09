@@ -1,5 +1,30 @@
+/**
+ * One bar, for every page.
+ *
+ * The artwork page used to carry three stacked bands: this header, a title row
+ * with the artwork's name and a back link, and an action row with Focus, Share
+ * and Export. Three full-width rules across the top of a page whose subject is a
+ * picture — and the picture had whatever height was left.
+ *
+ * They are one bar now. The wordmark holds the left, the route fills the middle
+ * with whatever it has to say about itself, and the menu holds the right. A page
+ * with nothing contextual to add simply passes nothing, and the bar is a
+ * wordmark and a menu.
+ */
+
 import { AplArtLogo } from '@/components/branding/AplArtLogo';
+import { SiteMenu } from './SiteMenu';
 import styles from './SiteHeader.module.css';
+
+/**
+ * Where a route puts what it has to say about itself.
+ *
+ * Filled by portal rather than by a prop, so the workspace can put its title and
+ * actions in the bar without its state being lifted into `App` — and without the
+ * artwork being remounted every time the bar re-renders. A page with nothing
+ * contextual to add simply never portals, and the slot holds the middle open.
+ */
+export const APP_BAR_SLOT_ID = 'app-bar-slot';
 
 interface Props {
   /** Which top-level destination is showing, so it can be marked current. */
@@ -25,29 +50,9 @@ export function SiteHeader({ current }: Props) {
         <AplArtLogo className={styles.wordmark} decorative />
       </a>
 
-      <nav className={styles.nav} aria-label="Main">
-        <a
-          className={styles.navLink}
-          href="#/"
-          {...(current === 'gallery' ? { 'aria-current': 'page' as const } : {})}
-        >
-          Gallery
-        </a>
-        <a
-          className={styles.navLink}
-          href="#/about"
-          {...(current === 'about' ? { 'aria-current': 'page' as const } : {})}
-        >
-          About
-        </a>
-        <a
-          className={styles.navLink}
-          href="#/help"
-          {...(current === 'help' ? { 'aria-current': 'page' as const } : {})}
-        >
-          Help
-        </a>
-      </nav>
+      <div className={styles.slot} id={APP_BAR_SLOT_ID} />
+
+      <SiteMenu current={current} />
     </header>
   );
 }

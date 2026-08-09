@@ -1,0 +1,106 @@
+.group {
+  position: relative;
+  display: inline-flex;
+}
+
+/*
+ * A hamburger drawn in CSS.
+ *
+ * Three lines from one box and its two pseudo-elements, sized in `em` so it
+ * follows the bar's type rather than a fixed pixel count. An icon font or an SVG
+ * set would be a dependency for one glyph.
+ */
+.trigger {
+  composes: control from global;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--tap-target);
+  padding: 0;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text);
+  transition:
+    background var(--motion-fast) var(--ease),
+    border-color var(--motion-fast) var(--ease);
+}
+
+.trigger:hover {
+  background: var(--surface-sunken);
+}
+
+.trigger[aria-expanded='true'] {
+  background: var(--surface-sunken);
+  border-color: var(--border);
+}
+
+.bars,
+.bars::before,
+.bars::after {
+  display: block;
+  inline-size: 1.125em;
+  block-size: 2px;
+  border-radius: 1px;
+  background: currentcolor;
+}
+
+.bars {
+  position: relative;
+}
+
+.bars::before,
+.bars::after {
+  position: absolute;
+  content: '';
+  inset-inline: 0;
+}
+
+.bars::before {
+  inset-block-start: -0.375em;
+}
+
+.bars::after {
+  inset-block-start: 0.375em;
+}
+
+/*
+ * Anchored to the button and out of the flow, so opening it never moves the bar
+ * or the artwork beneath.
+ */
+.menu {
+  position: absolute;
+  inset-block-start: calc(100% + var(--space-2));
+  inset-inline-end: 0;
+  z-index: 60;
+
+  min-inline-size: 10rem;
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  min-block-size: var(--tap-target);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.item:hover {
+  background: var(--surface-sunken);
+}
+
+.item[aria-current='page'] {
+  font-weight: 600;
+  /* Not colour alone: the current page also carries a rule of its own. */
+  box-shadow: inset 2px 0 0 var(--ui-accent-border);
+}

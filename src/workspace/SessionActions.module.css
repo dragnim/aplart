@@ -8,7 +8,22 @@
 .actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
+}
+
+/*
+ * Quiet, and first. It is a statement rather than a control, so it takes the
+ * muted colour and the small size that everything else in the application uses
+ * for one — and it sits before the buttons that act on what it says.
+ */
+.saveState {
+  margin: 0 var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 /*

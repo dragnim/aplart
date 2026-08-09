@@ -79,6 +79,7 @@ import { useArtworkActions } from './useArtworkActions';
 import { RenderControls } from './RenderControls';
 import { RunPanel } from './RunPanel';
 import { WorkspaceToolbar } from './WorkspaceToolbar';
+import { AppBarPortal } from '@/components/SiteHeader/AppBarPortal';
 import { useWorkspace } from './useWorkspace';
 import { initialWorkspaceState, sameRenderOptions } from './workspaceState';
 import {
@@ -1459,6 +1460,7 @@ function Workspace({
       undoLabel={state.past.at(-1)?.label ?? null}
       onReset={handleReset}
       canReset={canReset}
+      modified={state.modified}
     />
   );
 
@@ -1651,13 +1653,23 @@ function Workspace({
           onExitFocus={exitFocus}
         />
       ) : (
-        <WorkspaceToolbar
-          preset={preset}
-          state={state}
-          actions={actions}
-          onEnterFocus={enterFocus}
-          focusButtonRef={focusTrigger}
-        />
+        /*
+         * Into the app bar, not into the page.
+         *
+         * The title and the three actions belong at the top of the window beside
+         * the wordmark; the state they need belongs here. A portal is what lets
+         * both be true — nothing is lifted into `App`, so nothing about the
+         * artwork, the result or the history is disturbed by where the buttons
+         * are drawn.
+         */
+        <AppBarPortal>
+          <WorkspaceToolbar
+            preset={preset}
+            actions={actions}
+            onEnterFocus={enterFocus}
+            focusButtonRef={focusTrigger}
+          />
+        </AppBarPortal>
       )}
 
       {shareNotice !== null && !focus && (

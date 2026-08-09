@@ -1,12 +1,38 @@
+/*
+ * Compact, and one row.
+ *
+ * `flex-wrap` is gone on purpose: it was what let a busy artwork page grow the
+ * bar to two rows and take back the height this consolidation exists to
+ * reclaim. What sits in the middle is responsible for shrinking instead — the
+ * artwork title truncates, and the actions compact — so the bar has one height
+ * at every width.
+ */
 .header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-4);
-  flex-wrap: wrap;
-  padding: var(--space-4) var(--space-5);
+  min-block-size: var(--tap-target);
+  padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--border);
   background: var(--surface);
+}
+
+/*
+ * The middle. Empty on most pages, and holding the artwork's title and actions
+ * on an artwork page — see APP_BAR_SLOT_ID.
+ *
+ * `min-inline-size: 0` because what goes in it truncates: without it a long
+ * artwork title would refuse to shrink and push the menu off the end.
+ */
+.slot {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+.brand {
+  flex: 0 0 auto;
 }
 
 /*
@@ -38,33 +64,8 @@
   font-size: 1.5rem;
 }
 
-.nav {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.navLink {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--tap-target);
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-md);
-  color: var(--text-muted);
-  text-decoration: none;
-  transition:
-    background var(--motion-fast) var(--ease),
-    color var(--motion-fast) var(--ease);
-}
-
-.navLink:hover {
-  background: var(--surface-sunken);
-  color: var(--text);
-}
-
-.navLink[aria-current='page'] {
-  color: var(--text);
-  font-weight: 600;
-  /* Not colour alone: the current page also carries an underline. */
-  box-shadow: inset 0 -2px 0 var(--ui-accent-border);
-}
+/*
+ * Gallery, About and Help used to sit here as a row of links. They are in the
+ * menu at the right-hand end now — secondary while somebody is making
+ * something, and the space they held is the artwork's.
+ */

@@ -78,12 +78,12 @@ describe('Focus mode on a wide screen', () => {
     const user = userEvent.setup();
     renderWorkspace();
 
-    expect(screen.getByRole('link', { name: /Gallery/ })).toBeInTheDocument();
+    // The ordinary bar offers the way in; the overlay bar offers the way out.
+    expect(screen.getByRole('button', { name: 'Focus mode' })).toBeInTheDocument();
     await enterFocus(user);
 
     expect(screen.getByRole('button', { name: 'Exit focus' })).toBeInTheDocument();
-    // Navigation away is not offered while the artwork has the whole screen.
-    expect(screen.queryByRole('link', { name: /Gallery/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Focus mode' })).not.toBeInTheDocument();
   });
 
   it('opens the drawer on arrival, so there is a visible way in', async () => {
@@ -192,7 +192,7 @@ describe('Focus mode on a wide screen', () => {
 
       await user.keyboard('{Escape}');
       expect(screen.queryByRole('button', { name: 'Exit focus' })).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /Gallery/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Focus mode' })).toBeInTheDocument();
     });
 
     it('closes an open menu without also unwinding Focus mode', async () => {

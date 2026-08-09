@@ -27,11 +27,26 @@ interface Props {
   readonly onReset: () => void;
   /** False when the artwork is already the preset's own, in source and appearance. */
   readonly canReset: boolean;
+  /** Whether the artwork on screen differs from the preset's own. */
+  readonly modified: boolean;
 }
 
-export function SessionActions({ onRandomise, onUndo, undoLabel, onReset, canReset }: Props) {
+export function SessionActions({ onRandomise, onUndo, undoLabel, onReset, canReset, modified }: Props) {
   return (
     <div className={styles.actions} aria-label="Artwork actions" role="group">
+      {/*
+        Whether this is your work or the piece as it ships.
+
+        It used to sit under the title in a band of its own, where it described
+        the artwork to nobody in particular. Here it is next to the two controls
+        that answer it — Undo takes a step of it back, Reset takes all of it back
+        — so the state and the response to it are in the same place.
+
+        The word, not a dot. A coloured mark would be smaller and would need
+        explaining, which is a poor trade for one short word.
+      */}
+      <p className={styles.saveState}>{modified ? 'Edited' : 'Original'}</p>
+
       <button type="button" className={styles.primary} onClick={onRandomise}>
         Randomise
       </button>

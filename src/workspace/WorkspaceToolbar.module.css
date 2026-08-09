@@ -1,38 +1,21 @@
 /*
- * Tightened, because everything below it is the artwork.
+ * No longer a band. This is the middle of the app bar.
  *
- * Ninety-six pixels of chrome sat above a picture that has to fit the window,
- * and each one came out of the square. The padding is trimmed rather than the
- * content: the title, the piece's metadata and the five actions all stay, at the
- * shared control size, so the row is shorter without being denser.
+ * It was a row of its own beneath the site header, and a second row of actions
+ * beneath that — ninety-six pixels of chrome above a picture that has to fit the
+ * window, every one of them out of the square. Both are gone into the one bar,
+ * and this is what the workspace puts there: its title at the left of the space,
+ * its three actions at the right.
+ *
+ * No padding and no wrapping. The bar owns its own height, and a row that could
+ * wrap would take back exactly what this change was made to reclaim.
  */
 .toolbar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-3) 0 var(--space-4);
-}
-
-.identity {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-4);
-  min-width: 0;
-}
-
-/* Shape from the shared control rule; only the colours are its own. */
-.back {
-  composes: control from global;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  text-decoration: none;
-}
-
-.back:hover {
-  background: var(--surface-sunken);
+  inline-size: 100%;
+  min-inline-size: 0;
 }
 
 /*
@@ -56,8 +39,28 @@
    * instead, which is exactly what happened the first time.
    */
   position: relative;
-  font-size: var(--text-2xl);
-  letter-spacing: -0.02em;
+  /*
+   * Bar-sized, not page-sized. It was the page's heading at --text-2xl above its
+   * own row; in a bar beside a wordmark it is a label, and a label that big
+   * would compete with the mark it sits next to.
+   */
+  font-size: var(--text-lg);
+  letter-spacing: -0.01em;
+  /*
+   * Truncates rather than pushing the actions and the menu off the end. This is
+   * the one thing in the bar that has no natural width, so it is the one thing
+   * that gives.
+   */
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The actions sit at the far end, whatever the title does. */
+.actions {
+  margin-inline-start: auto;
 }
 
 .title::before {

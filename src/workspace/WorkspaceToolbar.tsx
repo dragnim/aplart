@@ -13,12 +13,10 @@ import { useDismissable } from '@/components/useDismissable';
 import { type ArtworkPreset } from '@/presets/schema';
 import { ExportMenu } from './ExportMenu';
 import { EXPORT_SIZES, type ArtworkActions } from './useArtworkActions';
-import { type WorkspaceState } from './workspaceState';
 import styles from './WorkspaceToolbar.module.css';
 
 interface Props {
   readonly preset: ArtworkPreset;
-  readonly state: WorkspaceState;
   readonly actions: ArtworkActions;
   readonly onEnterFocus: () => void;
   /** Focus returns here when Focus mode is left. */
@@ -34,7 +32,7 @@ interface Props {
  * session actions, where Undo is — it is an editing decision, and it is now one
  * that can be taken back.
  */
-export function WorkspaceToolbar({ preset, state, actions, onEnterFocus, focusButtonRef }: Props) {
+export function WorkspaceToolbar({ preset, actions, onEnterFocus, focusButtonRef }: Props) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const actionsGroup = useRef<HTMLDivElement>(null);
   const closeActions = useCallback(() => setActionsOpen(false), []);
@@ -45,18 +43,20 @@ export function WorkspaceToolbar({ preset, state, actions, onEnterFocus, focusBu
 
   return (
     <div className={styles.toolbar}>
-      <div className={styles.identity}>
-        <a className={styles.back} href="#/">
-          <span aria-hidden="true">←</span> Gallery
-        </a>
-        <div>
-          <h1 className={styles.title}>{preset.title}</h1>
-          <p className={styles.meta}>
-            <span className={styles.category}>{preset.category}</span>
-            <span className={styles.saveState}>{state.modified ? 'Edited' : 'Original'}</span>
-          </p>
-        </div>
-      </div>
+      {/*
+        The title, and nothing under it.
+
+        This used to be a band of its own: a back link, the title, and a line
+        reading "Pattern · Original" beneath. The back link went because the
+        wordmark to its left is the way home and the menu to its right holds the
+        Gallery. The category went because the gallery card it came from already
+        says it, and repeating it bought a whole row.
+
+        Edited and Original did not go — that one means something, and it now sits
+        with Undo and Reset in the controls, where what it describes can be acted
+        on.
+      */}
+      <h1 className={styles.title}>{preset.title}</h1>
 
       {/*
         Focus mode stays out of the overflow menu at every width. It is the one
