@@ -109,6 +109,7 @@ export function LifeCodePanel({ open, apl, onClose }: Props) {
         <p className={styles.note}>{ATTRIBUTION.boundaryNote}</p>
         <p className={styles.note}>{ATTRIBUTION.colourNote}</p>
         <p className={styles.note}>{ATTRIBUTION.engineNote}</p>
+        <p className={styles.note}>{ATTRIBUTION.verificationNote}</p>
       </section>
 
       <p className={styles.notice} role="status" aria-live="polite">

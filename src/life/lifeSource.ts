@@ -73,6 +73,24 @@ export const ATTRIBUTION = {
     'Conway’s rules say nothing about edges, and different implementations answer that differently — an unbounded plane, a wall, or a wrap. Scholes’s rotations make opposite edges adjacent, so his world is a torus: a glider leaving the right-hand side arrives at the left. This one wraps too, to match the expression above.',
   colourNote:
     'The colours show how long each cell has been alive — newly born cells arrive brightest. That is only a way of seeing the world. The rules never read it, and it never changes what happens next.',
+  /*
+   * What is actually executing, said plainly.
+   *
+   * The expression above is the definition; the animation is an equivalent
+   * implementation of it. Somebody watching forty-eight generations a second
+   * could reasonably assume they were watching APL being interpreted frame by
+   * frame, and they are not — saying so is the difference between a
+   * demonstration and a conjuring trick.
+   */
   engineNote:
-    'The animation runs an equivalent implementation in your browser, so a generation costs no network request. Same rules, same torus, no shortcuts.',
+    'The expression above defines the transformation. The animation applies it in your browser rather than asking TryAPL for each generation — twelve to forty-eight of them a second is not a network round trip — so what you are watching is an equivalent local implementation, not APL being interpreted frame by frame.',
+
+  /*
+   * And the word "equivalent" earning its place.
+   *
+   * It is a claim about two programs producing the same thing, which is either
+   * checked or it is decoration. `tests/live/life.test.ts` is the check.
+   */
+  verificationNote:
+    'Equivalent is checked rather than claimed: that implementation is compared against real APL execution of the expression above — every cell of every generation, over a still life, an oscillator, a glider, a glider crossing the edges of the torus, and a longer-running pattern.',
 } as const;

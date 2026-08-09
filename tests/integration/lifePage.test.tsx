@@ -377,6 +377,25 @@ describe('View APL', () => {
     expect(panel).toHaveTextContent(/never changes what happens next/u);
   });
 
+  it('says what is executing, without implying APL runs every frame', async () => {
+    /*
+     * The honesty of the whole demo sits in these two sentences. A visitor
+     * watching forty-eight generations a second could reasonably assume they
+     * were watching APL interpreted frame by frame; the panel has to say
+     * otherwise, and has to say that "equivalent" was checked rather than
+     * asserted — `tests/live/life.test.ts` is the check it is referring to.
+     */
+    const user = userEvent.setup();
+    render(<LifePage />);
+    await user.click(screen.getByRole('button', { name: 'View APL' }));
+    const panel = screen.getByRole('dialog', { name: /APL behind this artwork/u });
+
+    expect(panel).toHaveTextContent(/The expression above defines the transformation/u);
+    expect(panel).toHaveTextContent(/applies it in your browser/u);
+    expect(panel).toHaveTextContent(/not APL being interpreted frame by frame/u);
+    expect(panel).toHaveTextContent(/compared against real APL execution/u);
+  });
+
   it('is out of the way, and out of the tab order, until it is asked for', () => {
     render(<LifePage />);
     const panel = screen.getByRole('dialog', { name: /APL behind this artwork/u, hidden: true });
