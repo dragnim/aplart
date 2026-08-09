@@ -1,0 +1,141 @@
+/*
+ * The drawer, over the world.
+ *
+ * One scrolling context: this element scrolls and nothing inside it does. The
+ * Focus-mode drawer nests a scroller inside a scroller, and the result is that a
+ * wheel gesture moves whichever one the pointer happened to be over — which is
+ * never something anybody chose.
+ */
+.drawer {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 3;
+
+  inline-size: min(34rem, 100vw);
+  padding: var(--space-5);
+  padding-block-start: calc(var(--space-5) + 3.5rem);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+
+  overflow-y: auto;
+  overscroll-behavior: contain;
+
+  background: rgb(8 9 16 / 94%);
+  backdrop-filter: blur(14px);
+  border-inline-start: 1px solid rgb(247 247 247 / 14%);
+  color: #f0f0f2;
+
+  /* Slid out rather than removed, so opening it never rebuilds the world. */
+  transform: translateX(0);
+  transition: transform var(--motion-base) var(--ease);
+}
+
+.drawer[data-open='closed'] {
+  transform: translateX(101%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer {
+    transition: none;
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.credit {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: rgb(240 240 242 / 68%);
+}
+
+.close {
+  composes: control from global;
+  border: 1px solid rgb(247 247 247 / 24%);
+  background: rgb(20 22 32 / 80%);
+  color: #f0f0f2;
+}
+
+.close:hover {
+  background: rgb(34 38 52 / 90%);
+}
+
+.close:focus-visible,
+.copy:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.block {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.blockHeading {
+  margin: 0;
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgb(240 240 242 / 58%);
+}
+
+/*
+ * The APL itself, and the reason anybody opened this.
+ *
+ * Given room and the artwork's own accent, because it is the punchline: four
+ * lines against a whole moving world. It wraps rather than scrolls sideways —
+ * a second scrollbar in here is exactly what this panel exists to avoid.
+ */
+.apl {
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: rgb(0 0 0 / 55%);
+  border: 1px solid rgb(247 247 247 / 12%);
+
+  font-family: var(--font-apl, var(--font-mono));
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--ui-accent-text-on-dark, #ffc39a);
+
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.copy {
+  composes: control from global;
+  justify-self: start;
+  border: 1px solid rgb(247 247 247 / 24%);
+  background: rgb(20 22 32 / 80%);
+  color: #f0f0f2;
+}
+
+.copy:hover {
+  background: rgb(34 38 52 / 90%);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: rgb(240 240 242 / 76%);
+}
+
+.notice {
+  margin: 0;
+  min-block-size: 1.2em;
+  font-size: var(--text-xs);
+  color: var(--ui-accent-text-on-dark, #ffc39a);
+}
