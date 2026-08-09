@@ -20,6 +20,13 @@ const WorkspacePage = lazy(async () => ({
   default: (await import('@/workspace/WorkspacePage')).WorkspacePage,
 }));
 
+/*
+ * Life is lazy for the same reason and one of its own: nobody reaches it by
+ * accident, and its simulation has no business being downloaded by somebody who
+ * came to look at the gallery.
+ */
+const LifePage = lazy(async () => ({ default: (await import('@/life/LifePage')).LifePage }));
+
 const SITE_NAME = 'APL Art';
 
 function titleFor(route: Route): string {
@@ -32,6 +39,8 @@ function titleFor(route: Route): string {
       return `About — ${SITE_NAME}`;
     case 'help':
       return `Help — ${SITE_NAME}`;
+    case 'life':
+      return `Conway's Game of Life — ${SITE_NAME}`;
     case 'notFound':
       return `Not found — ${SITE_NAME}`;
   }
@@ -66,6 +75,7 @@ function headerSelection(route: Route): 'gallery' | 'about' | 'help' | null {
     case 'help':
       return 'help';
     case 'artwork':
+    case 'life':
     case 'notFound':
       return null;
   }
@@ -176,13 +186,29 @@ export function App() {
      */
     <InterfaceAccentBoundary
       className={styles.shell}
-      presetId={route.name === 'artwork' ? route.presetId : null}
+      /*
+       * Life counts as an artwork here even though it is not in the registry:
+       * it publishes a palette like one, and without a name to publish under,
+       * the boundary discards it and the page's own colours never reach the
+       * interface. `getPreset('life')` finds nothing, which is right — there is
+       * no declared palette to start from, only the one the page announces.
+       */
+      presetId={route.name === 'artwork' ? route.presetId : route.name === 'life' ? 'life' : null}
     >
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
 
-      <SiteHeader current={headerSelection(route)} />
+      {/*
+        The immersive route has no site chrome.
+
+        Life fills the viewport and carries its own bar, so the header and footer
+        are not merely hidden behind it — they are not rendered. A covered header
+        is still in the tab order, and somebody navigating by keyboard would find
+        themselves in a menu they cannot see, above an artwork that is the whole
+        page.
+      */}
+      {route.name === 'life' ? null : <SiteHeader current={headerSelection(route)} />}
 
       <main id="main" ref={mainRef} className={styles.main} tabIndex={-1}>
         <ErrorBoundary area={route.name === 'artwork' ? 'this artwork' : 'this page'} resetKey={routeKey}>
@@ -190,7 +216,7 @@ export function App() {
         </ErrorBoundary>
       </main>
 
-      <SiteFooter />
+      {route.name === 'life' ? null : <SiteFooter />}
     </InterfaceAccentBoundary>
   );
 }
@@ -214,6 +240,12 @@ function RouteView({ route }: { readonly route: Route }) {
       return <AboutPage />;
     case 'help':
       return <HelpPage />;
+    case 'life':
+      return (
+        <Suspense fallback={<p className={styles.loading}>Starting the world…</p>}>
+          <LifePage />
+        </Suspense>
+      );
     case 'notFound':
       return <NotFoundPage what={`There is no page at “${route.path}”.`} />;
   }

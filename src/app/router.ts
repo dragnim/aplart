@@ -40,6 +40,14 @@ export type Route =
     }
   | { readonly name: 'about' }
   | { readonly name: 'help' }
+  /**
+   * The immersive Conway's Game of Life.
+   *
+   * Its own route rather than an artwork's, because it is not one: there is no
+   * preset behind it, no shared state to decode and no workspace to arrange. The
+   * address is the entire request — open it and the world is already running.
+   */
+  | { readonly name: 'life' }
   | { readonly name: 'notFound'; readonly path: string };
 
 export function parseRoute(hash: string): Route {
@@ -56,6 +64,7 @@ export function parseRoute(hash: string): Route {
   if (segments.length === 1) {
     if (first === 'about') return { name: 'about' };
     if (first === 'help') return { name: 'help' };
+    if (first === 'life') return { name: 'life' };
   }
 
   if (segments.length === 2 && first === 'art' && second !== undefined) {

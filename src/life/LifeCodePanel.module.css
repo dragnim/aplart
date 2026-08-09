@@ -1,0 +1,170 @@
+/*
+ * The drawer, over the world.
+ *
+ * An APL Art panel, not a developer console. This was a dark translucent sheet,
+ * which read as a debugger someone had opened over the artwork rather than as
+ * part of the site — so it is now the same white surface, border, radius and
+ * type as every other panel in the application, lifted off the dark canvas by a
+ * shadow rather than by inventing a second visual language for one page.
+ *
+ * One scrolling context: this element scrolls and nothing inside it does. The
+ * Focus-mode drawer nests a scroller inside a scroller, and the result is that a
+ * wheel gesture moves whichever one the pointer happened to be over — which is
+ * never something anybody chose.
+ */
+.drawer {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 3;
+
+  inline-size: min(34rem, 100vw);
+  padding: var(--space-5);
+  padding-block-start: calc(var(--space-5) + 3.5rem);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+
+  /* The reading measure the rest of the site uses, on a panel this wide. */
+  font-size: var(--text-base);
+
+  overflow-y: auto;
+  overscroll-behavior: contain;
+
+  background: var(--surface);
+  border-inline-start: 1px solid var(--border);
+  color: var(--text);
+  /*
+   * A white panel against a black world needs no translucency to be legible, but
+   * it does need to look like it is in front. The shadow is the site's own.
+   */
+  box-shadow: var(--shadow-lg);
+
+  /* Slid out rather than removed, so opening it never rebuilds the world. */
+  transform: translateX(0);
+  transition: transform var(--motion-base) var(--ease);
+}
+
+.drawer[data-open='closed'] {
+  transform: translateX(101%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer {
+    transition: none;
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+/* Tucked under the title it belongs to, rather than floating between sections. */
+.credit {
+  margin: calc(var(--space-4) * -1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.close {
+  composes: control from global;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  transition:
+    background var(--motion-fast) var(--ease),
+    border-color var(--motion-fast) var(--ease);
+}
+
+.close:hover {
+  background: var(--surface-sunken);
+  border-color: var(--ui-accent-border, var(--border-strong));
+}
+
+.block {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.blockHeading {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+/*
+ * The APL itself, and the reason anybody opened this.
+ *
+ * Given room, the site's sunken surface, and a rule down the edge in the colour
+ * of whichever palette the world is wearing — the one place on this panel the
+ * artwork is allowed to tint. The glyphs themselves stay near-black on
+ * off-white, because a code sample that is also a colour swatch is a code sample
+ * nobody can read.
+ *
+ * It wraps rather than scrolls sideways: a second scrollbar in here is exactly
+ * what this panel exists to avoid.
+ */
+.apl {
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--ui-accent-border, var(--accent-orange));
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+
+  font-family: var(--font-apl, var(--font-mono));
+  font-size: var(--text-base);
+  line-height: 1.65;
+  color: var(--text);
+
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The quoted sources: the same treatment, one step quieter. */
+.apl.quotation {
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+  border-inline-start-width: 1px;
+  border-inline-start-color: var(--border);
+}
+
+.copy {
+  composes: control from global;
+  justify-self: start;
+  border: 1px solid var(--ui-accent-border, var(--accent-orange));
+  background: var(--ui-accent-soft, #fff0ea);
+  color: var(--ui-accent-text, var(--accent-orange-strong));
+  transition: background var(--motion-fast) var(--ease);
+}
+
+.copy:hover {
+  background: var(--surface-sunken);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.notice {
+  margin: 0;
+  min-block-size: 1.2em;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--success);
+}
