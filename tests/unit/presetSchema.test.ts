@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { escapeRegExp, validatePreset, type ArtworkPreset } from '@/presets/schema';
+import { presets } from '@/presets/presets';
 
 function makePreset(overrides: Partial<ArtworkPreset> = {}): ArtworkPreset {
   return {
@@ -164,5 +165,51 @@ describe('escapeRegExp', () => {
 
   it('leaves an ordinary APL name untouched', () => {
     expect(escapeRegExp('size')).toBe('size');
+  });
+});
+
+describe('how every artwork meets a Focus window', () => {
+  /*
+   * Stated by each preset, and checked as data rather than as a rule.
+   *
+   * This was briefly derived from `category`, which is tidy and wrong: a
+   * category says what an artwork is, and letting it decide a rendering policy
+   * means a piece filed differently one day is cropped differently the next,
+   * with nothing in the preset to say so. The schema tolerates the field being
+   * absent so a preset from elsewhere still loads; these assertions are what
+   * stop an authored one quietly falling back to the default.
+   */
+  const expected: Readonly<Record<string, 'cover' | 'contain'>> = {
+    'basket-weave': 'cover',
+    'quilt-stars': 'cover',
+    'maze-tiles': 'cover',
+    'glow-grid': 'cover',
+    'truchet-grid': 'cover',
+    'checker-shift': 'cover',
+    'modular-bloom': 'cover',
+    'wave-interference': 'cover',
+    'mandelbrot-field': 'contain',
+    'julia-set': 'contain',
+    'burning-ship': 'contain',
+    tricorn: 'contain',
+    multibrot: 'contain',
+    'sierpinski-array': 'contain',
+    'cellular-echo': 'contain',
+  };
+
+  it('is declared by every artwork, with nothing left to the default', () => {
+    for (const preset of presets) {
+      expect(preset.focusFit, `${preset.id} does not say how it meets a Focus window`).toBeDefined();
+    }
+  });
+
+  it('fills for the seamless surfaces and fits for everything else', () => {
+    for (const preset of presets) {
+      expect(preset.focusFit, preset.id).toBe(expected[preset.id]);
+    }
+  });
+
+  it('covers every artwork that exists, so a new one cannot be forgotten here', () => {
+    expect(new Set(presets.map((preset) => preset.id))).toEqual(new Set(Object.keys(expected)));
   });
 });

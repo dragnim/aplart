@@ -12,6 +12,7 @@ import { describeMatrix, type MatrixStats } from '@/matrix/matrixStats';
 import { type NumericMatrix } from '@/matrix/matrixTypes';
 import { type RenderMode } from '@/presets/schema';
 import { drawArtwork, drawCellMarker, type DrawRequest } from './CanvasRenderer';
+import { type ArtworkFit } from './fitArtwork';
 import { DEFAULT_TILING, describeTiling, isRepeating, type TilingView } from './tiling';
 import { type SourceCell, type SourceRect } from './displayMapping';
 import { animatePalette, phaseFor, type AnimationSettings } from './paletteAnimation';
@@ -53,6 +54,13 @@ interface Props {
   readonly stats: MatrixStats | null;
   readonly mode: RenderMode;
   readonly options: RenderOptions;
+  /**
+   * Whether the artwork fits inside the canvas or fills it.
+   *
+   * Only tells where the canvas is not the artwork's own shape — in practice
+   * Focus mode, since the ordinary workspace draws a square in a square frame.
+   */
+  readonly fit?: ArtworkFit;
   /** Dims the artwork while a new run is in flight, without removing it. */
   readonly busy: boolean;
   readonly canvasRef?: RefObject<HTMLCanvasElement | null>;
@@ -82,6 +90,7 @@ export function ArtworkCanvas({
   stats,
   mode,
   options,
+  fit = 'contain',
   busy,
   canvasRef,
   exploration,
@@ -129,14 +138,14 @@ export function ArtworkCanvas({
       const drawn = singleCopy ? { ...options, tiling: DEFAULT_TILING } : options;
       drawArtwork(
         element,
-        { matrix, stats, mode, options: drawn, palette: painted, escape },
+        { matrix, stats, mode, options: drawn, palette: painted, escape, fit },
         width,
         height,
         ratio,
       );
       // After the artwork, so the outline is not painted over. Repainted with it
       // on every resize, which is why it is inside `paint` rather than beside it.
-      if (marked !== null) drawCellMarker(element, marked, matrix, drawn, width, height, ratio);
+      if (marked !== null) drawCellMarker(element, marked, matrix, drawn, width, height, ratio, fit);
     };
 
     paintRef.current = paint;
@@ -147,7 +156,7 @@ export function ArtworkCanvas({
     const observer = new ResizeObserver(paint);
     observer.observe(box);
     return () => observer.disconnect();
-  }, [matrix, stats, mode, options, canvas, marked, animation, escape, singleCopy]);
+  }, [matrix, stats, mode, options, canvas, marked, animation, escape, singleCopy, fit]);
 
   /*
    * The animation loop.
@@ -206,6 +215,7 @@ export function ArtworkCanvas({
     rows: matrix?.rows ?? 0,
     columns: matrix?.columns ?? 0,
     renderOptions: options,
+    fit,
     onSelect: exploration?.onSelect ?? ignore,
     onInspect: inspection?.onInspect ?? ignore,
   });

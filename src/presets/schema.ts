@@ -23,6 +23,29 @@ export type RenderMode = 'indexed' | 'continuous' | 'binary' | 'threshold' | 'ti
 
 export type PresetCategory = 'pattern' | 'fractal' | 'geometry' | 'cellular';
 
+/**
+ * How an artwork meets a frame that is not its own shape.
+ *
+ * Only Focus mode asks the question: the ordinary workspace draws a square
+ * artwork in a square frame, where filling and fitting are the same thing.
+ *
+ * `cover` fills the window and lets the artwork run off the long edges. It is
+ * right for a piece that is a fragment of something larger — a seamless pattern
+ * has no edges worth preserving, and showing it with margins presents a swatch
+ * where a surface was wanted.
+ *
+ * `contain` shows all of it. It is right where the frame is part of the work:
+ * a plane explorer's edges are the view somebody navigated to, and cropping
+ * them would move that view without being asked; a figure with a silhouette —
+ * a triangle, a cellular run — loses its shape at the corners.
+ *
+ * Declared rather than inferred. This was briefly derived from `category`,
+ * which reads tidily and is wrong: a category says what an artwork *is*, and
+ * letting it quietly decide a rendering policy means a piece filed differently
+ * one day is cropped differently the next, with nothing in the preset to say so.
+ */
+export type FocusFit = 'cover' | 'contain';
+
 export interface PrimitiveReference {
   readonly glyph: string;
   readonly name: string;
@@ -159,6 +182,14 @@ export interface ArtworkPreset {
   readonly defaultPaletteId: string;
   readonly availablePaletteIds?: readonly string[];
   readonly renderMode: RenderMode;
+  /**
+   * How this artwork meets a Focus-mode window.
+   *
+   * Optional so that a preset from elsewhere still loads, and it then fits
+   * inside the frame — the answer that can never crop anything unexpectedly.
+   * Every authored preset states it outright, and a test insists they do.
+   */
+  readonly focusFit?: FocusFit;
   /** Set only by presets whose matrix is a patch of a plane. */
   readonly planeExploration?: PlaneExploration;
   /** Set by presets whose largest value means something worth saying. */

@@ -184,9 +184,19 @@ test.describe('Focus mode', () => {
     await page.setViewportSize({ width: 1000, height: 700 });
     await settled(page);
 
-    // Motifs are rasterised at a cell size taken from the matrix and then
-    // scaled to fit, so a resize must repaint rather than stretch or blank.
-    expect(await colourCount(page)).toBeGreaterThan(2);
+    /*
+     * Motifs are rasterised at a cell size taken from the matrix and then
+     * scaled, so a resize must repaint rather than blank.
+     *
+     * "More than one" rather than "more than two". Truchet is a two-colour
+     * artwork — a dark ground and white curves — and the third colour this used
+     * to find was the mat behind a letterboxed square. Truchet now covers the
+     * Focus window, so there is no mat to count, and requiring three would be
+     * requiring the letterbox back. A blank canvas is one colour, which is the
+     * thing actually being ruled out here; that the drawing is the right one is
+     * settled by the export comparison below.
+     */
+    expect(await colourCount(page)).toBeGreaterThan(1);
 
     const inFocus = await exportOriginal(page, testInfo.outputPath('tiles-focus.png'));
     expect(inFocus).toEqual(inWorkspace);

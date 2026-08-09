@@ -24,10 +24,21 @@
  * gallery card that opened the piece. What is left here is three actions.
  */
 
+/*
+ * Held to the far end of the bar's middle, whatever else is in it.
+ *
+ * `auto` rather than a width or a margin of its own: it takes whatever space is
+ * free before it, so the group sits against the site menu at every viewport
+ * without any of them knowing a number. This was lost when the artwork's title
+ * left the bar — the title had been the flexible thing pushing the actions
+ * along, and removing the dead rules that went with it took this one too, so
+ * the actions fell back to the start of the row beside the wordmark.
+ */
 .actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  margin-inline-start: auto;
 }
 
 .action {

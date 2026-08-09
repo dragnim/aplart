@@ -154,6 +154,8 @@ export const mandelbrotField: ArtworkPreset = {
    */
   defaultPaletteId: 'abyss',
   renderMode: 'continuous',
+  // The frame is part of the work, so a Focus window shows all of it.
+  focusFit: 'contain',
 
   // The axes above are built in exactly the form this declaration promises,
   // which is what lets a dragged region be turned back into three assignments.

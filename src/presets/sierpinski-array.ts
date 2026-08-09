@@ -62,6 +62,8 @@ export const sierpinskiArray: ArtworkPreset = {
 
   defaultPaletteId: 'neon',
   renderMode: 'binary',
+  // The frame is part of the work, so a Focus window shows all of it.
+  focusFit: 'contain',
 
   primitives: [
     { glyph: '⊤', name: 'Encode', shortDescription: 'Writes numbers in another base — here, binary.' },

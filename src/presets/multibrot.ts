@@ -168,6 +168,8 @@ export const multibrot: ArtworkPreset = {
    */
   defaultPaletteId: 'ember',
   renderMode: 'continuous',
+  // The frame is part of the work, so a Focus window shows all of it.
+  focusFit: 'contain',
 
   /*
    * The three view variables, and deliberately not `power`. Dragging changes where

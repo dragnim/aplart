@@ -141,6 +141,8 @@ export const burningShip: ArtworkPreset = {
    */
   defaultPaletteId: 'heat',
   renderMode: 'continuous',
+  // The frame is part of the work, so a Focus window shows all of it.
+  focusFit: 'contain',
 
   // Built in exactly the form this declaration promises, which is what lets a
   // dragged region be turned back into three assignments.

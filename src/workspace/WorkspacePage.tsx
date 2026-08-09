@@ -1471,6 +1471,18 @@ function Workspace({
         stats={shown?.stats ?? null}
         mode={preset.renderMode}
         options={state.renderOptions}
+        /*
+         * Only in Focus, which is the only place the frame is not the artwork's
+         * own shape. The ordinary workspace draws into a square panel and must
+         * keep fitting: an artwork whose matrix is not square would otherwise be
+         * cropped there too, which is not what a workspace is for and not what
+         * this field is called.
+         *
+         * Declared by the artwork rather than inferred from what kind of thing
+         * it is — see `FocusFit` in the preset schema for what the two answers
+         * mean and why this is data rather than a rule about categories.
+         */
+        fit={focus ? (preset.focusFit ?? 'contain') : 'contain'}
         busy={state.status === 'running'}
         canvasRef={canvasRef}
         exploration={

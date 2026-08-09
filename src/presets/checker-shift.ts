@@ -97,6 +97,8 @@ export const checkerShift: ArtworkPreset = {
 
   defaultPaletteId: 'blueprint',
   renderMode: 'indexed',
+  // A seamless surface: it fills a Focus window and runs off the edges.
+  focusFit: 'cover',
 
   /*
    * The gentlest artwork in the gallery, and the easiest to describe without

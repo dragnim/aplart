@@ -655,6 +655,22 @@
    */
   justify-self: stretch;
   align-self: stretch;
+  /*
+   * And its rows keep their own heights, with the spare going to the bottom.
+   *
+   * This column is a grid, and a grid's default `align-content` behaves as
+   * `stretch`. Now that the drawer fills the viewport, every mode whose controls
+   * are short leaves spare space — and the grid shared it between the rows,
+   * growing the "Controls / Close" row and carrying the tab strip down with it.
+   * Measured on Basket Weave: that row was 32px in Create and 147px in Animate,
+   * moving the tabs from y=152 to y=267 for no reason but that Animate has less
+   * in it.
+   *
+   * The same trap as the artwork column above, one level in. A short mode should
+   * leave its unused space below the content, where nobody sees it, rather than
+   * above it, where it moves the furniture.
+   */
+  align-content: start;
 }
 
 /*

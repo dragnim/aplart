@@ -81,6 +81,8 @@ export const quiltStars: ArtworkPreset = {
 
   defaultPaletteId: 'sunset',
   renderMode: 'continuous',
+  // A seamless surface: it fills a Focus window and runs off the edges.
+  focusFit: 'cover',
 
   /*
    * Shape is the control worth meeting first: one slider takes the artwork from

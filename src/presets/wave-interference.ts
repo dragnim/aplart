@@ -117,6 +117,8 @@ export const waveInterference: ArtworkPreset = {
 
   defaultPaletteId: 'poolrooms',
   renderMode: 'continuous',
+  // A seamless surface: it fills a Focus window and runs off the edges.
+  focusFit: 'cover',
 
   /*
    * Three questions about the ripples: how many directions they travel in, how

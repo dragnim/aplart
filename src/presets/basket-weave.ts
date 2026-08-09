@@ -68,6 +68,8 @@ export const basketWeave: ArtworkPreset = {
 
   defaultPaletteId: 'ember',
   renderMode: 'continuous',
+  // A seamless surface: it fills a Focus window and runs off the edges.
+  focusFit: 'cover',
 
   /*
    * Three controls, and the third is the one that surprises people: the same

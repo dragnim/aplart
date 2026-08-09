@@ -129,6 +129,8 @@ export const modularBloom: ArtworkPreset = {
 
   defaultPaletteId: 'ember',
   renderMode: 'continuous',
+  // A seamless surface: it fills a Focus window and runs off the edges.
+  focusFit: 'cover',
 
   /*
    * The artwork somebody meets first.

@@ -73,6 +73,8 @@ export const glowGrid: ArtworkPreset = {
 
   defaultPaletteId: 'poolrooms',
   renderMode: 'continuous',
+  // A seamless surface: it fills a Focus window and runs off the edges.
+  focusFit: 'cover',
 
   /*
    * Two controls carry this artwork and they pull in opposite directions:

@@ -157,6 +157,8 @@ export const juliaSet: ArtworkPreset = {
    */
   defaultPaletteId: 'poolrooms',
   renderMode: 'continuous',
+  // The frame is part of the work, so a Focus window shows all of it.
+  focusFit: 'contain',
 
   /*
    * Only the three view variables. `realC` and `imagC` are deliberately absent:

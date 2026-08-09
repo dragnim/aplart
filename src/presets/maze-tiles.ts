@@ -81,6 +81,8 @@ export const mazeTiles: ArtworkPreset = {
 
   defaultPaletteId: 'blueprint',
   renderMode: 'continuous',
+  // A seamless surface: it fills a Focus window and runs off the edges.
+  focusFit: 'cover',
 
   /*
    * The arrangement is the control this artwork exists for. It is a hash seed,

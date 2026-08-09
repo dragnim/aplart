@@ -13,6 +13,7 @@ import { type RenderMode } from '@/presets/schema';
 import { cellBounds, displayedShape, type SourceCell } from './displayMapping';
 import { type Palette } from './palettes';
 import { tileCounts, tileGrid, tileParity, tileRect, type TileGrid } from './tiling';
+import { type ArtworkFit } from './fitArtwork';
 import { renderArtwork, type RenderArtworkOptions } from './renderArtwork';
 import { paletteFor, transformMatrix, type RenderOptions } from './renderOptions';
 
@@ -32,6 +33,14 @@ export interface DrawRequest {
   readonly palette?: Palette;
   /** How escape counts become colours, for a preset that declares a range. */
   readonly escape?: RenderArtworkOptions['escape'];
+  /**
+   * Whether the artwork fits inside the canvas or fills it.
+   *
+   * Only visible where the canvas is not the artwork's own shape, which in
+   * practice means Focus mode: the ordinary workspace draws a square artwork in
+   * a square frame, where the two are the same thing.
+   */
+  readonly fit?: ArtworkFit;
 }
 
 /**
@@ -102,6 +111,7 @@ export function drawArtwork(
     pixelHeight,
     request.options.tiling?.scale ?? 1,
     request.options.tiling?.mode === 'mirror-repeat',
+    request.fit ?? 'contain',
   );
   const box = grid.region;
 
@@ -342,6 +352,7 @@ export function drawCellMarker(
   cssWidth: number,
   cssHeight: number,
   devicePixelRatio = 1,
+  fit: ArtworkFit = 'contain',
 ): void {
   const context = canvas.getContext('2d');
   if (context === null) return;
@@ -357,6 +368,7 @@ export function drawCellMarker(
     Math.round(cssHeight * devicePixelRatio),
     options.tiling?.scale ?? 1,
     options.tiling?.mode === 'mirror-repeat',
+    fit,
   );
   if (grid.region.width === 0 || grid.region.height === 0) return;
 

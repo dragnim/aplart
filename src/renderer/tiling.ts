@@ -16,7 +16,7 @@
  * press would land one tile away from where it looked.
  */
 
-import { fitArtwork, type FittedBox } from './fitArtwork';
+import { fitArtwork, type ArtworkFit, type FittedBox } from './fitArtwork';
 
 /**
  * How the artwork is repeated.
@@ -202,10 +202,12 @@ export function tileGrid(
   boxHeight: number,
   scale = 1,
   mirrored = false,
+  /** Whether the artwork fits inside the box or fills it. */
+  fit: ArtworkFit = 'contain',
 ): TileGrid {
   const across = Math.max(1, Math.round(columns));
   const down = Math.max(1, Math.round(rows));
-  const region = fitArtwork(tileWidth * across, tileHeight * down, boxWidth, boxHeight);
+  const region = fitArtwork(tileWidth * across, tileHeight * down, boxWidth, boxHeight, fit);
 
   const size = Math.min(MAX_TILE_SCALE, Math.max(MIN_TILE_SCALE, scale));
   const drawnWidth = (region.width / across) * size;

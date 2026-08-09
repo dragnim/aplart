@@ -28,6 +28,7 @@ import {
 import { fitArtwork } from './fitArtwork';
 import { tileAt, tileCounts, tileGrid, tileParity, unreflect } from './tiling';
 import { type RenderOptions } from './renderOptions';
+import { type ArtworkFit } from './fitArtwork';
 
 /** A rectangle in CSS pixels, relative to the element, for drawing the overlay. */
 export interface OverlayRect {
@@ -65,6 +66,8 @@ export function useArtworkPointer(options: {
   readonly rows: number;
   readonly columns: number;
   readonly renderOptions: RenderOptions;
+  /** Must match what the canvas drew with, or a press lands on the wrong cell. */
+  readonly fit?: ArtworkFit;
   readonly onSelect: (rect: SourceRect) => void;
   /** A press on a cell, or null for a press that missed the artwork. */
   readonly onInspect: (cell: SourceCell | null, at?: { u: number; v: number }) => void;
@@ -75,14 +78,14 @@ export function useArtworkPointer(options: {
   readonly onPointerUp: (event: ReactPointerEvent<HTMLElement>) => void;
   readonly onPointerCancel: () => void;
 } {
-  const { enabled, rows, columns, renderOptions, onSelect, onInspect } = options;
+  const { enabled, rows, columns, renderOptions, onSelect, onInspect, fit = 'contain' } = options;
   const [drag, setDrag] = useState<Drag | null>(null);
 
   // Read inside the handlers so they can stay stable across a drag.
-  const latest = useRef({ rows, columns, renderOptions, onSelect, onInspect });
+  const latest = useRef({ rows, columns, renderOptions, onSelect, onInspect, fit });
   useEffect(() => {
-    latest.current = { rows, columns, renderOptions, onSelect, onInspect };
-  }, [rows, columns, renderOptions, onSelect, onInspect]);
+    latest.current = { rows, columns, renderOptions, onSelect, onInspect, fit };
+  }, [rows, columns, renderOptions, onSelect, onInspect, fit]);
 
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     // Primary button only: a right-press opens a menu, and a middle-press
@@ -140,6 +143,7 @@ export function useArtworkPointer(options: {
         finished.bounds.height,
         render.tiling?.scale ?? 1,
         render.tiling?.mode === 'mirror-repeat',
+        latest.current.fit,
       );
       const box = grid.region;
       if (box.width === 0 || box.height === 0) return;

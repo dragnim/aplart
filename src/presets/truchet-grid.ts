@@ -142,6 +142,8 @@ export const truchetGrid: ArtworkPreset = {
   // shapes whose edges line up, so the curves run on across tile boundaries;
   // a flat colour per cell cannot show that at all.
   renderMode: 'tiles',
+  // A seamless surface: it fills a Focus window and runs off the edges.
+  focusFit: 'cover',
 
   /*
    * Two shapes are the two arc orientations, and both cross every edge at the
