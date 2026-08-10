@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useRef } from 'react';
 import { ErrorBoundary } from '@/components/ErrorBoundary/ErrorBoundary';
 import { SiteFooter } from '@/components/SiteFooter/SiteFooter';
 import { SiteHeader } from '@/components/SiteHeader/SiteHeader';
+import { type MenuDestination } from '@/components/SiteHeader/SiteMenu';
 import { GalleryPage } from '@/gallery/GalleryPage';
 import { AboutPage } from '@/pages/AboutPage';
 import { HelpPage } from '@/pages/HelpPage';
@@ -66,7 +67,7 @@ function keyFor(route: Route): string {
  */
 const rememberedOffsets = new Map<string, number>();
 
-function headerSelection(route: Route): 'gallery' | 'about' | 'help' | null {
+function headerSelection(route: Route): MenuDestination | null {
   switch (route.name) {
     case 'gallery':
       return 'gallery';
@@ -74,8 +75,14 @@ function headerSelection(route: Route): 'gallery' | 'about' | 'help' | null {
       return 'about';
     case 'help':
       return 'help';
-    case 'artwork':
+    /*
+     * Life is a destination in the menu but never a current one, because the
+     * route that would say so renders no header: Life is the whole window and
+     * carries its own bar. Named here anyway, so the menu's list of destinations
+     * and this function's list of pages stay the same list.
+     */
     case 'life':
+    case 'artwork':
     case 'notFound':
       return null;
   }

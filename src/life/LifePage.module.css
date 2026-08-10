@@ -9,10 +9,43 @@
 .page {
   position: fixed;
   inset: 0;
+  /*
+   * Clipped, and deliberately not merely hidden.
+   *
+   * `overflow: hidden` still makes a box programmatically scrollable, and the
+   * closed panel sits just off the right-hand edge — so when focus moved into
+   * the panel as it opened, the browser scrolled that off-screen element into
+   * view and took the whole world with it. Measured: the canvas jumped 549px
+   * left and eased back over the next dozen frames, which is the world sliding
+   * about while a side panel opens over it. `clip` cannot be scrolled at all.
+   * `hidden` first, so an engine that does not know `clip` keeps the old
+   * behaviour rather than none.
+   */
   overflow: hidden;
+  overflow: clip;
   background: #04050a;
   /* No page scroll, and no rubber-banding on a trackpad over the canvas. */
   overscroll-behavior: none;
+
+  /*
+   * Two bands: whatever the bar needs, then everything else.
+   *
+   * The only two things in flow are the bar and the APL panel, and this is what
+   * puts the panel below the bar rather than on top of it. It is a layout
+   * relationship rather than a measurement on purpose. The panel was briefly
+   * positioned from a height this page measured and published as a custom
+   * property, which is a fact that does not exist until after the first paint —
+   * so the panel drew once in the wrong place and moved. A grid row sized by its
+   * own contents is correct in the first frame and stays correct when the bar
+   * wraps to five rows on a phone or disappears entirely, with nothing to
+   * observe and nothing to publish.
+   *
+   * The world is not in this grid. It is centred against the whole window, as it
+   * has to be: the bar floats over the artwork and takes none of its space.
+   */
+  display: grid;
+  grid-template-rows: auto 1fr;
+  grid-template-columns: 100%;
 }
 
 /*
@@ -59,9 +92,14 @@
  * toolbar a row of the page, this one sits over the artwork and takes none.
  */
 .bar {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline: 0;
+  /*
+   * In flow, so that the row it sits in is exactly as tall as it is — and so the
+   * panel beneath it needs to know nothing about it. `relative` rather than
+   * `static` only so that `z-index` applies: it still floats over the world,
+   * which is drawn against the whole window behind this grid.
+   */
+  grid-row: 1;
+  position: relative;
   z-index: 2;
   display: flex;
   align-items: center;

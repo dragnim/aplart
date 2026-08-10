@@ -17,11 +17,22 @@ import styles from './SiteMenu.module.css';
 
 interface Props {
   /** Which destination is showing, so the menu can mark it current. */
-  readonly current: 'gallery' | 'about' | 'help' | null;
+  readonly current: MenuDestination | null;
 }
 
+export type MenuDestination = 'gallery' | 'life' | 'about' | 'help';
+
+/*
+ * Ordered as somebody would look for them: the artworks, the one thing that is
+ * not an artwork, then the two pages about the site.
+ *
+ * Life sits second rather than last because it is a destination of the same kind
+ * as the gallery — something to go and watch — while About and Help are about
+ * the site rather than part of it.
+ */
 const DESTINATIONS = [
   { id: 'gallery', label: 'Gallery', href: '#/' },
+  { id: 'life', label: 'Game of Life', href: '#/life' },
   { id: 'about', label: 'About', href: '#/about' },
   { id: 'help', label: 'Help', href: '#/help' },
 ] as const;

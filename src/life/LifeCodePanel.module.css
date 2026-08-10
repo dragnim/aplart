@@ -13,14 +13,31 @@
  * never something anybody chose.
  */
 .drawer {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-end: 0;
+  /*
+   * Below the bar, not over it — and there in the first frame it is drawn.
+   *
+   * This used to start at the top of the window and push its own contents down
+   * by a guessed 3.5rem to clear the bar. But the panel is opaque and the bar
+   * runs the full width beneath it, so what actually happened is that the bar's
+   * right-hand end went *under* the panel: at 1440 that buried Clear, Speed,
+   * Palette, Hide controls and View APL itself, and at 1024 it took Step,
+   * Randomise and Reset as well. The controls were still there, still focusable,
+   * and could not be seen or pressed.
+   *
+   * The page is two rows — the bar, then the rest — and this is the second of
+   * them. Nothing is measured, so there is no moment at which the measurement
+   * has not arrived yet and the panel is somewhere else.
+   */
+  grid-row: 2;
+  grid-column: 1;
+  justify-self: end;
+  align-self: stretch;
+  /* Only so that `z-index` applies; the grid decides where it is. */
+  position: relative;
   z-index: 3;
 
-  inline-size: min(34rem, 100vw);
+  inline-size: min(34rem, 100%);
   padding: var(--space-5);
-  padding-block-start: calc(var(--space-5) + 3.5rem);
 
   display: flex;
   flex-direction: column;
@@ -73,21 +90,6 @@
   margin: calc(var(--space-4) * -1) 0 0;
   font-size: var(--text-sm);
   color: var(--text-muted);
-}
-
-.close {
-  composes: control from global;
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text);
-  transition:
-    background var(--motion-fast) var(--ease),
-    border-color var(--motion-fast) var(--ease);
-}
-
-.close:hover {
-  background: var(--surface-sunken);
-  border-color: var(--ui-accent-border, var(--border-strong));
 }
 
 .block {

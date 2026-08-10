@@ -36,6 +36,15 @@ beforeEach(() => {
   }));
   vi.stubGlobal('requestAnimationFrame', () => 0);
   vi.stubGlobal('cancelAnimationFrame', () => undefined);
+  // The page watches its own bar, so that the APL panel knows where the bar ends.
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
   // jsdom has no canvas; the page must survive that rather than throw.
   HTMLCanvasElement.prototype.getContext = () => null;
   Element.prototype.setPointerCapture = () => undefined;
@@ -84,6 +93,28 @@ describe('opening the page', () => {
     // and is mounted while closed, so the query says which one it means.
     const bar = screen.getByRole('banner');
     expect(within(bar).getByText('APL formulation by John Scholes')).toBeInTheDocument();
+  });
+
+  it('offers a way back to the gallery among the visible controls', async () => {
+    /*
+     * Life renders no site header, so without this the only way out is the
+     * browser's Back button — and somebody who arrived by typing the address has
+     * no Back to press. The arrow is decoration; the name is what it goes to.
+     */
+    const user = userEvent.setup();
+    render(<LifePage />);
+
+    const bar = screen.getByRole('banner');
+    const back = within(bar).getByRole('link', { name: 'Gallery' });
+    expect(back).toHaveAttribute('href', '#/');
+
+    // It goes with the rest of the interface, and the corner affordance brings
+    // both back — so hiding the controls never strands anybody.
+    await user.click(within(bar).getByRole('button', { name: 'Hide controls' }));
+    expect(screen.queryByRole('link', { name: 'Gallery' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Show controls' }));
+    expect(screen.getByRole('link', { name: 'Gallery' })).toBeInTheDocument();
   });
 });
 
@@ -328,8 +359,130 @@ describe('View APL', () => {
      */
     expect(readout()).toEqual(before);
 
-    await user.click(within(panel).getByRole('button', { name: 'Close' }));
+    await user.click(screen.getByRole('button', { name: 'Hide APL' }));
+    expect(panel).toHaveAttribute('data-open', 'closed');
     expect(readout()).toEqual(before);
+  });
+
+  it('is opened and closed by one button, which says which way it goes', async () => {
+    /*
+     * There used to be two controls for one piece of state: this button, which
+     * only opened, and a Close inside the panel. Two places to learn, and the
+     * second of them somewhere you had to already be looking to find.
+     */
+    const user = userEvent.setup();
+    render(<LifePage />);
+
+    const panel = screen.getByRole('dialog', { name: /APL behind this artwork/u });
+    const toggle = () => screen.getByRole('button', { name: /View APL|Hide APL/u });
+
+    expect(toggle()).toHaveTextContent('View APL');
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle()).toHaveAttribute('aria-controls', 'life-code');
+
+    await user.click(toggle());
+    expect(toggle()).toHaveTextContent('Hide APL');
+    expect(toggle()).toHaveAttribute('aria-expanded', 'true');
+    expect(panel).toHaveAttribute('data-open', 'true');
+
+    // And nothing else offers to close it.
+    expect(within(panel).queryByRole('button', { name: 'Close' })).toBeNull();
+
+    await user.click(toggle());
+    expect(toggle()).toHaveTextContent('View APL');
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false');
+    expect(panel).toHaveAttribute('data-open', 'closed');
+  });
+
+  it('leaves every control of the bar reachable while it is open', async () => {
+    /*
+     * The defect this exists for, and it was a real one.
+     *
+     * The panel began at the top of the window and pushed its own contents down
+     * by a guessed amount to clear the bar. But the panel is opaque and the bar
+     * runs the full width underneath it, so the bar's right-hand end was simply
+     * buried: measured at 1440, Clear, Speed, Palette, Hide controls and View APL
+     * itself all became invisible and unpressable, and at 1024 Step, Randomise
+     * and Reset went with them. Every one of them was still in the document and
+     * still focusable, which is why nothing caught it.
+     *
+     * jsdom cannot say what covers what — `tiling`-style geometry lives in the
+     * browser suite — so what is asserted here is the contract that makes the
+     * geometry possible: the bar and the panel occupy different bands of the
+     * window, the panel beginning where the bar ends.
+     */
+    const user = userEvent.setup();
+    render(<LifePage />);
+
+    await user.click(screen.getByRole('button', { name: 'View APL' }));
+
+    const bar = screen.getByRole('banner');
+    // "Pause" rather than "Play": the world is already running when the page
+    // opens. "Hide APL" rather than "View APL": one button, and it has just been
+    // pressed, so it now offers the other direction.
+    for (const name of ['Pause', 'Step', 'Randomise', 'Reset', 'Clear', 'Hide controls', 'Hide APL']) {
+      expect(within(bar).getByRole('button', { name })).toBeVisible();
+    }
+    expect(within(bar).getByRole('link', { name: 'Gallery' })).toBeVisible();
+    expect(bar).not.toHaveAttribute('hidden');
+  });
+
+  it('gives the keyboard to the panel and takes it back on Escape', async () => {
+    const user = userEvent.setup();
+    render(<LifePage />);
+
+    const opener = screen.getByRole('button', { name: 'View APL' });
+    await user.click(opener);
+
+    const panel = screen.getByRole('dialog', { name: /APL behind this artwork/u });
+    // The panel itself, now that there is no button inside it to receive the
+    // keyboard — focusable without being tabbable.
+    await waitFor(() => expect(panel).toHaveFocus());
+
+    // Escape closes the panel and nothing else — the interface is still here.
+    fireEvent.keyDown(window, { key: 'Escape' });
+    await waitFor(() => expect(opener).toHaveFocus());
+    expect(panel).toHaveAttribute('data-open', 'closed');
+    expect(screen.getByRole('banner')).not.toHaveAttribute('hidden');
+  });
+
+  it('opens again after being closed, as many times as asked', async () => {
+    const user = userEvent.setup();
+    render(<LifePage />);
+    const opener = screen.getByRole('button', { name: 'View APL' });
+    const panel = screen.getByRole('dialog', { name: /APL behind this artwork/u });
+
+    for (let round = 0; round < 3; round += 1) {
+      await user.click(opener);
+      expect(panel).toHaveAttribute('data-open', 'true');
+      await user.click(screen.getByRole('button', { name: 'Hide APL' }));
+      expect(panel).toHaveAttribute('data-open', 'closed');
+    }
+  });
+
+  it('does not recreate the world, at any point in opening and closing it', async () => {
+    /*
+     * Not merely "the generation is the same". A panel that rebuilt the world
+     * with the same seed would pass that and still have thrown away everything
+     * anybody had drawn, so the population is checked too — and the world's
+     * dimensions, which are decided when a run starts and never afterwards.
+     */
+    const user = userEvent.setup();
+    render(<LifePage />);
+
+    await user.click(screen.getByRole('button', { name: 'Pause' }));
+    await user.click(screen.getByRole('button', { name: 'Randomise' }));
+    const label = () => screen.getByRole('img').getAttribute('aria-label') ?? '';
+    const before = label();
+
+    await user.click(screen.getByRole('button', { name: 'View APL' }));
+    expect(label()).toBe(before);
+
+    await user.click(screen.getByRole('button', { name: 'Hide APL' }));
+    expect(label()).toBe(before);
+
+    await user.click(screen.getByRole('button', { name: 'View APL' }));
+    expect(label()).toBe(before);
   });
 
   it('shows the formulation it credits, and offers to copy it', async () => {

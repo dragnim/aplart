@@ -20,6 +20,7 @@ import { GalleryPage } from '@/gallery/GalleryPage';
 import { MockAplExecutionService } from '@/execution/MockAplExecutionService';
 import { fromNested } from '@/matrix/matrixTypes';
 import { parseRoute } from '@/app/router';
+import { basketWeave } from '@/presets/basket-weave';
 import { mandelbrotField } from '@/presets/mandelbrot-field';
 import { modularBloom } from '@/presets/modular-bloom';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
@@ -171,6 +172,33 @@ describe('where the actions live', () => {
       .map((button) => button.textContent?.trim());
 
     expect(named).toEqual(['Focus mode', 'Share', 'Export']);
+  });
+
+  it('gives the artwork back its way to the gallery, on the title’s own line', () => {
+    /*
+     * Lost when three bars became one, and it mattered: the wordmark goes to the
+     * gallery too, but it is the site's mark at the corner of the window rather
+     * than a way out of this artwork, and nothing on the page said "back".
+     *
+     * It belongs with the title rather than in the app bar. Both name the
+     * artwork's own column and sit on the artwork's left edge; the bar holds the
+     * site and the three things that can be done to a picture.
+     */
+    open(basketWeave.id);
+
+    const back = screen.getByRole('link', { name: 'Gallery' });
+    expect(back).toHaveAttribute('href', '#/');
+
+    const heading = screen.getByRole('heading', { level: 1, name: 'Basket Weave' });
+    // One line, in that order: the way out, then what you are looking at.
+    expect(back.parentElement).toBe(heading.parentElement);
+    expect(back.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    // And none of what the consolidation removed comes back with it.
+    expect(screen.queryByText(/^Pattern$/u)).toBeNull();
+    expect(screen.queryByText(/Pattern · Original/u)).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Focus mode' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Export' })).toHaveLength(1);
   });
 
   it('puts exactly Randomise, Undo and Reset beneath the modes', () => {

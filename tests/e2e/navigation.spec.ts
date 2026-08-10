@@ -40,6 +40,48 @@ test.describe('site navigation', () => {
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Help');
   });
 
+  test('the menu is the only way to Game of Life, and it goes there', async ({ page }) => {
+    /*
+     * Life has no card in the gallery and no site header of its own to come back
+     * to, so the menu entry is not a convenience — it is the route. What it lands
+     * on is asserted by its own bar rather than by the address alone: an
+     * immersive page that had quietly acquired the site chrome would still have
+     * the right hash.
+     */
+    await page.goto('./');
+
+    await page.getByRole('button', { name: 'Site menu' }).click();
+    await page.getByRole('list', { name: 'Site' }).getByRole('link', { name: 'Game of Life' }).click();
+
+    /*
+     * The Life bar is a `header` inside `main`, which is not a banner — the role
+     * belongs to the site header this page deliberately does not render. So it is
+     * found as an element rather than by a landmark role, and the landmark's
+     * absence is asserted separately below.
+     */
+    const bar = page.locator('header');
+    await expect(bar).toContainText('Conway’s Game of Life');
+    await expect(bar).toContainText('APL formulation by John Scholes');
+    expect(page.url()).toContain('#/life');
+
+    // Immersive means immersive: no site header, no footer, nothing behind it.
+    await expect(page.getByRole('link', { name: 'APL Art' })).toHaveCount(0);
+    await expect(page.locator('footer')).toHaveCount(0);
+
+    // And a way back that is not the browser's Back button.
+    await page.getByRole('link', { name: 'Gallery' }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Infinite patterns');
+  });
+
+  test('an artwork offers its own way back to the gallery', async ({ page }) => {
+    await page.goto('./#/art/basket-weave');
+    await expect(page.getByRole('heading', { level: 1, name: 'Basket Weave' })).toBeVisible();
+
+    await page.getByRole('link', { name: 'Gallery', exact: true }).click();
+
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Infinite patterns');
+  });
+
   test('a hash route opens correctly when visited directly', async ({ page }) => {
     // The point of hash routing: GitHub Pages cannot rewrite unknown paths, so
     // a deep link must resolve without any server involvement.

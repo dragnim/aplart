@@ -13,7 +13,7 @@
  */
 
 import { AplArtLogo } from '@/components/branding/AplArtLogo';
-import { SiteMenu } from './SiteMenu';
+import { SiteMenu, type MenuDestination } from './SiteMenu';
 import styles from './SiteHeader.module.css';
 
 /**
@@ -28,7 +28,7 @@ export const APP_BAR_SLOT_ID = 'app-bar-slot';
 
 interface Props {
   /** Which top-level destination is showing, so it can be marked current. */
-  readonly current: 'gallery' | 'about' | 'help' | null;
+  readonly current: MenuDestination | null;
 }
 
 export function SiteHeader({ current }: Props) {

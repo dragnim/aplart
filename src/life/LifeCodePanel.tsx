@@ -15,36 +15,63 @@
  * handling and its own focus behaviour into an overlay that wants none of them.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { ATTRIBUTION, SCHOLES_VIDEO, SCHOLES_WORKSPACE } from './lifeSource';
 import styles from './LifeCodePanel.module.css';
 
 interface Props {
   readonly open: boolean;
   readonly apl: string;
-  readonly onClose: () => void;
+  /**
+   * The control that opens and closes this, so the keyboard can go back to it.
+   *
+   * There is no Close button in here. One button in the bar reads "View APL"
+   * and then "Hide APL", which is the whole of the control: a second way to
+   * shut a panel, inside the panel, is a second thing to find and a second thing
+   * to explain.
+   *
+   * Named rather than remembered from `document.activeElement`, which is what
+   * this used to do. Safari does not focus a button when it is clicked, so on an
+   * iPhone the panel remembered the document body and "restoring" focus dropped
+   * the keyboard at the top of the page — the exact thing the restoration exists
+   * to prevent, on the one platform where tabbing back is hardest.
+   */
+  readonly returnFocusTo: RefObject<HTMLButtonElement | null>;
 }
 
-export function LifeCodePanel({ open, apl, onClose }: Props) {
+export function LifeCodePanel({ open, apl, returnFocusTo }: Props) {
   const panel = useRef<HTMLDivElement>(null);
-  const closer = useRef<HTMLButtonElement>(null);
-  const opener = useRef<HTMLElement | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
   /*
-   * Focus goes into the drawer when it opens and back where it came from when it
+   * Focus goes into the drawer when it opens and back to the toggle when it
    * closes. Without the second half, closing the panel leaves the keyboard at
    * the top of the document and somebody has to tab back to where they were.
+   *
+   * It goes to the panel rather than to a control inside it, and it goes with
+   * `preventScroll`, and the page is clipped rather than hidden. Three guards
+   * against one thing: at the moment focus arrives the panel is still off the
+   * right-hand edge, and a browser asked to focus something off-screen scrolls
+   * it into view — which here meant scrolling the whole page sideways and
+   * dragging the world with it, measured as the canvas jumping 549px left and
+   * easing back over the following frames while the panel it was making room for
+   * needed no room at all.
+   *
+   * Measured separately, `overflow: clip` on the page is the one that settles
+   * it and focusing the panel itself avoids it in practice; `preventScroll` is
+   * the one that says so at the call site.
    */
   useEffect(() => {
     if (!open) return;
-    opener.current = document.activeElement as HTMLElement | null;
-    closer.current?.focus();
+    panel.current?.focus({ preventScroll: true });
 
+    // Read now rather than in the cleanup. The bar is never remounted, so the
+    // two are the same button either way, and taking it here says so.
+    const opener = returnFocusTo.current;
     return () => {
-      opener.current?.focus();
+      opener?.focus({ preventScroll: true });
     };
-  }, [open]);
+  }, [open, returnFocusTo]);
 
   const copy = (text: string, what: string) => {
     void navigator.clipboard
@@ -71,12 +98,12 @@ export function LifeCodePanel({ open, apl, onClose }: Props) {
       // Out of the tab order entirely when shut, so a closed panel cannot be
       // reached by somebody who cannot see that it is closed.
       inert={!open}
+      // Focusable but not tabbable: somewhere for the keyboard to arrive when
+      // the panel opens, now that there is no button in here to give it to.
+      tabIndex={-1}
     >
       <div className={styles.head}>
         <h2 className={styles.heading}>{ATTRIBUTION.title}</h2>
-        <button type="button" className={styles.close} ref={closer} onClick={onClose}>
-          Close
-        </button>
       </div>
 
       <p className={styles.credit}>{ATTRIBUTION.formulation}</p>

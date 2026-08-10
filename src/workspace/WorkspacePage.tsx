@@ -1543,6 +1543,29 @@ function Workspace({
     />
   );
 
+  /**
+   * The way back, and the name of what you are looking at, on one line.
+   *
+   * Built once and used by both layouts, because it is one heading rather than a
+   * wide one and a narrow one — and because the return had been lost entirely
+   * when three bars became one. It belongs here rather than in the app bar: the
+   * bar is the site and its actions, while this names the artwork and sits on
+   * the artwork's own left edge, directly above the picture it names.
+   *
+   * The link comes first in the document as well as on screen, so the keyboard
+   * reaches the way out before the artwork rather than after all of it.
+   */
+  const artworkHeading = (
+    <div className={styles.artworkHeading}>
+      {/* The arrow is a direction, not a word: "left arrow Gallery" is nothing
+          anybody would read aloud, so only "Gallery" is announced. */}
+      <a className={styles.galleryReturn} href="#/">
+        <span aria-hidden="true">←</span> Gallery
+      </a>
+      <h1 className={styles.artworkTitle}>{preset.title}</h1>
+    </div>
+  );
+
   const artworkPanel = (
     <div className={styles.artworkPanel}>
       <ArtworkCanvas
@@ -1805,7 +1828,7 @@ function Workspace({
             every width, with no arithmetic to keep in step.
           */}
           <div className={styles.artworkColumn}>
-            <h1 className={styles.artworkTitle}>{preset.title}</h1>
+            {artworkHeading}
             {artworkPanel}
           </div>
           {secondaryColumn}
@@ -1820,7 +1843,7 @@ function Workspace({
             page with no level-one heading is a page a screen reader cannot
             summarise. One compact line; the tab bar beneath it does the rest.
           */}
-          <h1 className={styles.artworkTitle}>{preset.title}</h1>
+          {artworkHeading}
 
           {/* The artwork sits behind the sheet in Focus mode, always visible. */}
           <div className={styles.focusBackdrop}>{focus ? artworkPanel : null}</div>

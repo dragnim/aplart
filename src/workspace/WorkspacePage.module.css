@@ -271,8 +271,47 @@
  * of actions; what is wanted here is the artwork's name, close enough to the
  * artwork to belong to it.
  */
+/*
+ * The return and the title, on one line.
+ *
+ * A row rather than two stacked lines, because both belong to the artwork and
+ * neither is worth a line of the picture's height. The title takes whatever is
+ * left and truncates; the return never shrinks, since a way out that had been
+ * squeezed to "← Gal…" would be worse than no arrow at all.
+ */
+.artworkHeading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+/*
+ * Quiet on purpose.
+ *
+ * It is the third thing on the line after the marker and the name, and it is
+ * needed once per visit; the artwork's own colour belongs to the title's marker
+ * and to the Run button, not to a link back.
+ */
+.galleryReturn {
+  flex: none;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.galleryReturn:hover,
+.galleryReturn:focus-visible {
+  color: var(--text);
+  text-decoration: underline;
+}
+
 .artworkTitle {
   margin: 0;
+  /* Whatever the return leaves, and no more: see the truncation below. */
+  min-inline-size: 0;
+  flex: 1 1 auto;
   font-size: var(--text-lg);
   line-height: 1.2;
   letter-spacing: -0.01em;

@@ -11,8 +11,9 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { SiteHeader } from '@/components/SiteHeader/SiteHeader';
+import { type MenuDestination } from '@/components/SiteHeader/SiteMenu';
 
-function open(current: 'gallery' | 'about' | 'help' | null = null) {
+function open(current: MenuDestination | null = null) {
   const user = userEvent.setup();
   render(<SiteHeader current={current} />);
   return user;
@@ -40,8 +41,25 @@ describe('the app bar', () => {
     expect(menuButton()).toHaveAttribute('aria-expanded', 'true');
     const menu = screen.getByRole('list', { name: 'Site' });
     expect(within(menu).getByRole('link', { name: 'Gallery' })).toBeInTheDocument();
+    expect(within(menu).getByRole('link', { name: 'Game of Life' })).toBeInTheDocument();
     expect(within(menu).getByRole('link', { name: 'About' })).toBeInTheDocument();
     expect(within(menu).getByRole('link', { name: 'Help' })).toBeInTheDocument();
+  });
+
+  it('lists the destinations in one order, and each goes where it says', async () => {
+    /*
+     * Life is reachable from the menu or it is not reachable at all: it has no
+     * card in the gallery, and the page itself renders no site header to come
+     * back to. Its place in the order is part of that — it is somewhere to go and
+     * watch, like the gallery, rather than a page about the site.
+     */
+    const user = open();
+    await user.click(menuButton());
+
+    const menu = screen.getByRole('list', { name: 'Site' });
+    const links = within(menu).getAllByRole('link');
+    expect(links.map((link) => link.textContent)).toEqual(['Gallery', 'Game of Life', 'About', 'Help']);
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(['#/', '#/life', '#/about', '#/help']);
   });
 
   it('marks where you already are', async () => {

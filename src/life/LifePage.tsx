@@ -99,6 +99,8 @@ export function LifePage() {
   const palette = useMemo(() => getPalette(paletteId), [paletteId]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  /* Where the keyboard goes back to when the APL panel closes. */
+  const aplTrigger = useRef<HTMLButtonElement>(null);
 
   /* ── The window, which decides only how the world is shown ───────────────── */
 
@@ -107,6 +109,14 @@ export function LifePage() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  /*
+   * Where the bar ends and the APL panel begins is settled in the stylesheet,
+   * not here. The page is a two-row grid — the bar, then everything else — so
+   * the panel is in the right place in the first frame it is drawn, at every
+   * width, and when the bar wraps or is hidden the rows follow without anything
+   * being measured, observed or published. See `LifePage.module.css`.
+   */
 
   /* ── The interface's own colours follow the world's ──────────────────────── */
 
@@ -343,8 +353,17 @@ export function LifePage() {
       )}
 
       <header className={styles.bar} hidden={!showInterface}>
+        {/*
+          The way back, named for where it goes.
+
+          Life has no site header by design, so this link is the only route out
+          that is not the browser's Back button — and it said "APL Art", which
+          names the site rather than the page it lands on. The arrow is hidden
+          from assistive technology: it is a direction, and "left arrow Gallery"
+          is not how anybody would read it aloud.
+        */}
         <a className={styles.home} href="#/">
-          ← APL Art
+          <span aria-hidden="true">←</span> Gallery
         </a>
         <span className={styles.title}>
           Conway’s Game of Life
@@ -428,19 +447,29 @@ export function LifePage() {
             Hide controls
           </button>
 
+          {/*
+            One control for both directions.
+
+            It used to open only, with a Close button inside the panel to shut
+            it — two controls for one piece of state, in two places, and the
+            second of them somewhere you had to already be looking to find. The
+            button says which way it goes and `aria-expanded` says the same thing
+            to anybody who cannot see it.
+          */}
           <button
             type="button"
             className={styles.primary}
-            onClick={() => setShowCode(true)}
+            ref={aplTrigger}
+            onClick={() => setShowCode((shown) => !shown)}
             aria-expanded={showCode}
             aria-controls="life-code"
           >
-            View APL
+            {showCode ? 'Hide APL' : 'View APL'}
           </button>
         </div>
       </header>
 
-      <LifeCodePanel open={showCode} apl={LIFE_APL} onClose={() => setShowCode(false)} />
+      <LifeCodePanel open={showCode} apl={LIFE_APL} returnFocusTo={aplTrigger} />
     </div>
   );
 }
