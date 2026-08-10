@@ -501,10 +501,12 @@ test.describe('the readout and the Classic palette', () => {
       const terms = [...panel.querySelectorAll('dt')];
       const values = [...panel.querySelectorAll('dd')];
       return Object.fromEntries(
-        terms.map((term, index) => [
-          term.textContent?.trim() ?? '',
-          values[index]?.textContent?.trim() ?? '',
-        ]),
+        terms.map((term, index) => {
+          const cell = values[index];
+          // The glyphs, not the words beside them that only a screen reader hears.
+          const visible = cell?.querySelector('[aria-hidden=\"true\"]') ?? cell;
+          return [term.textContent?.trim() ?? '', visible?.textContent?.trim() ?? ''];
+        }),
       );
     });
   }
@@ -525,14 +527,14 @@ test.describe('the readout and the Classic palette', () => {
     expect(opening.Generation, 'the seed is generation 0').toBe('0');
     expect(Number(opening.Population)).toBeGreaterThan(0);
     // A dash, not a zero: nothing has stepped, so there is nothing to report.
-    expect(opening['Births / Deaths']).toBe('—');
+    expect(opening['Last step']).toBe('—');
     expect(opening.Activity).toBe('—');
 
     await page.getByRole('button', { name: 'Step' }).click();
     const stepped = await readStats(page);
 
     expect(stepped.Generation).toBe('1');
-    expect(stepped['Births / Deaths']).toMatch(/^\+\d+ \/ −\d+$/u);
+    expect(stepped['Last step']).toMatch(/^\+\d+ \/ −\d+$/u);
     expect(stepped.Activity).toMatch(/^\d+\.\d%$/u);
 
     /*
@@ -542,7 +544,7 @@ test.describe('the readout and the Classic palette', () => {
      */
     const label = await readout(page);
     const [, width, height] = /on a (\d+) by (\d+)/u.exec(label) ?? [];
-    const [, births, deaths] = /^\+(\d+) \/ −(\d+)$/u.exec(stepped['Births / Deaths'] ?? '') ?? [];
+    const [, births, deaths] = /^\+(\d+) \/ −(\d+)$/u.exec(stepped['Last step'] ?? '') ?? [];
     const expected = ((Number(births) + Number(deaths)) / (Number(width) * Number(height))) * 100;
     expect(stepped.Activity).toBe(`${expected.toFixed(1)}%`);
 
@@ -579,7 +581,7 @@ test.describe('the readout and the Classic palette', () => {
       );
 
       const now = await readStats(page);
-      readings.add(`${now.Population ?? ''}|${now['Births / Deaths'] ?? ''}|${now.Activity ?? ''}`);
+      readings.add(`${now.Population ?? ''}|${now['Last step'] ?? ''}|${now.Activity ?? ''}`);
     }
 
     expect(boxes.size, `the panel changed shape: ${[...boxes].join(' then ')}`).toBe(1);

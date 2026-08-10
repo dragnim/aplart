@@ -34,28 +34,59 @@ const NOTHING = '—';
 const whole = new Intl.NumberFormat('en-GB');
 
 /**
+ * One reading, and what it says out loud.
+ *
+ * `spoken` is present only where the shown form is not a sentence. A signed pair
+ * is compact and unambiguous to look at and nearly meaningless to hear — "plus
+ * twenty-six slash minus twenty-four" — so the two are separated: the glyphs are
+ * hidden from assistive technology and the words are hidden from the screen.
+ * Neither is an explanation added to the panel; they are the same fact in the
+ * form each reader needs.
+ */
+interface Reading {
+  readonly term: string;
+  readonly shown: string;
+  readonly spoken?: string;
+}
+
+/**
  * Births and deaths as one reading.
  *
  * Signed, because the signs are the point: one number went up and the other went
  * down, and a pair of bare integers would leave the reader to work out which.
  */
-function describeChange(world: LifeWorld): string {
-  if (world.transition === null) return NOTHING;
+function change(world: LifeWorld): Reading {
+  if (world.transition === null) {
+    return { term: 'Last step', shown: NOTHING, spoken: 'No generation has run yet' };
+  }
+
   const { births, deaths } = world.transition;
-  return `+${whole.format(births)} / −${whole.format(deaths)}`;
+  return {
+    term: 'Last step',
+    shown: `+${whole.format(births)} / −${whole.format(deaths)}`,
+    spoken: `${whole.format(births)} born, ${whole.format(deaths)} died`,
+  };
 }
 
-function describeActivity(world: LifeWorld): string {
+function activityReading(world: LifeWorld): Reading {
   const share = activity(world);
-  return share === null ? NOTHING : `${share.toFixed(1)}%`;
+  return share === null
+    ? { term: 'Activity', shown: NOTHING, spoken: 'No generation has run yet' }
+    : { term: 'Activity', shown: `${share.toFixed(1)}%` };
 }
 
 export function LifeStats({ world }: Props) {
-  const rows: readonly (readonly [string, string])[] = [
-    ['Generation', whole.format(world.generation)],
-    ['Population', whole.format(population(world))],
-    ['Births / Deaths', describeChange(world)],
-    ['Activity', describeActivity(world)],
+  /*
+   * "Last step" rather than "Births / Deaths". The old label read as a running
+   * total of every birth and death since the world began, which is not what the
+   * numbers are: they describe the one generation that has just been computed,
+   * and so does Activity beneath them.
+   */
+  const rows: readonly Reading[] = [
+    { term: 'Generation', shown: whole.format(world.generation) },
+    { term: 'Population', shown: whole.format(population(world)) },
+    change(world),
+    activityReading(world),
   ];
 
   return (
@@ -73,10 +104,24 @@ export function LifeStats({ world }: Props) {
      * readout that twitches while you read it.
      */
     <dl className={styles.panel} aria-label="World statistics">
-      {rows.map(([term, value]) => (
+      {rows.map(({ term, shown, spoken }) => (
         <Fragment key={term}>
           <dt className={styles.term}>{term}</dt>
-          <dd className={styles.value}>{value}</dd>
+          <dd className={styles.value}>
+            {spoken === undefined ? (
+              shown
+            ) : (
+              <>
+                <span aria-hidden="true">{shown}</span>
+                {/*
+                  Absolutely positioned by the global class, so it takes no room:
+                  the panel's dimensions are as fixed as they were before this
+                  existed.
+                */}
+                <span className="visually-hidden">{spoken}</span>
+              </>
+            )}
+          </dd>
         </Fragment>
       ))}
     </dl>

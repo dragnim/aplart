@@ -149,7 +149,17 @@ function stats(): Record<string, string> {
   const terms = [...panel.querySelectorAll('dt')];
   const values = [...panel.querySelectorAll('dd')];
   return Object.fromEntries(
-    terms.map((term, index) => [term.textContent?.trim() ?? '', values[index]?.textContent?.trim() ?? '']),
+    terms.map((term, index) => {
+      const cell = values[index];
+      /*
+       * Where a reading has a spoken form the cell holds both — the glyphs
+       * hidden from assistive technology and the words hidden from the screen —
+       * so reading the cell whole would return the two run together. This is the
+       * readout as somebody sees it; what somebody hears is asserted separately.
+       */
+      const visible = cell?.querySelector('[aria-hidden="true"]') ?? cell;
+      return [term.textContent?.trim() ?? '', visible?.textContent?.trim() ?? ''];
+    }),
   );
 }
 
@@ -169,8 +179,44 @@ describe('the readout', () => {
     const opening = stats();
     expect(opening.Generation).toBe('0');
     expect(Number(opening.Population)).toBeGreaterThan(0);
-    expect(opening['Births / Deaths']).toBe('—');
+    expect(opening['Last step']).toBe('—');
     expect(opening.Activity).toBe('—');
+  });
+
+  it('says the signed pair in words, for anybody who cannot see the signs', async () => {
+    /*
+     * "+26 / −24" is compact and unambiguous to look at and close to meaningless
+     * to hear. So the glyphs are hidden from assistive technology and the words
+     * are hidden from the screen — the same fact in the form each reader needs,
+     * rather than an explanation added to the panel.
+     *
+     * The label carries its share of the meaning too: "Last step" says these
+     * describe one generation, where "Births / Deaths" read as a running total
+     * of every birth and death since the world began.
+     */
+    const user = userEvent.setup();
+    render(<LifePage />);
+    await user.click(screen.getByRole('button', { name: 'Pause' }));
+
+    const panel = statsPanel();
+    const spokenFor = (term: string) => {
+      const terms = [...(panel?.querySelectorAll('dt') ?? [])];
+      const index = terms.findIndex((node) => node.textContent?.trim() === term);
+      return panel?.querySelectorAll('dd')[index]?.querySelector('.visually-hidden')?.textContent ?? '';
+    };
+
+    expect(stats()['Last step']).toBe('—');
+    expect(spokenFor('Last step')).toBe('No generation has run yet');
+    expect(spokenFor('Activity')).toBe('No generation has run yet');
+
+    await user.click(screen.getByRole('button', { name: 'Step' }));
+
+    const shown = stats()['Last step'] ?? '';
+    const [, births, deaths] = /^\+(\d+) \/ −(\d+)$/u.exec(shown) ?? [];
+    expect(spokenFor('Last step')).toBe(`${births} born, ${deaths} died`);
+
+    // A percentage reads perfectly well as it stands, so it gains no second form.
+    expect(spokenFor('Activity')).toBe('');
   });
 
   it('reports the step it has just taken', async () => {
@@ -183,14 +229,14 @@ describe('the readout', () => {
     const after = stats();
 
     expect(after.Generation).toBe('1');
-    expect(after['Births / Deaths']).toMatch(/^\+\d+ \/ −\d+$/u);
+    expect(after['Last step']).toMatch(/^\+\d+ \/ −\d+$/u);
     expect(after.Activity).toMatch(/^\d+\.\d%$/u);
 
     /*
      * And the numbers agree with each other rather than merely existing: the
      * population moved by exactly births minus deaths.
      */
-    const [, births, deaths] = /^\+(\d+) \/ −(\d+)$/u.exec(after['Births / Deaths'] ?? '') ?? [];
+    const [, births, deaths] = /^\+(\d+) \/ −(\d+)$/u.exec(after['Last step'] ?? '') ?? [];
     expect(Number(after.Population)).toBe(before + Number(births) - Number(deaths));
   });
 
@@ -202,7 +248,7 @@ describe('the readout', () => {
     for (let generation = 1; generation <= 3; generation += 1) {
       await user.click(screen.getByRole('button', { name: 'Step' }));
       expect(stats().Generation).toBe(String(generation));
-      expect(stats()['Births / Deaths']).not.toBe('—');
+      expect(stats()['Last step']).not.toBe('—');
     }
   });
 
@@ -218,7 +264,7 @@ describe('the readout', () => {
 
       const now = stats();
       expect(now.Generation, action).toBe('0');
-      expect(now['Births / Deaths'], action).toBe('—');
+      expect(now['Last step'], action).toBe('—');
       expect(now.Activity, action).toBe('—');
     }
 
@@ -242,7 +288,7 @@ describe('the readout', () => {
 
     const after = stats();
     expect(Number(after.Population)).not.toBe(before);
-    expect(after['Births / Deaths']).toBe('—');
+    expect(after['Last step']).toBe('—');
     expect(after.Activity).toBe('—');
     expect(after.Generation).toBe('0');
   });
