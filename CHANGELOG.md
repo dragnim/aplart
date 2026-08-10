@@ -1,5 +1,43 @@
 # Changelog
 
+## v1.4.0
+
+Game of Life gains a readout and the palette it has always deserved, and the
+README finally shows the site as it is.
+
+### What the world is doing
+
+Four numbers in the corner of Conway's Game of Life: **Generation**,
+**Population**, **Last step** as a signed pair of births and deaths, and
+**Activity**, the share of every cell in the grid that changed on that step.
+
+Two of them are facts about the world as it stands and two are facts about the
+step that produced it, and the readout keeps the difference. A world that was
+seeded, randomised, cleared or drawn on shows a dash rather than a zero: nothing
+has stepped, and "no cells changed" would be a different claim. Painting a cell
+moves the population and is never reported as a birth.
+
+The panel reserves room for the longest reading any of its rows can produce, so
+it holds one size and one position while the numbers move underneath it. The
+signed pair is read aloud as "26 born, 24 died" rather than as a row of symbols.
+
+### Classic
+
+A black-and-white palette for Life: white cells on black, the way it has always
+been drawn. It is the one palette that shows no age at all — the cells still age
+underneath it, but a palette with a single colour has nowhere to show it.
+Switching back to Sunset brings the age colouring straight back.
+
+Everything here is computed and drawn in your browser. Neither the readout nor
+the palettes ask anything of the network.
+
+### Documentation
+
+The README now describes the application that ships: the fifteen artworks in
+gallery order with their Create and Tile capabilities, the unified workspace,
+Tile, Focus, and Game of Life. Six new screenshots replace the two that showed
+an interface rebuilt two releases ago.
+
 ## v1.3.0
 
 Four new pattern artworks, one workspace for every piece, a Tile mode that answers
