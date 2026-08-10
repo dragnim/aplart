@@ -1,5 +1,68 @@
 # Changelog
 
+## v1.3.0
+
+Four new pattern artworks, one workspace for every piece, a Tile mode that answers
+whether an artwork will repeat, and Conway's Game of Life in APL.
+
+### Patterns worth using as backgrounds
+
+Basket Weave, Quilt Stars, Maze Tiles and Glow Grid join the gallery, and the
+gallery now leads with patterns rather than fractals. **Start creating** opens one
+of them on a curated variation.
+
+### One workspace, for every artwork
+
+There used to be two ways to edit a piece depending on how you arrived. There is
+one now: Create, Colour, Animate, Tile, Advanced and Code, beside the artwork they
+change. Create appears only where an artwork has controls written in its own
+words, and its ranges are chosen to stay inside what the artwork does well.
+
+Artworks draw on arrival rather than waiting for Run. Randomise, Undo and Reset sit
+together beneath the modes with a quiet note of whether you are looking at the
+original or something you have changed.
+
+### Tile
+
+Seven of the artworks are built from a pattern that genuinely repeats, and Tile
+says which of three things is true of the one in front of you: seamless, seamless
+once a number is nudged, or not seamless at all. **Auto tile** makes the smallest
+change that fixes it, in one undoable step, and a three-by-three preview shows the
+joins — including the middle, where four copies meet.
+
+The answer is read from the APL itself rather than promised by the artwork, so it
+stays true when you edit the code by hand. Repeat and Mirror repeat move here for
+those seven; every other artwork keeps them where they were.
+
+### Conway's Game of Life in APL
+
+A new immersive page, from the site menu. The world fills the window and is already
+running when it opens; it follows John Scholes's APL formulation, which the page
+shows and credits under **View APL**. Play, step, draw cells with the pointer,
+change the palette and the speed, or hide the interface entirely and watch.
+
+The simulation runs in your browser. It is Conway's rules exactly — nothing is
+added to a world once it is running and nothing intervenes when it grows quiet —
+and the page is careful to separate those rules from this world's wrapped edges,
+which are Scholes's choice rather than Conway's.
+
+### A quieter shell, and the way back
+
+Three stacked bars became one: the wordmark, whatever the page has to say about
+itself, and a menu holding Gallery, Game of Life, About and Help. At narrower
+widths the artwork's actions fold into one Actions control, and the bar stays a
+single row down to a phone.
+
+**← Gallery** is back beside the artwork's name, on the artwork's own left edge,
+and Game of Life has one of its own.
+
+### Focus
+
+Focus mode gives the artwork the whole window rather than most of it, and each
+artwork now states whether it should fill that window or fit inside it, so a
+pattern covers the screen while a square stays square. Opening the drawer no
+longer shifts anything behind it.
+
 ## v1.2.0 — Instant Play
 
 Added a new Start creating experience that opens an attractive artwork immediately

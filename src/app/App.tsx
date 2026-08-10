@@ -8,6 +8,7 @@ import { AboutPage } from '@/pages/AboutPage';
 import { HelpPage } from '@/pages/HelpPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { InterfaceAccentBoundary } from '@/theme/InterfaceAccentBoundary';
+import { applyMetadata } from './metadata';
 import { useRoute, type Route } from './router';
 import styles from './App.module.css';
 
@@ -28,24 +29,10 @@ const WorkspacePage = lazy(async () => ({
  */
 const LifePage = lazy(async () => ({ default: (await import('@/life/LifePage')).LifePage }));
 
-const SITE_NAME = 'APL Art';
-
-function titleFor(route: Route): string {
-  switch (route.name) {
-    case 'gallery':
-      return `${SITE_NAME} — tiny programs, infinite patterns`;
-    case 'artwork':
-      return `${route.presetId} — ${SITE_NAME}`;
-    case 'about':
-      return `About — ${SITE_NAME}`;
-    case 'help':
-      return `Help — ${SITE_NAME}`;
-    case 'life':
-      return `Conway's Game of Life — ${SITE_NAME}`;
-    case 'notFound':
-      return `Not found — ${SITE_NAME}`;
-  }
-}
+/*
+ * What each route calls itself now lives in `metadata.ts`, with the description
+ * and the social tags that have to agree with it.
+ */
 
 /**
  * What counts as a different page for scrolling.
@@ -92,9 +79,11 @@ export function App() {
   const route = useRoute();
 
   // A single-page application does not update the document title on its own,
-  // and the title is how screen reader users know the page changed.
+  // and the title is how screen reader users know the page changed. The
+  // description and the social tags go with it — see `metadata.ts` for what a
+  // crawler does and does not see of this.
   useEffect(() => {
-    document.title = titleFor(route);
+    applyMetadata(route);
   }, [route]);
 
   /*

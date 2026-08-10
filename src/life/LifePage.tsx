@@ -365,10 +365,19 @@ export function LifePage() {
         <a className={styles.home} href="#/">
           <span aria-hidden="true">←</span> Gallery
         </a>
-        <span className={styles.title}>
-          Conway’s Game of Life
+        {/*
+          The page's heading, and the only one it has above the APL panel.
+
+          It was a `span`, which left the route with no level-one heading at all
+          — every other page has one, and a page without one is a page a screen
+          reader cannot summarise. It says "in APL" because that is what
+          distinguishes this from every other Game of Life on the web, and the
+          credit stays with it rather than becoming a second heading.
+        */}
+        <h1 className={styles.title}>
+          Conway’s Game of Life in APL
           <span className={styles.credit}>APL formulation by John Scholes</span>
-        </span>
+        </h1>
 
         <div className={styles.actions}>
           <button

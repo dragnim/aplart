@@ -66,6 +66,38 @@ export function HelpPage() {
         </ul>
       </section>
 
+      {/*
+        Life is reachable only from the site menu, so somebody who finds it there
+        deserves to be told what it is before they press it. Enough to recognise
+        the thing and use it — the page itself carries the expression, the
+        attribution and the difference between Conway's rules and this world's
+        edges, and repeating any of that here would be a worse copy of it.
+      */}
+      <section className={styles.section}>
+        <h2 className={styles.heading}>Conway’s Game of Life</h2>
+        <p className={styles.paragraph}>
+          Chosen from the site menu, <strong>Game of Life</strong> opens a world that is already running,
+          filling the window. It follows John Scholes’s APL formulation, which the page shows and credits
+          under <strong>View APL</strong>. The simulation runs in your browser rather than being sent anywhere
+          to be calculated.
+        </p>
+        <ul className={styles.list}>
+          <li>
+            <span className={styles.keys}>Space</span> plays and pauses.{' '}
+            <span className={styles.keys}>.</span> advances one generation.
+          </li>
+          <li>
+            <span className={styles.keys}>H</span> hides the controls and brings them back, so there is
+            nothing on screen but the world.
+          </li>
+          <li>Drag on the world to bring cells to life or clear them. It pauses while you draw.</li>
+          <li>
+            Randomise, Reset and Clear all start a new world. Nothing is added to a world once it is running,
+            and nothing steps in when it grows quiet.
+          </li>
+        </ul>
+      </section>
+
       <section className={styles.section}>
         <h2 className={styles.heading}>Why did my code not run?</h2>
         <ul className={styles.list}>

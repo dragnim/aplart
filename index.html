@@ -8,6 +8,30 @@
       name="description"
       content="Create patterns, fractals and generative art with Dyalog APL. Choose a piece, change the code and see what happens."
     />
+    <!--
+      The site's own card, and the only one a crawler ever sees.
+
+      Routes live in the URL fragment, which is never sent to a server, so every
+      address returns this file — and social crawlers generally do not run the
+      JavaScript that would then rewrite these for the route being viewed. So
+      what is written here describes APL Art, which is honestly what the address
+      a crawler fetched resolves to. `src/app/metadata.ts` keeps these in step
+      with the route for the browser tab and for anything reading the live
+      document; making them true for crawlers as well would need real paths and
+      server-rendered routes rather than different markup.
+    -->
+    <meta property="og:title" content="APL Art — tiny programs, infinite patterns" />
+    <meta
+      property="og:description"
+      content="Create patterns, fractals and generative art with Dyalog APL. Choose a piece, change the code and see what happens."
+    />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:title" content="APL Art — tiny programs, infinite patterns" />
+    <meta
+      name="twitter:description"
+      content="Create patterns, fractals and generative art with Dyalog APL. Choose a piece, change the code and see what happens."
+    />
+
     <meta name="colour-scheme" content="light dark" />
     <meta name="theme-color" content="#ff6a13" />
 

@@ -4,8 +4,8 @@
  * What only a browser can answer: that the artwork is the dominant thing on the
  * page, that a real drag of a real slider asks the service for one artwork rather
  * than forty, that arrow keys move a range input at all, that a closed disclosure
- * genuinely takes the editor out of the tab order, that Save image writes a file,
- * and that all of it survives a phone-sized screen and Focus mode.
+ * genuinely takes the editor out of the tab order, that Export writes a file, and
+ * that all of it survives a phone-sized screen and Focus mode.
  */
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
@@ -18,12 +18,13 @@ const SEED = 20_260_805;
 
 const playPanel = (page: Page) => page.getByRole('region', { name: 'Make it yours' });
 /**
- * Randomise, Undo, Save image and Share.
+ * Randomise, Undo and Reset.
  *
  * Beneath the editing modes rather than inside the curated controls: they act on
  * the artwork, not on one way of changing it, so they stay put as the mode
  * changes. They used to live in the Create panel, which is why so many of these
- * tests once reached for them there.
+ * tests once reached for them there — and alongside Share and Save image, which
+ * have since become one Share in the app bar and one Export beside it.
  */
 const sessionActions = (page: Page) => page.getByRole('group', { name: 'Artwork actions' });
 const slider = (page: Page, label: string) => page.getByLabel(label, { exact: true });

@@ -457,30 +457,33 @@ must not fail because that service is momentarily busy.
 
 ## What is in it
 
-Eleven artworks, each a real `.apl` file that the editor shows and the service runs:
+Fifteen artworks, each a real `.apl` file that the editor shows and the service runs:
 
-| Artwork           | Category | What it is                                                    |
-| ----------------- | -------- | ------------------------------------------------------------- |
-| Modular Bloom     | geometry | A multiplication table folded by a modulus.                   |
-| Checker Shift     | pattern  | Row plus column, folded by a repeat.                          |
-| Wave Interference | geometry | Straight waves crossing and reinforcing.                      |
-| Truchet Grid      | pattern  | A hashed tile choice per cell.                                |
-| Sierpiński Array  | fractal  | The triangle, from a bitwise test.                            |
-| Cellular Echo     | cellular | A one-dimensional automaton, one row per generation.          |
-| Mandelbrot Field  | fractal  | The set, counted in real arithmetic.                          |
-| Julia Set         | fractal  | The same iteration with `c` fixed and the grid seeding `z`.   |
-| Burning Ship      | fractal  | Mandelbrot with each component made positive before squaring. |
-| Tricorn           | fractal  | Mandelbrot with one sign reversed — the conjugate.            |
-| Multibrot         | fractal  | Mandelbrot with the square replaced by an integer power.      |
+| Artwork           | Category | What it is                                                     |
+| ----------------- | -------- | -------------------------------------------------------------- |
+| Basket Weave      | pattern  | Straps crossing over and under, shaded to look raised.         |
+| Quilt Stars       | pattern  | A star block, ringed and repeated.                             |
+| Maze Tiles        | pattern  | Two diagonals per cell, chosen by a hash, joining into a maze. |
+| Glow Grid         | pattern  | Rows of lights, each row offset from the last.                 |
+| Modular Bloom     | geometry | A multiplication table folded by a modulus.                    |
+| Checker Shift     | pattern  | Row plus column, folded by a repeat.                           |
+| Wave Interference | geometry | Straight waves crossing and reinforcing.                       |
+| Truchet Grid      | pattern  | A hashed tile choice per cell.                                 |
+| Sierpiński Array  | fractal  | The triangle, from a bitwise test.                             |
+| Cellular Echo     | cellular | A one-dimensional automaton, one row per generation.           |
+| Mandelbrot Field  | fractal  | The set, counted in real arithmetic.                           |
+| Julia Set         | fractal  | The same iteration with `c` fixed and the grid seeding `z`.    |
+| Burning Ship      | fractal  | Mandelbrot with each component made positive before squaring.  |
+| Tricorn           | fractal  | Mandelbrot with one sign reversed — the conjugate.             |
+| Multibrot         | fractal  | Mandelbrot with the square replaced by an integer power.       |
 
 The four fractals after Mandelbrot exist to be compared with it: each differs by one legible thing, and
 Multibrot at `power←2` returns Mandelbrot's matrix cell for cell.
 
-**Starting without reading anything.** The gallery's **Start creating** action opens Modular Bloom on
-one of eight curated variations and draws it, so the first thing on screen is an artwork. Three controls
-in the artwork's own words — Complexity, Scale and Detail — sit beside it, with Randomise, Undo, Save
-image and Share. The seed is in the link, so reloading, sharing the address and pressing Back all show
-the same piece; coming back to the gallery offers a new one.
+**Starting without reading anything.** The gallery's **Start creating** action opens a pattern artwork on
+a curated variation and draws it, so the first thing on screen is an artwork. Controls in the artwork's
+own words sit beside it, with Randomise, Undo and Reset. The seed is in the link, so reloading, sharing
+the address and pressing Back all show the same piece; coming back to the gallery offers a new one.
 
 Nothing there is a second model of the artwork. Each control reads its value out of the visible APL and
 writes changes back into it, and can show the assignment it changes and open the editor at that line.
@@ -518,6 +521,13 @@ explains the picture. Inspect any cell by pointer or by naming its row and colum
 against the artwork's declared range. Open a Julia set from an inspected Mandelbrot coordinate. Repeat or
 mirror-repeat the artwork into a composition, with optional seam guides. Focus mode gives the artwork the
 window with the controls in a drawer.
+
+**Conway's Game of Life in APL.** A separate immersive page, reached from the site menu rather than from
+the gallery: it is an experience rather than another preset. The world fills the window and is already
+running when it opens, and it follows John Scholes's APL formulation, which the page shows and credits.
+The simulation itself runs locally in the browser — twelve to forty-eight generations a second is not a
+network round trip — so nothing about it is executed remotely. That the local implementation matches the
+expression is checked against real APL execution in `tests/live/life.test.ts` rather than asserted.
 
 **Keeping and sharing.** PNG export at several sizes, of one tile or of the whole composition, with an
 optional caption stating the real character count. Projects are saved in the browser. A share link

@@ -193,6 +193,36 @@ async function framesWhileToggling(page: Page, becoming: 'true' | 'closed'): Pro
 test.describe('Game of Life', () => {
   test.use({ viewport: WIDE });
 
+  test('names itself, in the page and in the document', async ({ page }) => {
+    await openLife(page);
+
+    // One level-one heading, and it says which Game of Life this is.
+    const heading = page.getByRole('heading', { level: 1 });
+    await expect(heading).toHaveCount(1);
+    await expect(heading).toContainText('Conway’s Game of Life in APL');
+    await expect(heading).toContainText('APL formulation by John Scholes');
+
+    await expect(page).toHaveTitle('Conway’s Game of Life in APL | APL Art');
+    await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+      'content',
+      /Conway’s Game of Life through John Scholes’ elegant APL formulation/,
+    );
+
+    // Nothing asks a search engine to skip it.
+    await expect(page.locator('meta[name="robots"][content*="noindex"]')).toHaveCount(0);
+
+    /*
+     * And the panel's heading sits beneath the page's rather than beside it, so
+     * the document reads as one page about one thing.
+     */
+    await openPanel(page);
+    const levels = await page.evaluate(() =>
+      [...document.querySelectorAll('h1,h2,h3')].map((node) => node.tagName),
+    );
+    expect(levels[0]).toBe('H1');
+    expect(levels.slice(1)).not.toContain('H1');
+  });
+
   test('runs entirely in the browser, asking TryAPL for nothing', async ({ page }) => {
     const requests = await openLife(page);
 
@@ -472,6 +502,21 @@ test.describe('Game of Life on a phone', () => {
     // ends rather than assuming a height.
     expect(await coveredControls(page)).toEqual([]);
     await expect(page.getByRole('link', { name: 'Gallery' })).toBeVisible();
+
+    /*
+     * And the page still has its heading. There is no room to show it beside a
+     * bar that wraps to five rows, so it is hidden the way a live region is —
+     * off the screen rather than out of the document, because `display: none`
+     * would take the route's only level-one heading out of the accessibility
+     * tree and leave a phone with a page nothing can summarise.
+     */
+    const heading = page.getByRole('heading', { level: 1 });
+    await expect(heading).toHaveCount(1);
+    await expect(heading).toContainText('Conway’s Game of Life in APL');
+    expect(
+      await heading.evaluate((node) => getComputedStyle(node).display),
+      'the heading was removed rather than hidden',
+    ).not.toBe('none');
 
     // The panel is the rest of the window, and scrolls within itself.
     const scrolls = await page.evaluate(() => {

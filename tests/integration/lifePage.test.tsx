@@ -86,6 +86,25 @@ describe('opening the page', () => {
     expect(within(palette).getAllByRole('option').length).toBeGreaterThan(4);
   });
 
+  it('has one level-one heading, naming the thing and the language', () => {
+    /*
+     * The route used to have no `h1` at all — its visible title was a `span`, so
+     * the first heading on the page was the APL panel's, and a page without a
+     * level-one heading is one a screen reader cannot summarise. The credit is
+     * inside it rather than beside it, so there is one heading rather than two.
+     */
+    render(<LifePage />);
+
+    const headings = screen.getAllByRole('heading', { level: 1 });
+    expect(headings).toHaveLength(1);
+    expect(headings[0]).toHaveTextContent('Conway’s Game of Life in APL');
+    expect(headings[0]).toHaveTextContent('APL formulation by John Scholes');
+
+    // And the panel's own heading sits underneath it rather than competing.
+    const panel = screen.getByRole('dialog', { name: /APL behind this artwork/u });
+    expect(within(panel).getByRole('heading', { level: 2 })).toBeInTheDocument();
+  });
+
   it('credits the formulation on the bar without making a fuss of it', () => {
     render(<LifePage />);
 
