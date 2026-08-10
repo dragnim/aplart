@@ -13,13 +13,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMediaQuery } from '@/app/useMediaQuery';
-import { getPalette, palettes } from '@/renderer/palettes';
-import { accentPaletteFor, paletteSignature } from '@/theme/accentSource';
-import { defaultRenderOptions } from '@/renderer/renderOptions';
+import { paletteSignature } from '@/theme/accentSource';
 import { usePublishAccentPalette } from '@/theme/accentContext';
 import { MAX_AGE, population } from './lifeEngine';
+import { accentRampFor, lifePalette, LIFE_PALETTES } from './lifePalettes';
 import { LIFE_APL } from './lifeSource';
 import { LifeCodePanel } from './LifeCodePanel';
+import { LifeStats } from './LifeStats';
 import { SPEEDS, useLifeSimulation, type SpeedId, type WorldSize } from './useLifeSimulation';
 import styles from './LifePage.module.css';
 
@@ -37,9 +37,6 @@ import styles from './LifePage.module.css';
  * itself, and small enough that when it does, it stays busy.
  */
 const CELL = 14;
-
-/** Palettes worth putting a living world in. */
-const LIFE_PALETTES = ['sunset', 'ember', 'neon', 'poolrooms', 'heat', 'forest', 'blueprint'] as const;
 
 /**
  * How big a world to *start* in a window this size.
@@ -96,7 +93,7 @@ export function LifePage() {
   const [paletteId, setPaletteId] = useState<string>('sunset');
   const [showCode, setShowCode] = useState(false);
   const [showInterface, setShowInterface] = useState(true);
-  const palette = useMemo(() => getPalette(paletteId), [paletteId]);
+  const palette = useMemo(() => lifePalette(paletteId), [paletteId]);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   /* Where the keyboard goes back to when the APL panel closes. */
@@ -121,11 +118,18 @@ export function LifePage() {
   /* ── The interface's own colours follow the world's ──────────────────────── */
 
   const publishAccentPalette = usePublishAccentPalette();
-  const accentSignature = paletteSignature(accentPaletteFor(defaultRenderOptions(paletteId)));
+  const accentSignature = paletteSignature(accentRampFor(palette));
 
+  /*
+   * Classic publishes nothing, and the empty signature is how it says so — the
+   * interface keeps APL Art's own colour rather than deriving one from a single
+   * white. So the accent is withdrawn rather than left standing, or switching to
+   * Classic would leave the previous palette's colour on the controls.
+   */
   useEffect(() => {
-    if (accentSignature === '') return;
-    publishAccentPalette({ presetId: 'life', colours: accentSignature.split(',') });
+    publishAccentPalette(
+      accentSignature === '' ? null : { presetId: 'life', colours: accentSignature.split(',') },
+    );
   }, [accentSignature, publishAccentPalette]);
 
   useEffect(() => () => publishAccentPalette(null), [publishAccentPalette]);
@@ -436,9 +440,9 @@ export function LifePage() {
               value={paletteId}
               onChange={(event) => setPaletteId(event.target.value)}
             >
-              {LIFE_PALETTES.map((id) => (
-                <option key={id} value={id}>
-                  {palettes.find((candidate) => candidate.id === id)?.name ?? id}
+              {LIFE_PALETTES.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
                 </option>
               ))}
             </select>
@@ -477,6 +481,14 @@ export function LifePage() {
           </button>
         </div>
       </header>
+
+      {/*
+        Part of the interface, so it goes when the interface goes. There is no
+        separate control for it: somebody who wants the world and nothing else
+        already has one, and a second switch for a corner of text would be a
+        setting to explain rather than a thing to use.
+      */}
+      {showInterface ? <LifeStats world={world} /> : null}
 
       <LifeCodePanel open={showCode} apl={LIFE_APL} returnFocusTo={aplTrigger} />
     </div>

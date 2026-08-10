@@ -490,6 +490,170 @@ test.describe('Game of Life', () => {
   });
 });
 
+test.describe('the readout and the Classic palette', () => {
+  test.use({ viewport: WIDE });
+
+  /** The four values, by the term labelling each. */
+  async function readStats(page: Page): Promise<Record<string, string>> {
+    return page.evaluate(() => {
+      const panel = document.querySelector('[aria-label="World statistics"]');
+      if (panel === null) return {};
+      return Object.fromEntries(
+        [...panel.querySelectorAll('div')].map((row) => [
+          row.querySelector('dt')?.textContent?.trim() ?? '',
+          row.querySelector('dd')?.textContent?.trim() ?? '',
+        ]),
+      );
+    });
+  }
+
+  test('says nothing about a generation that has not happened, then reports one', async ({ page }) => {
+    const requests = await openLife(page);
+    await page.getByRole('button', { name: 'Pause' }).click();
+    /*
+     * Reset rather than merely pause. The world is already running by the time a
+     * browser has finished loading the page, so "generation 0" has to be asked
+     * for — and asking for it is also the check that Reset puts the readout back
+     * to the seed with nothing to report.
+     */
+    await page.getByRole('button', { name: 'Reset' }).click();
+    await page.waitForTimeout(300);
+
+    const opening = await readStats(page);
+    expect(opening.Generation, 'the seed is generation 0').toBe('0');
+    expect(Number(opening.Population)).toBeGreaterThan(0);
+    // A dash, not a zero: nothing has stepped, so there is nothing to report.
+    expect(opening['Births / Deaths']).toBe('—');
+    expect(opening.Activity).toBe('—');
+
+    await page.getByRole('button', { name: 'Step' }).click();
+    const stepped = await readStats(page);
+
+    expect(stepped.Generation).toBe('1');
+    expect(stepped['Births / Deaths']).toMatch(/^\+\d+ \/ −\d+$/u);
+    expect(stepped.Activity).toMatch(/^\d+\.\d%$/u);
+
+    /*
+     * And the four agree with one another. Activity is births and deaths over
+     * every cell of the grid, and the grid's size is in the canvas's own
+     * description — so this checks the definition rather than the format.
+     */
+    const label = await readout(page);
+    const [, width, height] = /on a (\d+) by (\d+)/u.exec(label) ?? [];
+    const [, births, deaths] = /^\+(\d+) \/ −(\d+)$/u.exec(stepped['Births / Deaths'] ?? '') ?? [];
+    const expected = ((Number(births) + Number(deaths)) / (Number(width) * Number(height))) * 100;
+    expect(stepped.Activity).toBe(`${expected.toFixed(1)}%`);
+
+    expect(requests, 'the readout reached for the network').toEqual([]);
+  });
+
+  test('goes away with the controls and comes back with them', async ({ page }) => {
+    await openLife(page);
+    const panel = page.locator('[aria-label="World statistics"]');
+    await expect(panel).toBeVisible();
+
+    await page.getByRole('button', { name: 'Hide controls' }).click();
+    await expect(panel).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Show controls' }).click();
+    await expect(panel).toBeVisible();
+  });
+
+  test('stays clear of the APL panel when it opens', async ({ page }) => {
+    await openLife(page);
+    await page.getByRole('button', { name: 'Pause' }).click();
+
+    /*
+     * Where it sits, not how wide it is. The readout is as wide as its longest
+     * value, so a population crossing from three digits to four widens it — that
+     * is the text changing, not the panel moving it, and only the second would
+     * be a fault.
+     */
+    const corner = async () => {
+      const box = await page.locator('[aria-label="World statistics"]').boundingBox();
+      return box === null ? null : { x: Math.round(box.x), bottom: Math.round(box.y + box.height) };
+    };
+
+    const before = await corner();
+    await openPanel(page);
+    const after = await corner();
+
+    expect(after, 'the readout vanished when the panel opened').not.toBeNull();
+    expect(after, 'the panel moved the readout').toEqual(before);
+
+    // Bottom left, where neither the bar nor the panel goes.
+    const box = await page.locator('[aria-label="World statistics"]').boundingBox();
+    const panel = await page.locator('#life-code').boundingBox();
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThan(panel?.x ?? 0);
+  });
+
+  test('Classic draws white cells on black, at every age', async ({ page }) => {
+    const requests = await openLife(page);
+    await page.getByRole('button', { name: 'Pause' }).click();
+
+    // Several generations, so the world holds cells of many different ages —
+    // which is exactly what Classic must not show.
+    for (let generation = 0; generation < 8; generation += 1) {
+      await page.getByRole('button', { name: 'Step' }).click();
+    }
+
+    await page.getByLabel('Palette').selectOption('classic');
+    await page.waitForTimeout(600);
+
+    const colours = await page.evaluate(() => {
+      const canvas = document.querySelector('canvas');
+      const context = canvas?.getContext('2d');
+      if (!canvas || !context) return [];
+      const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+      const seen = new Set<string>();
+      for (let index = 0; index < data.length; index += 4) {
+        seen.add(`${String(data[index])},${String(data[index + 1])},${String(data[index + 2])}`);
+      }
+      return [...seen];
+    });
+
+    /*
+     * Two colours and no more. Anti-aliasing would add intermediates, so the
+     * cells are drawn as whole pixels — and any age gradient would show here as
+     * a third, fourth and fifth grey.
+     */
+    expect(colours.sort()).toEqual(['0,0,0', '255,255,255']);
+    expect(requests, 'changing palette reached for the network').toEqual([]);
+  });
+
+  test('switching back to Sunset restores the age colouring', async ({ page }) => {
+    await openLife(page);
+    await page.getByRole('button', { name: 'Pause' }).click();
+    for (let generation = 0; generation < 8; generation += 1) {
+      await page.getByRole('button', { name: 'Step' }).click();
+    }
+
+    const distinctColours = async () =>
+      page.evaluate(() => {
+        const canvas = document.querySelector('canvas');
+        const context = canvas?.getContext('2d');
+        if (!canvas || !context) return 0;
+        const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+        const seen = new Set<number>();
+        for (let index = 0; index < data.length; index += 4) {
+          seen.add(((data[index] ?? 0) << 16) | ((data[index + 1] ?? 0) << 8) | (data[index + 2] ?? 0));
+        }
+        return seen.size;
+      });
+
+    const withAges = await distinctColours();
+    expect(withAges, 'Sunset should show cells of several ages').toBeGreaterThan(2);
+
+    await page.getByLabel('Palette').selectOption('classic');
+    await page.waitForTimeout(500);
+    expect(await distinctColours()).toBe(2);
+
+    await page.getByLabel('Palette').selectOption('sunset');
+    await page.waitForTimeout(500);
+    expect(await distinctColours(), 'the age colouring did not come back').toBeGreaterThan(2);
+  });
+});
+
 test.describe('Game of Life on a phone', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 

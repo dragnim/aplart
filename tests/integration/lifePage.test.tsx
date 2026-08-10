@@ -137,6 +137,177 @@ describe('opening the page', () => {
   });
 });
 
+/** The readout, or null when the interface is hidden and it is not rendered. */
+function statsPanel(): HTMLElement | null {
+  return document.querySelector('[aria-label="World statistics"]');
+}
+
+/** The four values it is showing, by the term that labels each. */
+function stats(): Record<string, string> {
+  const panel = statsPanel();
+  if (panel === null) throw new Error('the statistics panel is not on the page');
+  return Object.fromEntries(
+    [...panel.querySelectorAll('div')].map((row) => [
+      row.querySelector('dt')?.textContent?.trim() ?? '',
+      row.querySelector('dd')?.textContent?.trim() ?? '',
+    ]),
+  );
+}
+
+describe('the readout', () => {
+  it('shows the world, and nothing about a generation that has not happened', async () => {
+    /*
+     * The distinction the whole readout rests on. Generation and population are
+     * facts about the world as it stands; births, deaths and activity are facts
+     * about the step that produced it — and the opening seed was not produced by
+     * a step, so it has none to report. Zero would be a different claim, and a
+     * false one: no cells failed to change, because nothing was asked to.
+     */
+    const user = userEvent.setup();
+    render(<LifePage />);
+    await user.click(screen.getByRole('button', { name: 'Pause' }));
+
+    const opening = stats();
+    expect(opening.Generation).toBe('0');
+    expect(Number(opening.Population)).toBeGreaterThan(0);
+    expect(opening['Births / Deaths']).toBe('—');
+    expect(opening.Activity).toBe('—');
+  });
+
+  it('reports the step it has just taken', async () => {
+    const user = userEvent.setup();
+    render(<LifePage />);
+    await user.click(screen.getByRole('button', { name: 'Pause' }));
+
+    const before = Number(stats().Population);
+    await user.click(screen.getByRole('button', { name: 'Step' }));
+    const after = stats();
+
+    expect(after.Generation).toBe('1');
+    expect(after['Births / Deaths']).toMatch(/^\+\d+ \/ −\d+$/u);
+    expect(after.Activity).toMatch(/^\d+\.\d%$/u);
+
+    /*
+     * And the numbers agree with each other rather than merely existing: the
+     * population moved by exactly births minus deaths.
+     */
+    const [, births, deaths] = /^\+(\d+) \/ −(\d+)$/u.exec(after['Births / Deaths'] ?? '') ?? [];
+    expect(Number(after.Population)).toBe(before + Number(births) - Number(deaths));
+  });
+
+  it('keeps reporting as the world runs on', async () => {
+    const user = userEvent.setup();
+    render(<LifePage />);
+    await user.click(screen.getByRole('button', { name: 'Pause' }));
+
+    for (let generation = 1; generation <= 3; generation += 1) {
+      await user.click(screen.getByRole('button', { name: 'Step' }));
+      expect(stats().Generation).toBe(String(generation));
+      expect(stats()['Births / Deaths']).not.toBe('—');
+    }
+  });
+
+  it('goes quiet again when a new world is started', async () => {
+    const user = userEvent.setup();
+    render(<LifePage />);
+    await user.click(screen.getByRole('button', { name: 'Pause' }));
+    await user.click(screen.getByRole('button', { name: 'Step' }));
+    expect(stats().Activity).not.toBe('—');
+
+    for (const action of ['Reset', 'Randomise', 'Clear']) {
+      await user.click(screen.getByRole('button', { name: action }));
+
+      const now = stats();
+      expect(now.Generation, action).toBe('0');
+      expect(now['Births / Deaths'], action).toBe('—');
+      expect(now.Activity, action).toBe('—');
+    }
+
+    // Clear came last, so nothing is alive — and that is population, not death.
+    expect(stats().Population).toBe('0');
+  });
+
+  it('counts a painted cell as population and not as a birth', async () => {
+    /*
+     * The most misleading thing this could do. Painting changes the world, but
+     * the rules did not decide it, so it must not appear as a generation's work.
+     */
+    render(<LifePage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+
+    const before = Number(stats().Population);
+    const canvas = screen.getByRole('img');
+    // jsdom lays nothing out, so the canvas is told where it is.
+    canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: 340, height: 200 }) as DOMRect;
+    fireEvent.pointerDown(canvas, { clientX: 5, clientY: 5, pointerId: 1, button: 0 });
+
+    const after = stats();
+    expect(Number(after.Population)).not.toBe(before);
+    expect(after['Births / Deaths']).toBe('—');
+    expect(after.Activity).toBe('—');
+    expect(after.Generation).toBe('0');
+  });
+
+  it('goes away with the rest of the interface, and comes back with it', async () => {
+    const user = userEvent.setup();
+    render(<LifePage />);
+
+    expect(statsPanel()).not.toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Hide controls' }));
+    expect(statsPanel()).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Show controls' }));
+    expect(statsPanel()).not.toBeNull();
+  });
+
+  it('stays put and stays readable while the APL panel is open', async () => {
+    const user = userEvent.setup();
+    render(<LifePage />);
+
+    await user.click(screen.getByRole('button', { name: 'View APL' }));
+
+    expect(statsPanel()).not.toBeNull();
+    expect(stats().Generation).toBeDefined();
+  });
+});
+
+describe('the palette', () => {
+  it('opens on Sunset and offers Classic among the rest', () => {
+    render(<LifePage />);
+
+    const palette = screen.getByLabelText('Palette');
+    expect(palette).toHaveValue('sunset');
+
+    const names = within(palette)
+      .getAllByRole('option')
+      .map((option) => option.textContent);
+    expect(names).toContain('Classic');
+    expect(names.slice(0, 2)).toEqual(['Sunset', 'Classic']);
+  });
+
+  it('switches to Classic and back without disturbing the world', async () => {
+    /*
+     * A palette is a way of looking at the world, so changing it must not touch
+     * the world — the same rule the artwork workspace keeps for its own palettes.
+     */
+    const user = userEvent.setup();
+    render(<LifePage />);
+    await user.click(screen.getByRole('button', { name: 'Pause' }));
+    await user.click(screen.getByRole('button', { name: 'Step' }));
+
+    const before = screen.getByRole('img').getAttribute('aria-label');
+
+    await user.selectOptions(screen.getByLabelText('Palette'), 'classic');
+    expect(screen.getByLabelText('Palette')).toHaveValue('classic');
+    expect(screen.getByRole('img').getAttribute('aria-label')).toBe(before);
+
+    await user.selectOptions(screen.getByLabelText('Palette'), 'sunset');
+    expect(screen.getByLabelText('Palette')).toHaveValue('sunset');
+    expect(screen.getByRole('img').getAttribute('aria-label')).toBe(before);
+  });
+});
+
 describe('reduced motion', () => {
   it('opens on a world that has already grown, and holds it still', () => {
     reducedMotion = true;

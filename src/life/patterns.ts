@@ -152,6 +152,7 @@ export function openingSeed(width: number, height: number, advance = 0): LifeWor
     cells: new Uint8Array(width * height),
     ages: new Uint16Array(width * height),
     generation: 0,
+    transition: null,
   };
 
   // Middle of the field, so it has the whole world to spread into.
@@ -182,6 +183,7 @@ export function randomField(width: number, height: number, random: () => number)
     cells: new Uint8Array(width * height),
     ages: new Uint16Array(width * height),
     generation: 0,
+    transition: null,
   };
 
   for (let index = 0; index < world.cells.length; index += 1) {

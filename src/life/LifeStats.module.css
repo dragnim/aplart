@@ -1,0 +1,77 @@
+/*
+ * The readout, over the world.
+ *
+ * The same treatment as the title plate on the bar: a dark card with a little
+ * blur, so it stays legible over a bright field of cells without becoming a
+ * panel in its own right. It deliberately does not take the site's light surface
+ * — this page is dark whatever palette is running, and a white block in the
+ * corner would read as a dialog somebody had left open.
+ */
+.panel {
+  position: absolute;
+  inset-block-end: var(--space-4);
+  inset-inline-start: var(--space-4);
+  z-index: 2;
+
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+
+  display: grid;
+  gap: var(--space-1);
+
+  border: 1px solid rgb(247 247 247 / 12%);
+  border-radius: var(--radius-md);
+  background: rgb(4 5 10 / 72%);
+  backdrop-filter: blur(6px);
+  color: #f7f7f7;
+
+  font-size: var(--text-xs);
+  line-height: 1.35;
+
+  /*
+   * Nothing here is for pressing, and the world underneath is: a pointer landing
+   * on the readout should paint a cell exactly as if the readout were not there.
+   */
+  pointer-events: none;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.term {
+  color: rgb(247 247 247 / 62%);
+  white-space: nowrap;
+}
+
+.value {
+  margin: 0;
+  font-weight: 650;
+  /*
+   * Lining figures of one width, so a population crossing from 999 to 1000 does
+   * not shift the column — the readout should look still while the world moves.
+   */
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/*
+ * On a phone the bar already takes several rows and the world is small, so this
+ * gets quieter still: tighter, smaller, and hard against the corner rather than
+ * inset from it.
+ */
+@media (max-width: 40rem) {
+  .panel {
+    inset-block-end: var(--space-2);
+    inset-inline-start: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    font-size: 0.6875rem;
+  }
+
+  .row {
+    gap: var(--space-3);
+  }
+}

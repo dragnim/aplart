@@ -51,6 +51,25 @@
  */
 export const MAX_AGE = 24;
 
+/**
+ * How a world differs from the one it came from.
+ *
+ * Counted by `step`, which already visits every cell and already knows both the
+ * old state and the new one — so this costs nothing beyond two increments, where
+ * comparing two worlds afterwards would mean a second pass over every cell at up
+ * to forty-eight generations a second.
+ *
+ * Read only by the readout. Nothing in the rules consults it, and it cannot: a
+ * world's transition describes the step that produced it and is decided after
+ * that step has already been computed.
+ */
+export interface LifeTransition {
+  /** Cells that were dead and are now alive. */
+  readonly births: number;
+  /** Cells that were alive and are now dead. */
+  readonly deaths: number;
+}
+
 export interface LifeWorld {
   readonly width: number;
   readonly height: number;
@@ -60,6 +79,16 @@ export interface LifeWorld {
   readonly ages: Uint16Array;
   /** How many generations have been computed. */
   readonly generation: number;
+  /**
+   * The step that produced this world, or null if no step did.
+   *
+   * Null for a world that was seeded, randomised, emptied or painted — none of
+   * which is a generation of Life, and none of which should be reported as one.
+   * A readout with nothing to say says nothing rather than zero: "no cells
+   * changed" and "nothing has happened yet" are different claims, and only one
+   * of them is true of a world that has not been stepped.
+   */
+  readonly transition: LifeTransition | null;
 }
 
 export function createWorld(width: number, height: number): LifeWorld {
@@ -69,6 +98,7 @@ export function createWorld(width: number, height: number): LifeWorld {
     cells: new Uint8Array(width * height),
     ages: new Uint16Array(width * height),
     generation: 0,
+    transition: null,
   };
 }
 
@@ -116,6 +146,9 @@ export function step(world: LifeWorld): LifeWorld {
   const cells = new Uint8Array(width * height);
   const ages = new Uint16Array(width * height);
 
+  let births = 0;
+  let deaths = 0;
+
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const index = y * width + x;
@@ -124,6 +157,15 @@ export function step(world: LifeWorld): LifeWorld {
       const lives = alive ? count === 2 || count === 3 : count === 3;
 
       cells[index] = lives ? 1 : 0;
+
+      /*
+       * Counted from the decision that has just been made, not from a later
+       * comparison. `lives` is the rule's answer and `alive` was the question;
+       * everything a readout wants to say about this generation is already here.
+       */
+      if (lives && !alive) births += 1;
+      else if (!lives && alive) deaths += 1;
+
       if (!lives) continue;
 
       // Born this generation, or one generation older than it was.
@@ -131,7 +173,21 @@ export function step(world: LifeWorld): LifeWorld {
     }
   }
 
-  return { width, height, cells, ages, generation: world.generation + 1 };
+  return { width, height, cells, ages, generation: world.generation + 1, transition: { births, deaths } };
+}
+
+/**
+ * How much of the world changed on the step that produced it, as a percentage.
+ *
+ * Births and deaths over every cell of the grid, living or not — the question is
+ * how much of the *world* moved, so the denominator is the world. Null when no
+ * step produced this state, for the same reason the transition is.
+ */
+export function activity(world: LifeWorld): number | null {
+  if (world.transition === null) return null;
+  const cells = world.width * world.height;
+  if (cells === 0) return null;
+  return ((world.transition.births + world.transition.deaths) / cells) * 100;
 }
 
 /** A world with the same shape and nothing alive in it. */
@@ -153,7 +209,13 @@ export function setCell(world: LifeWorld, x: number, y: number, alive: boolean):
   cells[index] = alive ? 1 : 0;
   ages[index] = 0;
 
-  return { ...world, cells, ages };
+  /*
+   * The transition goes. A painted cell is not a birth: the rules did not decide
+   * it, and reporting it as one would make the readout describe the drawing
+   * rather than the Life. The generation is untouched, because painting is not a
+   * generation either.
+   */
+  return { ...world, cells, ages, transition: null };
 }
 
 /** How many cells are alive, which is all the readout a status line needs. */
