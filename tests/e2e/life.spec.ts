@@ -504,7 +504,7 @@ test.describe('the readout and the Classic palette', () => {
         terms.map((term, index) => {
           const cell = values[index];
           // The glyphs, not the words beside them that only a screen reader hears.
-          const visible = cell?.querySelector('[aria-hidden=\"true\"]') ?? cell;
+          const visible = cell?.querySelector('[aria-hidden="true"]') ?? cell;
           return [term.textContent?.trim() ?? '', visible?.textContent?.trim() ?? ''];
         }),
       );
