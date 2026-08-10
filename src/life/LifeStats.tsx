@@ -20,6 +20,7 @@
  * Painting in particular must never read as births: the rules did not decide it.
  */
 
+import { Fragment } from 'react';
 import { activity, population, type LifeWorld } from './lifeEngine';
 import styles from './LifeStats.module.css';
 
@@ -64,13 +65,19 @@ export function LifeStats({ world }: Props) {
      * forty-eight times a second, and announcing that would make the page
      * unusable with a screen reader. The canvas already carries a polite live
      * region saying the generation and the population at a human pace.
+     *
+     * The terms and values are laid out directly by this element rather than
+     * wrapped a row at a time, so that all four share one grid and one pair of
+     * columns. Wrapped, each row measured its own contents and the panel was as
+     * wide as whichever row happened to be longest that frame — which is a
+     * readout that twitches while you read it.
      */
     <dl className={styles.panel} aria-label="World statistics">
       {rows.map(([term, value]) => (
-        <div className={styles.row} key={term}>
+        <Fragment key={term}>
           <dt className={styles.term}>{term}</dt>
           <dd className={styles.value}>{value}</dd>
-        </div>
+        </Fragment>
       ))}
     </dl>
   );

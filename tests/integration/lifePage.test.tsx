@@ -146,11 +146,10 @@ function statsPanel(): HTMLElement | null {
 function stats(): Record<string, string> {
   const panel = statsPanel();
   if (panel === null) throw new Error('the statistics panel is not on the page');
+  const terms = [...panel.querySelectorAll('dt')];
+  const values = [...panel.querySelectorAll('dd')];
   return Object.fromEntries(
-    [...panel.querySelectorAll('div')].map((row) => [
-      row.querySelector('dt')?.textContent?.trim() ?? '',
-      row.querySelector('dd')?.textContent?.trim() ?? '',
-    ]),
+    terms.map((term, index) => [term.textContent?.trim() ?? '', values[index]?.textContent?.trim() ?? '']),
   );
 }
 

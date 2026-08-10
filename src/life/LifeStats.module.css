@@ -16,8 +16,32 @@
   margin: 0;
   padding: var(--space-3) var(--space-4);
 
+  /*
+   * One grid for all four rows, and a value column wide enough for the widest
+   * reading any of them can produce.
+   *
+   * This is what keeps the panel still. Laid out row by row it was as wide as
+   * whichever row was longest at that instant, so the right-hand edge stepped in
+   * and out as a population crossed a thousand or a birth count lost a digit —
+   * a readout continually measuring itself rather than an instrument.
+   *
+   * The labels never change, so the first column is already constant; stating
+   * the second removes the only remaining variable.
+   *
+   * Thirteen `ch`, measured rather than counted. The longest reading any of
+   * these can produce is a birth and death count of every cell in the grid —
+   * "+6,528 / −6,528" at this window size — which renders 12.6 `ch` wide,
+   * because the signs, the slash and the separators are all narrower than a
+   * digit. Counting its fifteen characters would have reserved a third more
+   * space than it needs. In `ch` rather than pixels so the reservation follows
+   * the type down at the phone size below, where the same string is the same
+   * proportion of the same column.
+   */
   display: grid;
-  gap: var(--space-1);
+  grid-template-columns: auto 13ch;
+  column-gap: var(--space-4);
+  row-gap: var(--space-1);
+  align-items: baseline;
 
   border: 1px solid rgb(247 247 247 / 12%);
   border-radius: var(--radius-md);
@@ -35,13 +59,6 @@
   pointer-events: none;
 }
 
-.row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
 .term {
   color: rgb(247 247 247 / 62%);
   white-space: nowrap;
@@ -49,10 +66,12 @@
 
 .value {
   margin: 0;
+  /* Against the right-hand edge of its column, where a readout's figures go. */
+  text-align: end;
   font-weight: 650;
   /*
    * Lining figures of one width, so a population crossing from 999 to 1000 does
-   * not shift the column — the readout should look still while the world moves.
+   * not shift the digits either — the column holds its place and so do they.
    */
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -69,9 +88,10 @@
     inset-inline-start: var(--space-2);
     padding: var(--space-2) var(--space-3);
     font-size: 0.6875rem;
-  }
-
-  .row {
-    gap: var(--space-3);
+    /*
+     * The value column is in `ch`, so it has already narrowed with the type. Only
+     * the gap between the columns needs tightening by hand.
+     */
+    column-gap: var(--space-3);
   }
 }

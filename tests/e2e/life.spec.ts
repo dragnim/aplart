@@ -498,10 +498,12 @@ test.describe('the readout and the Classic palette', () => {
     return page.evaluate(() => {
       const panel = document.querySelector('[aria-label="World statistics"]');
       if (panel === null) return {};
+      const terms = [...panel.querySelectorAll('dt')];
+      const values = [...panel.querySelectorAll('dd')];
       return Object.fromEntries(
-        [...panel.querySelectorAll('div')].map((row) => [
-          row.querySelector('dt')?.textContent?.trim() ?? '',
-          row.querySelector('dd')?.textContent?.trim() ?? '',
+        terms.map((term, index) => [
+          term.textContent?.trim() ?? '',
+          values[index]?.textContent?.trim() ?? '',
         ]),
       );
     });
@@ -545,6 +547,47 @@ test.describe('the readout and the Classic palette', () => {
     expect(stepped.Activity).toBe(`${expected.toFixed(1)}%`);
 
     expect(requests, 'the readout reached for the network').toEqual([]);
+  });
+
+  test('holds one footprint while the values change under it', async ({ page }) => {
+    /*
+     * An instrument, not a box measuring its contents.
+     *
+     * Each row used to size its own two columns, so the panel was as wide as
+     * whichever row was longest that frame: a population crossing a thousand, or
+     * a birth count losing a digit, stepped the right-hand edge in and out while
+     * you were reading it. All four rows now share one grid with a value column
+     * wide enough for the longest reading any of them can produce.
+     *
+     * So this steps the world far enough for the values to change length several
+     * times over and asserts the panel's box never moves at all — while checking
+     * that the readings really did vary, or a frozen readout would pass.
+     */
+    await openLife(page);
+    await page.getByRole('button', { name: 'Pause' }).click();
+
+    const panel = page.locator('[aria-label="World statistics"]');
+    const boxes = new Set<string>();
+    const readings = new Set<string>();
+
+    for (let generation = 0; generation < 40; generation += 1) {
+      await page.getByRole('button', { name: 'Step' }).click();
+
+      const box = await panel.boundingBox();
+      boxes.add(
+        `${Math.round(box?.x ?? -1)},${Math.round(box?.y ?? -1)} ${Math.round(box?.width ?? -1)}x${Math.round(box?.height ?? -1)}`,
+      );
+
+      const now = await readStats(page);
+      readings.add(`${now.Population ?? ''}|${now['Births / Deaths'] ?? ''}|${now.Activity ?? ''}`);
+    }
+
+    expect(boxes.size, `the panel changed shape: ${[...boxes].join(' then ')}`).toBe(1);
+
+    // And it was a real test: the values underneath moved, and changed length.
+    expect(readings.size).toBeGreaterThan(5);
+    const widths = new Set([...readings].map((reading) => reading.length));
+    expect(widths.size, 'no reading ever changed length, so nothing was proved').toBeGreaterThan(1);
   });
 
   test('goes away with the controls and comes back with them', async ({ page }) => {
