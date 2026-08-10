@@ -12,12 +12,12 @@ Live site: <https://dragnim.github.io/aplart/>. What changed between versions is
 Every picture is drawn from numbers returned by actually running the APL shown in the editor. Nothing
 is simulated in JavaScript.
 
-![The APL Art gallery: a grid of artwork cards with category and difficulty filters](docs/screenshot-gallery.png)
+![The APL Art gallery, showing the pattern-first artwork collection](docs/screenshot-gallery.png)
 
-Open a piece and the code is right there beside it. Move a slider and the matching number in the APL
-changes with it.
+Open a piece and it draws straight away. Six ways to change it sit beside the picture, and every one of
+them writes into the APL rather than into a second model of the artwork.
 
-![The workspace: APL on the left, the artwork it produced on the right](docs/screenshot-workspace.png)
+![Basket Weave in the APL Art workspace, with its Create controls](docs/screenshot-workspace.png)
 
 ---
 
@@ -308,9 +308,19 @@ to work around CORS with browser flags or public CORS-anywhere services.
    value may wander from it. Nothing in it redefines a parameter: the variable, step, limits and
    binding to the source stay authoritative, and the block only relabels and narrows.
 
-   Two things are worth knowing before curating one. Look at the combinations rather than the
-   parameters — Modular Bloom's drift once moved a modulus onto a multiple of its multiplier, which is
-   arithmetically two shades and visually a blank artwork, and only a batch of live renders showed it.
+   Two other optional declarations are worth knowing about. `focusFit` says whether Focus mode should
+   fill the window with this artwork or fit the whole of it inside — `'cover'` for a repeating pattern,
+   `'contain'` for anything whose shape is part of it. And `tiling` declares that the artwork's pattern
+   has a period, which is what gives it the Tile mode: it states the variable holding the grid size, a
+   function computing the repeat length from the artwork's own numbers, and the control to move if the
+   size cannot. Declaring it is a claim about the mathematics, not about any particular settings — the
+   verdict is recomputed from the source every time, so a preset cannot promise seamlessness that the
+   numbers do not deliver. See [`src/presets/tileability.ts`](src/presets/tileability.ts).
+
+   Two things are worth knowing before curating an `instantPlay` block. Look at the combinations rather
+   than the parameters — Modular Bloom's drift once moved a modulus onto a multiple of its multiplier,
+   which is arithmetically two shades and visually a blank artwork, and only a batch of live renders
+   showed it.
    And the same rule the validator applies applies to judgement: `validate:presets` checks that every
    control names a numeric parameter, that Play ranges sit inside the parameter's and on its step grid,
    that recipes set every control to a value inside its Play range, and that drift is positive and not
@@ -437,7 +447,7 @@ does not publish from a private repository on GitHub Free.
 | ------------------ | --------------------------- | ------------------------------------------------------------------------------------ |
 | Unit and component | `npm test`                  | Parsing, transport planning, colour mapping, parameter binding, sharing, storage.    |
 | End-to-end         | `npm run test:e2e`          | Full journeys in Chromium and WebKit, plus the accessibility audit.                  |
-| Live service       | `npm run test:live`         | Every preset against the real TryAPL endpoint, at its defaults and its range limits. |
+| Live service       | `npm run test:live`         | Every preset against the real TryAPL endpoint, and Game of Life against its own APL. |
 | Deployed site      | `npm run verify:cors`       | That the published origin can actually reach the APL endpoint.                       |
 | Deployed site      | `npm run verify:deployment` | The things only production can show — see below.                                     |
 
@@ -452,32 +462,45 @@ the real `TryAplExecutionService` — wire format, error detection, banding and 
 under test. `MockAplExecutionService` exists for the component tests, where there is no network to
 intercept.
 
+The live suite also holds the Game of Life engine to the expression the page displays: it runs Scholes's
+formulation on the real service over a still life, an oscillator, a glider, a glider crossing the edges
+of the torus and a longer-running pattern, and compares every cell of every generation against the local
+implementation. Forty-nine matrices go in one request, so checking it costs one round trip.
+
 Only the first two run in required CI. The live suite calls a shared public service, and a pull request
 must not fail because that service is momentarily busy.
 
 ## What is in it
 
-Fifteen artworks, each a real `.apl` file that the editor shows and the service runs:
+Fifteen artworks, each a real `.apl` file that the editor shows and the service runs — thirteen in the
+gallery, and two reachable only by address. In the order the gallery shows them, patterns first.
 
-| Artwork           | Category | What it is                                                     |
-| ----------------- | -------- | -------------------------------------------------------------- |
-| Basket Weave      | pattern  | Straps crossing over and under, shaded to look raised.         |
-| Quilt Stars       | pattern  | A star block, ringed and repeated.                             |
-| Maze Tiles        | pattern  | Two diagonals per cell, chosen by a hash, joining into a maze. |
-| Glow Grid         | pattern  | Rows of lights, each row offset from the last.                 |
-| Modular Bloom     | geometry | A multiplication table folded by a modulus.                    |
-| Checker Shift     | pattern  | Row plus column, folded by a repeat.                           |
-| Wave Interference | geometry | Straight waves crossing and reinforcing.                       |
-| Truchet Grid      | pattern  | A hashed tile choice per cell.                                 |
-| Sierpiński Array  | fractal  | The triangle, from a bitwise test.                             |
-| Cellular Echo     | cellular | A one-dimensional automaton, one row per generation.           |
-| Mandelbrot Field  | fractal  | The set, counted in real arithmetic.                           |
-| Julia Set         | fractal  | The same iteration with `c` fixed and the grid seeding `z`.    |
-| Burning Ship      | fractal  | Mandelbrot with each component made positive before squaring.  |
-| Tricorn           | fractal  | Mandelbrot with one sign reversed — the conjugate.             |
-| Multibrot         | fractal  | Mandelbrot with the square replaced by an integer power.       |
+**Create** marks an artwork with controls written in its own words; **Tile** marks one whose pattern
+repeats, and which therefore gets the Tile mode described below.
 
-The four fractals after Mandelbrot exist to be compared with it: each differs by one legible thing, and
+| Artwork           | Category | Create | Tile | What it is                                                         |
+| ----------------- | -------- | ------ | ---- | ------------------------------------------------------------------ |
+| Basket Weave      | pattern  | ✓      | ✓    | Straps crossing over and under, shaded to look raised.             |
+| Quilt Stars       | pattern  | ✓      | ✓    | A star block, ringed and repeated.                                 |
+| Maze Tiles        | pattern  | ✓      | ✓    | Two diagonals per cell, chosen by a hash, joining into a maze.     |
+| Glow Grid         | geometry | ✓      | ✓    | Rows of lights, each row offset from the last.                     |
+| Modular Bloom     | geometry | ✓      | ✓    | A multiplication table folded by a modulus.                        |
+| Truchet Grid      | pattern  | ✓      | ✓    | A hashed tile choice per cell.                                     |
+| Checker Shift     | pattern  | ✓      | ✓    | Row plus column, folded by a repeat.                               |
+| Wave Interference | geometry | ✓      |      | Straight waves crossing and reinforcing.                           |
+| Sierpiński Array  | fractal  |        |      | The triangle, from a bitwise test.                                 |
+| Cellular Echo     | cellular |        |      | A one-dimensional automaton, one row per generation.               |
+| Mandelbrot Field  | fractal  |        |      | The set, counted in real arithmetic.                               |
+| Julia Set         | fractal  |        |      | The same iteration with `c` fixed and the grid seeding `z`.        |
+| Burning Ship      | fractal  |        |      | Mandelbrot with each component made positive before squaring.      |
+| Tricorn           | fractal  |        |      | Mandelbrot with one sign reversed — the conjugate. Unlisted.       |
+| Multibrot         | fractal  |        |      | Mandelbrot with the square replaced by an integer power. Unlisted. |
+
+Tricorn and Multibrot are not in the gallery. Both are one line of arithmetic away from Mandelbrot, and
+the gallery stopped being a survey of the family — but their addresses still resolve, so a link somebody
+was sent still opens the artwork it promised.
+
+The fractals after Mandelbrot exist to be compared with it: each differs by one legible thing, and
 Multibrot at `power←2` returns Mandelbrot's matrix cell for cell.
 
 **Starting without reading anything.** The gallery's **Start creating** action opens a pattern artwork on
@@ -499,9 +522,9 @@ exactly to where it started.
 
 **The interface follows the artwork.** Open a piece and APL Art takes its accent from that piece's
 palette. `APL` in the pixel logo stays neutral; `Art` becomes a colour derived from the palette, and so
-do the Run button, selected palettes, sliders, checked boxes, the current tab, a small block beside the
-artwork's title and one beside each of the three headings in the controls column. Everything else stays
-neutral — the interface is meant to belong to the artwork, not to be repainted by it.
+do the Run button, selected palettes, sliders, checked boxes, the current mode and a small block beside
+the artwork's title. Everything else stays neutral — the interface is meant to belong to the artwork,
+not to be repainted by it.
 
 No palette colour is used as an interface colour directly. Each is adjusted in OKLCH until it meets the
 contrast that role needs, keeping its hue, and separately for light and dark surfaces, because nothing
@@ -515,19 +538,60 @@ palette _definition_, never the pixels. The wordmark's artwork lives at
 `src/assets/branding/aplart_logo.svg`; how the colours are derived is in
 [`docs/interface-accent.md`](docs/interface-accent.md).
 
+**One workspace, six ways into it.** Every artwork opens the same way, whether it came from a card or a
+shared link: Create, Colour, Animate, Tile, Advanced and Code, beside the picture they change. Create
+appears only where an artwork has curated controls and Tile only where its pattern repeats; the rest are
+always there. The artwork draws on arrival rather than waiting for Run.
+
+**Tile: will this repeat?** For the seven artworks whose pattern has a period, Tile answers the question
+somebody wanting a background actually has. It reports one of three states — seamless, seamless once a
+number is nudged, or not seamless — and offers **Auto tile**, which makes the smallest change that fixes
+it as one undoable step. A three-by-three preview shows the joins, including the middle where four
+copies meet. The verdict is computed from the APL itself rather than promised by the preset, so editing
+the code by hand cannot make it lie. Repeat and Mirror repeat live here for those seven and stay in
+Advanced for everything else, where they are composition rather than construction.
+
+![Maze Tiles in Tile mode, showing a seamless verdict and the 3×3 repeat preview](docs/screenshot-tile.png)
+
+**Focus.** Focus mode gives the artwork the whole window, with the controls in a drawer over it. Each
+artwork declares whether it should fill that window or fit inside it, so a repeating pattern covers the
+screen while a square stays square.
+
+![Glow Grid filling the window in Focus mode](docs/screenshot-focus.png)
+
 **Working with a piece.** Drag on a Mandelbrot-family artwork to zoom into a region, or use the pan and
 zoom buttons; either way the visible centre and span assignments are rewritten, so the code still
 explains the picture. Inspect any cell by pointer or by naming its row and column, and read its value
-against the artwork's declared range. Open a Julia set from an inspected Mandelbrot coordinate. Repeat or
-mirror-repeat the artwork into a composition, with optional seam guides. Focus mode gives the artwork the
-window with the controls in a drawer.
+against the artwork's declared range. Open a Julia set from an inspected Mandelbrot coordinate.
 
-**Conway's Game of Life in APL.** A separate immersive page, reached from the site menu rather than from
-the gallery: it is an experience rather than another preset. The world fills the window and is already
-running when it opens, and it follows John Scholes's APL formulation, which the page shows and credits.
-The simulation itself runs locally in the browser — twelve to forty-eight generations a second is not a
-network round trip — so nothing about it is executed remotely. That the local implementation matches the
-expression is checked against real APL execution in `tests/live/life.test.ts` rather than asserted.
+**Conway's Game of Life in APL.** A separate immersive page at `#/life`, reached from the site menu and
+deliberately not from the gallery: it is an experience rather than another preset, so it has no card. The
+world fills the window and is already running when it opens, from a curated seed rather than a random
+field. Play, step, draw cells with the pointer, change the speed or the palette, or press `H` and watch
+with nothing else on screen.
+
+It follows John Scholes's APL formulation, which **View APL** shows and credits, alongside the two
+published forms of the expression and a note keeping Conway's rules separate from this world's wrapped
+edges — B3/S23 is Conway's; the torus is Scholes's choice, and Life does not require it.
+
+A small readout in the corner reports **Generation**, **Population**, **Last step** as a signed pair of
+births and deaths, and **Activity**, the share of every cell in the grid that changed on that step. The
+last two describe the generation just computed, so a world that was seeded, randomised, cleared or drawn
+on shows a dash rather than a zero — nothing has stepped, and "no cells changed" would be a different
+claim. The panel reserves room for its widest reading, so it holds one size while the numbers move.
+
+![Conway’s Game of Life in Sunset colours, with the live stats readout](docs/screenshot-life.png)
+
+Eight palettes, opening on Sunset, which colours cells by how long they have been alive. **Classic** is
+the traditional look — `#ffffff` cells on `#000000` — and the one palette that shows no age at all,
+because it has a single colour for the renderer to find. The cells still age underneath it.
+
+![The same Game of Life state in the Classic black-and-white palette](docs/screenshot-life-classic.png)
+
+The simulation runs locally in the browser: twelve to forty-eight generations a second is not a network
+round trip, and neither the readout nor the palettes touch the network either. That the local
+implementation matches the expression is checked against real APL execution in `tests/live/life.test.ts`
+— forty-nine matrices in one batched request — rather than asserted.
 
 **Keeping and sharing.** PNG export at several sizes, of one tile or of the whole composition, with an
 optional caption stating the real character count. Projects are saved in the browser. A share link
