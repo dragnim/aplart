@@ -1,10 +1,25 @@
 import source from './apl/maze-tiles.apl?raw';
 import { artworkSource } from './artworkSource';
 import { tilePeriodRule } from './createQuality';
+import { type TileCapability } from './tileability';
 import { type ArtworkPreset } from './schema';
 
 const CELL = { min: 6, max: 16, step: 2 };
 const DETAIL = { min: 48, max: 120 };
+
+/**
+ * How this artwork repeats.
+ *
+ * The tile index is taken modulo the tile count, so the maze wraps by construction — provided the grid is a whole number of cells.
+ */
+const TILING: TileCapability = {
+  kind: 'periodic',
+  sizeVariable: 'size',
+  period: (value) => value('cell') ?? 0,
+  sizeRange: DETAIL,
+  periodVariable: 'cell',
+  periodRange: CELL,
+};
 
 /**
  * Maze Tiles.
@@ -83,6 +98,7 @@ export const mazeTiles: ArtworkPreset = {
   renderMode: 'continuous',
   // A seamless surface: it fills a Focus window and runs off the edges.
   focusFit: 'cover',
+  tiling: TILING,
 
   /*
    * The arrangement is the control this artwork exists for. It is a hash seed,

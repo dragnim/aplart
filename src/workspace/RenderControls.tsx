@@ -15,14 +15,14 @@ import {
 } from '@/renderer/customPalette';
 import { palettes } from '@/renderer/palettes';
 import { paletteFor } from '@/renderer/renderOptions';
+import { DEFAULT_TILING } from '@/renderer/tiling';
+import { type EdgeCheck } from '@/renderer/edgeCheck';
 import { type AnimationSettings } from '@/renderer/paletteAnimation';
 import { AnimationControls } from './AnimationControls';
-import { TilingControls } from './TilingControls';
-import { type EdgeCheck } from '@/renderer/edgeCheck';
-import { DEFAULT_TILING } from '@/renderer/tiling';
 import { ColouringControls } from './ColouringControls';
 import { type EscapeSettings } from './escapeSettings';
 import { PaletteEditor } from './PaletteEditor';
+import { TilingControls } from './TilingControls';
 import { ROTATIONS, type RenderOptions } from '@/renderer/renderOptions';
 import styles from './RenderControls.module.css';
 
@@ -30,6 +30,16 @@ interface Props {
   readonly options: RenderOptions;
   readonly availablePaletteIds?: readonly string[] | undefined;
   readonly onChange: (options: Partial<RenderOptions>) => void;
+  /**
+   * Whether this panel owns the repeat controls.
+   *
+   * True only for an artwork with no Tile tab. The two must never both show
+   * them: one set of controls, in the place that can explain what they mean for
+   * this particular artwork.
+   */
+  readonly composition?: boolean;
+  /** How the base tile's opposite edges compare, or null before a first run. */
+  readonly edges?: EdgeCheck | null;
   /** Offered only where there is a workspace history for it to be a step in. */
   readonly onRandomPalette?: (() => void) | undefined;
   readonly animation: AnimationSettings;
@@ -38,8 +48,6 @@ interface Props {
   readonly reducedMotion: boolean;
   /** Present only for a preset that declares the range its values come from. */
   readonly escape?: EscapeSettings | undefined;
-  /** How the base tile's opposite edges compare, or null before a first run. */
-  readonly edges?: EdgeCheck | null;
   /**
    * Whether this artwork draws one square per matrix cell.
    *
@@ -66,12 +74,13 @@ export function RenderControls({
   availablePaletteIds,
   onChange,
   onRandomPalette,
+  composition = false,
+  edges = null,
   animation,
   onAnimationChange,
   onAnimationReset,
   reducedMotion,
   escape,
-  edges = null,
   cells = true,
   section = 'both',
 }: Props) {
@@ -270,14 +279,21 @@ export function RenderControls({
       )}
 
       {/*
-        After orientation, because the base tile is what gets repeated: rotating
-        and mirroring shape the copy, and the repeat is built from the result.
+        Repeating, for the artworks that have nowhere better to put it.
+
+        An artwork that can genuinely tile has a Tile tab, and this moves there
+        whole: it is not duplicated, because a visitor who found two copies would
+        reasonably expect them to mean different things. An artwork that cannot
+        tile has no such tab — a panel whose only message is "not seamless" is
+        not worth a press — but repeating one is still a useful composition, so
+        the controls stay here for those.
       */}
-      {form && (
+      {form && composition && (
         <TilingControls
           tiling={options.tiling ?? DEFAULT_TILING}
           edges={edges}
           onChange={(tiling) => onChange({ tiling })}
+          seamless={false}
         />
       )}
     </div>

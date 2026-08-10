@@ -12,6 +12,7 @@ import { stubTryApl } from './stubTryApl';
 import { enterFocus, choice, advanced, pressRun } from './workspaceModes';
 
 const WIDE = { width: 1440, height: 950 };
+const PHONE = { width: 390, height: 844 };
 
 function runStatus(page: Page) {
   return page.locator('[role="status"][data-status]');
@@ -415,5 +416,160 @@ test.describe('the value reading', () => {
 
     await clear.click();
     await expect(clear).toBeDisabled();
+  });
+});
+
+test.describe('the Tile preview', () => {
+  test.use({ viewport: WIDE });
+
+  /** What the preview canvas actually holds: its backing store and its variety. */
+  async function previewState(page: Page) {
+    return page.evaluate(() => {
+      const canvas = [...document.querySelectorAll('canvas')].at(-1);
+      if (canvas === undefined) return { backing: 0, colours: 0 };
+
+      const context = canvas.getContext('2d');
+      if (context === null) return { backing: 0, colours: 0 };
+
+      const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      const seen = new Set<string>();
+      // Sampled rather than exhaustive: the question is whether there is an
+      // artwork here, not which artwork, and a prime stride avoids landing on
+      // one repeating column.
+      for (let index = 0; index < data.length; index += 4 * 13) {
+        seen.add(`${String(data[index])},${String(data[index + 1])},${String(data[index + 2])}`);
+      }
+      return { backing: canvas.width, colours: seen.size };
+    });
+  }
+
+  test('holds the painted artwork, not an empty canvas', async ({ page }) => {
+    /*
+     * The regression this exists for, and it was not the failure it looked like.
+     *
+     * The preview lives in a tab panel that is `hidden` until Tile is opened, so
+     * its first effect measured a box of zero by zero and drew into a canvas of
+     * one pixel by one, stretched across 286 CSS pixels — a flat block of a
+     * single averaged colour that read exactly like "copied before the artwork
+     * painted". It had copied the artwork perfectly; there was simply nowhere to
+     * put it.
+     *
+     * So this asserts both halves: a backing store of a real size, and more than
+     * a handful of colours in it.
+     */
+    await stubTryApl(page);
+    await page.goto('./#/art/maze-tiles');
+    await pressRun(page);
+    await expect(page.getByRole('img', { name: /grid/ })).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Tile' }).click();
+    await expect(page.getByText('Seamless')).toBeVisible();
+
+    await expect
+      .poll(async () => (await previewState(page)).backing, { message: 'the preview never gained a size' })
+      .toBeGreaterThan(64);
+
+    const drawn = await previewState(page);
+    expect(drawn.colours, 'the preview is a flat block rather than an artwork').toBeGreaterThan(8);
+  });
+
+  test('follows the artwork when it is painted again', async ({ page }) => {
+    await stubTryApl(page);
+    await page.goto('./#/art/maze-tiles');
+    await pressRun(page);
+    await expect(page.getByRole('img', { name: /grid/ })).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Tile' }).click();
+    await expect.poll(async () => (await previewState(page)).backing).toBeGreaterThan(64);
+    const before = await page.evaluate(() =>
+      ([...document.querySelectorAll('canvas')].at(-1) as HTMLCanvasElement).toDataURL().slice(-256),
+    );
+
+    // A palette is not a recalculation, so nothing runs — but the artwork is
+    // repainted, and a preview that ignored that would be showing yesterday.
+    await (await choice(page, 'Neon')).click();
+    await page.getByRole('tab', { name: 'Tile' }).click();
+
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() =>
+            ([...document.querySelectorAll('canvas')].at(-1) as HTMLCanvasElement).toDataURL().slice(-256),
+          ),
+        { message: 'the preview kept the old colours' },
+      )
+      .not.toBe(before);
+  });
+});
+
+/**
+ * The preview, on a screen where the artwork it shows is not mounted at all.
+ *
+ * The narrow layout gives the window to one thing at a time, so while the
+ * controls are up the artwork canvas is not hidden — it does not exist. A
+ * preview built by photographing that canvas therefore had nothing to
+ * photograph, and went on showing whatever had been on screen before: measured
+ * as a stale weave under a verdict describing a different artwork, which is the
+ * one thing this panel must never do.
+ *
+ * These two run only in a real browser because the fault was in pixels, and only
+ * at a narrow viewport because at any other width the canvas is right there.
+ */
+test.describe('the Tile preview where the artwork is not on screen', () => {
+  test.use({ viewport: PHONE });
+
+  /** The preview specifically: it is labelled by its heading, the artwork by itself. */
+  function preview(page: Page) {
+    return page.locator('canvas[aria-labelledby]');
+  }
+
+  function previewImage(page: Page) {
+    return preview(page).evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL());
+  }
+
+  async function openControls(page: Page, id: string) {
+    await stubTryApl(page);
+    await page.goto(`./#/art/${id}`);
+    await pressRun(page);
+    await expect(runStatus(page)).not.toHaveText(/Running/, { timeout: 30_000 });
+
+    await page.getByRole('tab', { name: 'Controls' }).click();
+    // Not merely hidden. If this ever becomes one, these tests stop testing
+    // anything and should be deleted rather than quietly kept.
+    await expect(page.getByRole('img', { name: /grid/ })).toHaveCount(0);
+
+    await page.getByRole('heading', { name: 'Tile' }).scrollIntoViewIfNeeded();
+    await expect
+      .poll(async () => preview(page).evaluate((canvas: HTMLCanvasElement) => canvas.width))
+      .toBeGreaterThan(64);
+  }
+
+  test('follows a palette change made while the artwork is unmounted', async ({ page }) => {
+    await openControls(page, 'basket-weave');
+    const before = await previewImage(page);
+
+    await page.getByLabel('Invert palette').check();
+
+    await expect
+      .poll(() => previewImage(page), { message: 'the preview kept the old palette' })
+      .not.toBe(before);
+  });
+
+  test('shows the corrected artwork after Auto tile, without visiting Artwork', async ({ page }) => {
+    await openControls(page, 'modular-bloom');
+    await expect(page.getByText('Can be made seamless')).toBeVisible();
+    const before = await previewImage(page);
+
+    // No waiting on the run status: it lives with the artwork, and the artwork
+    // is not on this screen. Both assertions below poll, which is the honest way
+    // to wait for a correction that has to go back to the interpreter first.
+    await page.getByRole('button', { name: 'Auto tile' }).click();
+
+    // The verdict is read from the code and was always going to change. The
+    // point is that the picture beneath it changed with it.
+    await expect(page.getByText('Seamless', { exact: true })).toBeVisible();
+    await expect
+      .poll(() => previewImage(page), { message: 'the verdict was corrected and the preview was not' })
+      .not.toBe(before);
   });
 });

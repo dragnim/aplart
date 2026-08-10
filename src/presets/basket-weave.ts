@@ -1,10 +1,25 @@
 import source from './apl/basket-weave.apl?raw';
 import { artworkSource } from './artworkSource';
 import { tilePeriodRule } from './createQuality';
+import { type TileCapability } from './tileability';
 import { type ArtworkPreset } from './schema';
 
 const STRAP = { min: 6, max: 24, step: 2 };
 const DETAIL = { min: 48, max: 120 };
+
+/**
+ * How this artwork repeats.
+ *
+ * A strap and its neighbour make one motif, so the weave repeats every two strap widths.
+ */
+const TILING: TileCapability = {
+  kind: 'periodic',
+  sizeVariable: 'size',
+  period: (value) => 2 * (value('width') ?? 0),
+  sizeRange: DETAIL,
+  periodVariable: 'width',
+  periodRange: STRAP,
+};
 
 /**
  * Basket Weave.
@@ -70,6 +85,7 @@ export const basketWeave: ArtworkPreset = {
   renderMode: 'continuous',
   // A seamless surface: it fills a Focus window and runs off the edges.
   focusFit: 'cover',
+  tiling: TILING,
 
   /*
    * Three controls, and the third is the one that surprises people: the same

@@ -22,6 +22,7 @@ import animateIcon from '@/assets/icons/icon_animate_01.svg?raw';
 import codeIcon from '@/assets/icons/icon_code_01.svg?raw';
 import colourIcon from '@/assets/icons/icon_color_01.svg?raw';
 import createIcon from '@/assets/icons/icon_create_01.svg?raw';
+import tileIcon from '@/assets/icons/icon_tile_01.svg?raw';
 import styles from './TabIcon.module.css';
 
 import { type EditorTab } from './editorTabs';
@@ -30,6 +31,7 @@ const ARTWORK: Record<EditorTab, string> = {
   create: createIcon,
   colour: colourIcon,
   animate: animateIcon,
+  tile: tileIcon,
   advanced: advancedIcon,
   code: codeIcon,
 };

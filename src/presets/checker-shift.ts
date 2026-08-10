@@ -1,10 +1,40 @@
 import source from './apl/checker-shift.apl?raw';
 import { artworkSource } from './artworkSource';
 import { nearestAccepted, type CreateQualityRule } from './createQuality';
+import { type TileCapability } from './tileability';
 import { type ArtworkPreset } from './schema';
 
 const BANDS = { min: 2, max: 12 };
 const SHEAR = { min: 1, max: 8 };
+
+/**
+ * How this artwork repeats.
+ *
+ * A cell holds `(row + shear × column) mod bands`. Going down, the value steps
+ * by one and returns after `bands` rows. Going across it steps by the shear and
+ * returns after `bands ÷ gcd(shear, bands)` columns, which divides `bands` — so
+ * the band count is the period on both axes and the grid only has to be a whole
+ * number of them.
+ *
+ * The extra condition is the same one the Create rule protects: a shear that is
+ * a multiple of the band count collapses the weave into plain stripes. Perfectly
+ * seamless, and not the artwork anybody was looking at, so a correction must not
+ * hand it back.
+ */
+const TILING: TileCapability = {
+  kind: 'periodic',
+  sizeVariable: 'size',
+  period: (value) => value('repeat'),
+  sizeRange: { min: 16, max: 72 },
+  periodVariable: 'repeat',
+  periodRange: { ...BANDS, step: 1 },
+  alsoRequires: (value) => {
+    const repeat = value('repeat');
+    const offset = value('offset');
+    if (repeat === undefined || offset === undefined || repeat === 0) return false;
+    return offset % repeat !== 0;
+  },
+};
 
 /**
  * Keep the shear actually shearing.
@@ -99,6 +129,7 @@ export const checkerShift: ArtworkPreset = {
   renderMode: 'indexed',
   // A seamless surface: it fills a Focus window and runs off the edges.
   focusFit: 'cover',
+  tiling: TILING,
 
   /*
    * The gentlest artwork in the gallery, and the easiest to describe without

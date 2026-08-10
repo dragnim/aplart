@@ -7,14 +7,22 @@
  * its own tests; these are about what repeating must not disturb.
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockAplExecutionService } from '@/execution/MockAplExecutionService';
 import { fromNested } from '@/matrix/matrixTypes';
 import { modularBloom } from '@/presets/modular-bloom';
 import { WorkspacePage } from '@/workspace/WorkspacePage';
-import { advanced, animate, codeEditor, paletteChoice, pressRunWith } from '../helpers/workspaceModes';
+import {
+  advanced,
+  animate,
+  codeEditor,
+  paletteChoice,
+  pressRunWith,
+  showMode,
+  tile,
+} from '../helpers/workspaceModes';
 import type * as CanvasRenderer from '@/renderer/CanvasRenderer';
 
 type CanvasRendererModule = typeof CanvasRenderer;
@@ -99,8 +107,8 @@ async function openAndRun(sharedState: string | null = null) {
   return { user, service };
 }
 
-const repeatButton = () => advanced().getByRole('radio', { name: 'Repeat' });
-const singleButton = () => advanced().getByRole('radio', { name: 'Single' });
+const repeatButton = () => tile().getByRole('radio', { name: 'Repeat' });
+const singleButton = () => tile().getByRole('radio', { name: 'Single' });
 
 function announced(): string {
   const spoken = screen
@@ -114,14 +122,14 @@ describe('turning the repeat on', () => {
     await openAndRun();
     expect(singleButton()).toHaveAttribute('aria-checked', 'true');
     // No count control until there is something to count.
-    expect(advanced().queryByRole('radio', { name: '3 by 3' })).not.toBeInTheDocument();
+    expect(tile().queryByRole('radio', { name: '3 by 3' })).not.toBeInTheDocument();
   });
 
   it('offers the counts once repeating, and defaults to three by three', async () => {
     const { user } = await openAndRun();
     await user.click(repeatButton());
 
-    expect(advanced().getByRole('radio', { name: '3 by 3' })).toHaveAttribute('aria-checked', 'true');
+    expect(tile().getByRole('radio', { name: '3 by 3' })).toHaveAttribute('aria-checked', 'true');
     expect(lastTiling()).toMatchObject({ mode: 'repeat', columns: 3, rows: 3 });
   });
 
@@ -130,7 +138,7 @@ describe('turning the repeat on', () => {
     await user.click(repeatButton());
 
     for (const count of [2, 5, 3]) {
-      await user.click(advanced().getByRole('radio', { name: `${String(count)} by ${String(count)}` }));
+      await user.click(tile().getByRole('radio', { name: `${String(count)} by ${String(count)}` }));
       expect(lastTiling()).toMatchObject({ columns: count, rows: count });
     }
   });
@@ -153,7 +161,7 @@ describe('what repeating must not disturb', () => {
     const before = service.executionCount;
 
     await user.click(repeatButton());
-    await user.click(advanced().getByRole('radio', { name: '5 by 5' }));
+    await user.click(tile().getByRole('radio', { name: '5 by 5' }));
     await user.click(singleButton());
 
     // Drawing the same result again is not a reason to compute it again.
@@ -204,7 +212,7 @@ describe('pressing a repeated copy', () => {
   it('reads the same source cell from every copy', async () => {
     const { user } = await openAndRun();
     await user.click(repeatButton());
-    await user.click(advanced().getByRole('radio', { name: '3 by 3' }));
+    await user.click(tile().getByRole('radio', { name: '3 by 3' }));
 
     const canvas = screen.getByRole('img', { name: /grid/ });
     const readings: string[] = [];
@@ -245,7 +253,7 @@ describe('keeping the setting', () => {
   it('saves it and restores it', async () => {
     const { user } = await openAndRun();
     await user.click(repeatButton());
-    await user.click(advanced().getByRole('radio', { name: '5 by 5' }));
+    await user.click(tile().getByRole('radio', { name: '5 by 5' }));
 
     const { readSavedProjectImmediate } = await import('@/workspace/useLocalProject');
     await waitFor(
@@ -273,7 +281,7 @@ describe('keeping the setting', () => {
     await screen.findByText(/shared with you/);
 
     expect(repeatButton()).toHaveAttribute('aria-checked', 'true');
-    expect(advanced().getByRole('radio', { name: '2 by 2' })).toHaveAttribute('aria-checked', 'true');
+    expect(tile().getByRole('radio', { name: '2 by 2' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('opens a link written before repeating existed', async () => {
@@ -339,7 +347,7 @@ describe('tile scale', () => {
     expect(screen.queryByRole('radio', { name: '100%' })).not.toBeInTheDocument();
 
     await user.click(repeatButton());
-    expect(advanced().getByRole('radio', { name: '100%' })).toHaveAttribute('aria-checked', 'true');
+    expect(tile().getByRole('radio', { name: '100%' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('changes the copies without touching the artwork', async () => {
@@ -362,7 +370,7 @@ describe('tile scale', () => {
     fireEvent.change(advanced().getByLabelText(/^Column/), { target: { value: '7' } });
     await user.click(advanced().getByRole('button', { name: /^Inspect$/ }));
 
-    await user.click(screen.getByRole('radio', { name: '200%' }));
+    await user.click(tile().getByRole('radio', { name: '200%' }));
 
     // The scale is how large a copy is drawn, not which cell was chosen.
     expect(announced()).toContain('Row 4, column 7');
@@ -398,7 +406,7 @@ describe('tile scale', () => {
     await screen.findByText(/shared with you/);
 
     expect(lastTiling()?.scale).toBe(1);
-    expect(advanced().getByRole('radio', { name: '100%' })).toHaveAttribute('aria-checked', 'true');
+    expect(tile().getByRole('radio', { name: '100%' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('clamps an absurd scale from a link', async () => {
@@ -440,7 +448,7 @@ describe('palette animation across the copies', () => {
   });
 });
 
-const mirrorButton = () => advanced().getByRole('radio', { name: 'Mirror repeat' });
+const mirrorButton = () => tile().getByRole('radio', { name: 'Mirror repeat' });
 
 describe('mirror repeat', () => {
   it('is offered beside the other modes and describes itself honestly', async () => {
@@ -472,7 +480,7 @@ describe('mirror repeat', () => {
     const code = codeEditor().textContent;
 
     await user.click(mirrorButton());
-    await user.click(advanced().getByRole('radio', { name: '5 by 5' }));
+    await user.click(tile().getByRole('radio', { name: '5 by 5' }));
     await user.click(screen.getByRole('radio', { name: '50%' }));
 
     expect(service.executionCount).toBe(before);
@@ -497,7 +505,7 @@ describe('mirror repeat', () => {
   it('reads the same source cell from every parity', async () => {
     const { user } = await openAndRun();
     await user.click(mirrorButton());
-    await user.click(advanced().getByRole('radio', { name: '2 by 2' }));
+    await user.click(tile().getByRole('radio', { name: '2 by 2' }));
 
     const canvas = screen.getByRole('img', { name: /grid/ });
     const readings: string[] = [];
@@ -529,7 +537,7 @@ describe('mirror repeat', () => {
     // no-op: the same offset into a reflected copy is a different cell.
     const { user } = await openAndRun();
     await user.click(mirrorButton());
-    await user.click(advanced().getByRole('radio', { name: '2 by 2' }));
+    await user.click(tile().getByRole('radio', { name: '2 by 2' }));
 
     const canvas = screen.getByRole('img', { name: /grid/ });
     const read = (x: number, y: number) => {
@@ -546,7 +554,7 @@ describe('mirror repeat', () => {
   it('saves and restores locally', async () => {
     const { user } = await openAndRun();
     await user.click(mirrorButton());
-    await user.click(advanced().getByRole('radio', { name: '5 by 5' }));
+    await user.click(tile().getByRole('radio', { name: '5 by 5' }));
 
     const { readSavedProjectImmediate } = await import('@/workspace/useLocalProject');
     await waitFor(
@@ -593,24 +601,32 @@ describe('mirror repeat', () => {
   });
 });
 
-const guidesToggle = () => screen.getByLabelText(/Show seam guides/);
+/*
+ * The seam-guide toggle, wherever this artwork keeps it.
+ *
+ * Tile and Advanced word it differently on purpose — "Mark where the copies
+ * meet" reads better beside a verdict about joins, while Advanced keeps the
+ * older phrasing among the exact numbers — so the helper matches either rather
+ * than each test having to know which panel it is in.
+ */
+const guidesToggle = () => screen.getByLabelText(/Mark where the copies meet|Show seam guides/);
 const edgeText = () => screen.getByText(/Left and right edges/).parentElement?.textContent ?? '';
 
 describe('seam guides', () => {
   it('are offered only where there is a join to mark', async () => {
     const { user } = await openAndRun();
-    expect(screen.queryByLabelText(/Show seam guides/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Mark where the copies meet/)).not.toBeInTheDocument();
 
     await user.click(repeatButton());
     expect(guidesToggle()).not.toBeChecked();
 
     await user.click(singleButton());
-    expect(screen.queryByLabelText(/Show seam guides/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Mark where the copies meet/)).not.toBeInTheDocument();
   });
 
   it('are available in mirror repeat too', async () => {
     const { user } = await openAndRun();
-    await user.click(advanced().getByRole('radio', { name: 'Mirror repeat' }));
+    await user.click(tile().getByRole('radio', { name: 'Mirror repeat' }));
     expect(guidesToggle()).toBeInTheDocument();
   });
 
@@ -689,15 +705,43 @@ describe('seam guides', () => {
   });
 });
 
-describe('the edge check', () => {
+/**
+ * An artwork with no Tile tab, which therefore keeps its composition controls —
+ * and the edge check that sits with them — in Advanced.
+ */
+async function openWithoutTiling() {
+  const user = userEvent.setup();
+  const { sierpinskiArray } = await import('@/presets/sierpinski-array');
+  const service = new MockAplExecutionService();
+  service.register('default', labelled(8, 8));
+  render(<WorkspacePage presetId={sierpinskiArray.id} sharedState={null} service={service} />);
+
+  await pressRunWith(user);
+  await waitFor(() => expect(screen.getByRole('img', { name: /grid/ })).toBeInTheDocument());
+  return { user, service };
+}
+
+/**
+ * The edge check, on an artwork that it actually describes.
+ *
+ * It moved off Modular Bloom because Modular Bloom no longer shows it. The
+ * comparison asks whether the last pixel column equals the first, which is one
+ * way to tile and not the way a periodic pattern does it — a period of
+ * twenty-four in a grid of ninety-six joins column 95 to column 0 of the next
+ * copy, adjacent phases rather than equal ones, so it reported a mismatch for
+ * artworks that tile perfectly. Tile therefore does not show it at all, and it
+ * stays where it is still meaningful: an artwork whose repetition is
+ * composition rather than construction.
+ */
+describe('the edge check, where it still says something', () => {
   it('reports both axes and never claims more than it knows', async () => {
-    await openAndRun();
+    await openWithoutTiling();
 
     expect(screen.getByText('Edge check')).toBeInTheDocument();
     expect(edgeText()).toMatch(/Left and right edges/);
     expect(edgeText()).toMatch(/Top and bottom edges/);
     expect(edgeText()).toContain('not proof of mathematical seamlessness');
-    // Modular Bloom is a cell artwork, so the values were compared.
+    // Sierpiński Array is a cell artwork, so the values were compared.
     expect(edgeText()).toContain('values along the edges');
     expect(edgeText()).not.toMatch(/seamless pattern|guaranteed|verified/i);
   });
@@ -709,21 +753,21 @@ describe('the edge check', () => {
      * the composed view it would report a match for an artwork whose edges do
      * not match at all.
      */
-    const { user } = await openAndRun();
+    const { user } = await openWithoutTiling();
     const before = edgeText();
 
     await user.click(advanced().getByRole('radio', { name: 'Mirror repeat' }));
     expect(edgeText()).toBe(before);
 
-    await user.click(repeatButton());
+    await user.click(advanced().getByRole('radio', { name: 'Repeat' }));
     await user.click(advanced().getByRole('radio', { name: '5 by 5' }));
-    await user.click(screen.getByRole('radio', { name: '200%' }));
+    await user.click(advanced().getByRole('radio', { name: '200%' }));
     expect(edgeText()).toBe(before);
   });
 
   it('is unchanged by the repeat count, the scale or the guides', async () => {
-    const { user } = await openAndRun();
-    await user.click(repeatButton());
+    const { user } = await openWithoutTiling();
+    await user.click(advanced().getByRole('radio', { name: 'Repeat' }));
     const readings = new Set<string>();
 
     for (const count of ['2 by 2', '3 by 3', '5 by 5']) {
@@ -742,7 +786,7 @@ describe('the edge check', () => {
   it('changes when the artwork’s own appearance changes the tile', async () => {
     // Rotation is part of the base tile, so it can genuinely change which edges
     // are being compared — the counterpart to the test above.
-    const { user } = await openAndRun();
+    const { user } = await openWithoutTiling();
     const upright = edgeText();
 
     await user.click(advanced().getByRole('radio', { name: '90°' }));
@@ -759,7 +803,7 @@ describe('the edge check', () => {
      * colours at another, so an answer read off the rendering would change while
      * nothing about the artwork had.
      */
-    const { user } = await openAndRun();
+    const { user } = await openWithoutTiling();
     const before = edgeText();
 
     await user.click(animate().getByRole('button', { name: 'Animate palette' }));
@@ -779,5 +823,105 @@ describe('the edge check', () => {
 
     // Only a completed result is ever analysed.
     expect(screen.queryByText('Edge check')).not.toBeInTheDocument();
+  });
+});
+
+/** A service for the artworks this file does not otherwise open. */
+function anotherService() {
+  const service = new MockAplExecutionService();
+  service.register('default', labelled(8, 8));
+  return service;
+}
+
+describe('who owns repeating', () => {
+  /*
+   * One set of controls, in one place, decided by whether the artwork can
+   * actually tile. A visitor who found two copies would reasonably expect them
+   * to mean different things, and an artwork whose only Tile message could be
+   * "not seamless" is not worth a tab — so the two cases are asserted together,
+   * because the rule is the pair rather than either half.
+   */
+  it('gives a tile-capable artwork its controls in Tile, and none in Advanced', async () => {
+    await openAndRun();
+
+    expect(tile().getByRole('radio', { name: 'Repeat' })).toBeInTheDocument();
+    expect(tile().getByRole('radio', { name: 'Mirror repeat' })).toBeInTheDocument();
+
+    // And Advanced keeps the exact numbers, with nothing about composition.
+    expect(advanced().queryByRole('radio', { name: 'Repeat' })).not.toBeInTheDocument();
+    expect(advanced().queryByRole('radio', { name: 'Mirror repeat' })).not.toBeInTheDocument();
+    expect(advanced().queryByRole('radio', { name: 'Single' })).not.toBeInTheDocument();
+  });
+
+  it('leaves an artwork that cannot tile with its composition controls in Advanced', async () => {
+    const { mandelbrotField } = await import('@/presets/mandelbrot-field');
+    render(<WorkspacePage presetId={mandelbrotField.id} sharedState={null} service={anotherService()} />);
+
+    // No tab: a panel whose only answer is "not seamless" invites a press and
+    // then disappoints it.
+    expect(screen.queryByRole('tab', { name: 'Tile' })).not.toBeInTheDocument();
+
+    // But repeating is still a useful composition, so it stays where it was.
+    expect(advanced().getByRole('radio', { name: 'Single' })).toBeInTheDocument();
+    expect(advanced().getByRole('radio', { name: 'Repeat' })).toBeInTheDocument();
+    expect(advanced().getByRole('radio', { name: 'Mirror repeat' })).toBeInTheDocument();
+
+    // Said plainly, because the thing it does not do is the thing somebody
+    // reaching for a repeat might hope for.
+    expect(advanced().getByText(/does not make this artwork seamless/)).toBeInTheDocument();
+  });
+
+  it('offers no Tile tab to an artwork with no reachable seamless state', async () => {
+    /*
+     * Wave Interference. Its waves travel at angles of πk ÷ symmetry, so the
+     * wave numbers include irrational multiples and no whole number of ripples
+     * ever brings one back to where it started.
+     */
+    const { waveInterference } = await import('@/presets/wave-interference');
+    render(<WorkspacePage presetId={waveInterference.id} sharedState={null} service={anotherService()} />);
+
+    expect(screen.queryByRole('tab', { name: 'Tile' })).not.toBeInTheDocument();
+    expect(advanced().getByRole('radio', { name: 'Repeat' })).toBeInTheDocument();
+  });
+});
+
+describe('what Tile must never contradict itself about', () => {
+  it('does not tell a Seamless artwork that its edges do not match', async () => {
+    /*
+     * The regression this exists to prevent, because it happened.
+     *
+     * The rendered-edge comparison asks whether the last pixel column equals
+     * the first. A periodic pattern does not tile that way: with a period of
+     * twenty-four in a grid of ninety-six, column 95 meets column 0 of the next
+     * copy — adjacent phases of the cycle, not equal ones — so the comparison
+     * reported "edges do not match" directly beneath a green Seamless, on every
+     * one of the seven. A verdict and its own evidence disagreeing in the same
+     * panel is worse than showing no evidence at all.
+     *
+     * Tile's corroboration is the 3×3 repeat preview, which shows the real
+     * joins, and that stays.
+     */
+    /*
+     * Basket Weave, because it opens seamless. Modular Bloom does not: its
+     * default grid of 64 is not a whole number of its period of 17, which makes
+     * it the natural "Can be made seamless" case rather than this one.
+     */
+    const { basketWeave } = await import('@/presets/basket-weave');
+    const user = userEvent.setup();
+    render(<WorkspacePage presetId={basketWeave.id} sharedState={null} service={anotherService()} />);
+    await pressRunWith(user);
+    await waitFor(() => expect(screen.getByRole('img', { name: /grid/ })).toBeInTheDocument());
+
+    const panel = showMode('Tile');
+
+    expect(within(panel).getByText('Seamless')).toBeInTheDocument();
+
+    expect(within(panel).queryByText('Edge check')).not.toBeInTheDocument();
+    expect(within(panel).queryByText(/edges do not match/i)).not.toBeInTheDocument();
+    expect(within(panel).queryByText(/Left and right edges/)).not.toBeInTheDocument();
+    expect(within(panel).queryByText(/Top and bottom edges/)).not.toBeInTheDocument();
+
+    // And the preview that replaces it is there to look at.
+    expect(within(panel).getByRole('img', { name: /How it repeats/ })).toBeInTheDocument();
   });
 });

@@ -59,6 +59,9 @@ import { AnimationControls } from './AnimationControls';
 import { ArtworkNavigator } from './ArtworkNavigator';
 import { PlayControls } from './PlayControls';
 import { SessionActions } from './SessionActions';
+import { TileControls } from './TileControls';
+import { tileSummary, tileVerdict } from '@/presets/tileability';
+import { createPaintSignal } from './paintSignal';
 import { SessionPanel } from './SessionPanel';
 import { defaultTabFor, tabsFor, type EditorTab } from './editorTabs';
 import { revealTargetFor, type RevealTarget } from './peek';
@@ -357,7 +360,10 @@ function Workspace({
    * where its real parameters are.
    */
   const createConfig = preset.instantPlay;
-  const tabs = useMemo(() => tabsFor(createConfig !== undefined), [createConfig]);
+  const tabs = useMemo(
+    () => tabsFor(createConfig !== undefined, preset.tiling !== undefined),
+    [createConfig, preset.tiling],
+  );
 
   /*
    * Which editing mode you are in. Presentation and nothing else: no run, no
@@ -1349,12 +1355,15 @@ function Workspace({
         availablePaletteIds={preset.availablePaletteIds}
         onChange={handleRenderChange}
         onRandomPalette={handleRandomPalette}
+        // An artwork with a Tile tab owns its repeat controls there; one without
+        // keeps them here, where they are still a useful composition.
+        composition={preset.tiling === undefined}
+        edges={edges}
         animation={animation}
         onAnimationChange={setAnimation}
         onAnimationReset={resetAnimation}
         reducedMotion={reducedMotion}
         escape={shownEscape}
-        edges={edges}
         cells={preset.renderMode !== 'tiles'}
       />
     </section>
@@ -1438,6 +1447,76 @@ function Workspace({
     </div>
   );
 
+  /*
+   * Tile: whether this artwork repeats, and how copies of it are shown.
+   *
+   * The verdict is computed from the source every render, so it follows what
+   * Advanced does rather than what the preset promises: an artwork built to
+   * repeat still reports a seam the moment its grid stops being a whole number
+   * of periods.
+   */
+  const verdict = useMemo(() => tileVerdict(preset, state.code), [preset, state.code]);
+
+  /*
+   * Where the renderer says it has finished painting.
+   *
+   * Created once and never replaced, so subscribing to it does not depend on a
+   * render. See `paintSignal.ts` for why this is not React state.
+   */
+  const [painted] = useState(createPaintSignal);
+
+  /**
+   * Applies the correction the verdict describes: one commit, one redraw.
+   *
+   * Written through the same door every other value change uses, so it lands in
+   * the history as a single step and one Undo restores the source, the seed and
+   * the appearance together.
+   */
+  const handleAutoTile = useCallback(() => {
+    const correction = verdict?.correction;
+    if (correction === undefined || correction === null) return;
+
+    const next = setParameterValues(state.code, correction);
+    if (next === state.code) return;
+
+    commitCode(next, { label: verdict?.correctionLabel ?? 'Auto tile' });
+    drawPlay(next);
+  }, [verdict, state.code, commitCode, drawPlay]);
+
+  const tilePanel =
+    preset.tiling === undefined || verdict === null ? null : (
+      <section aria-labelledby="tile-heading">
+        <h2 className={styles.sectionHeading} id="tile-heading">
+          Tile
+        </h2>
+        <p className={styles.sectionNote}>
+          Whether this artwork can be used as a repeating background, and how to look at it repeated.
+        </p>
+        <TileControls
+          verdict={verdict}
+          summary={tileSummary(preset.tiling, verdict.state)}
+          tiling={state.renderOptions.tiling ?? DEFAULT_TILING}
+          onChange={(tiling) => handleRenderChange({ tiling })}
+          onCorrect={handleAutoTile}
+          /*
+           * The same artwork the canvas is given, so the preview renders what
+           * the workspace renders rather than a photograph of it. It matters on
+           * a narrow screen, where the canvas is unmounted for as long as these
+           * controls are showing and there is no photograph to take.
+           */
+          source={{
+            matrix: shown?.matrix ?? null,
+            stats: shown?.stats ?? null,
+            mode: preset.renderMode,
+            options: state.renderOptions,
+            escape: shownEscape,
+            animation: { settings: animation, phase: animationPhase },
+          }}
+          painted={painted}
+        />
+      </section>
+    );
+
   const advancedPanel = (
     <div className={styles.controlsPanel}>
       {codeControlsSection}
@@ -1483,6 +1562,7 @@ function Workspace({
          * mean and why this is data rather than a rule about categories.
          */
         fit={focus ? (preset.focusFit ?? 'contain') : 'contain'}
+        onPainted={painted.announce}
         busy={state.status === 'running'}
         canvasRef={canvasRef}
         exploration={
@@ -1602,6 +1682,7 @@ function Workspace({
         create: createPanel,
         colour: colourPanel,
         animate: animatePanel,
+        tile: tilePanel,
         advanced: advancedPanel,
         code: codePanel,
       }}
@@ -1815,6 +1896,13 @@ function Workspace({
                 <>
                   {colourPanel}
                   {animatePanel}
+                  {/*
+                    In the same order as the wide layout's tabs, and present for
+                    the same reason: on a narrow screen every mode is a section
+                    of one column rather than a tab of its own, so a mode left
+                    out here is a mode a phone simply does not have.
+                  */}
+                  {tilePanel}
                   {advancedPanel}
                   {sessionActions}
                 </>

@@ -1,4 +1,5 @@
 import source from './apl/truchet-grid.apl?raw';
+import { type TileCapability } from './tileability';
 import { artworkSource } from './artworkSource';
 import { type ArtworkPreset } from './schema';
 
@@ -14,6 +15,29 @@ import { type ArtworkPreset } from './schema';
  * quarter-arc or a diagonal. Which motif belongs to which class is a rendering
  * decision, so the preset does not know or care.
  */
+/**
+ * How this artwork repeats.
+ *
+ * Not by periodicity — the classes come from a hash and no two regions are
+ * alike. It tiles because every arc crosses its cell edge at the midpoint and
+ * perpendicular to it, so any two arcs meeting at a join continue into each
+ * other whatever the cells either side happen to be. The join is continuous
+ * rather than identical, which is why comparing the tile's opposite edges pixel
+ * for pixel reports a mismatch and is wrong to.
+ *
+ * The diagonals added at three and four arrive at a corner at an angle and
+ * cannot continue an arc. Dropping back to two is therefore not a small
+ * corrective snap but a different artwork, so it is offered as its own named
+ * action rather than folded into Auto tile.
+ */
+const TILING: TileCapability = {
+  kind: 'motif',
+  variable: 'classes',
+  compatibleUpTo: 2,
+  correctionLabel: 'Use 2 tile shapes',
+  compatibleSummary: 'Seamless with one or two tile shapes.',
+};
+
 export const truchetGrid: ArtworkPreset = {
   id: 'truchet-grid',
   title: 'Truchet Grid',
@@ -144,6 +168,7 @@ export const truchetGrid: ArtworkPreset = {
   renderMode: 'tiles',
   // A seamless surface: it fills a Focus window and runs off the edges.
   focusFit: 'cover',
+  tiling: TILING,
 
   /*
    * Two shapes are the two arc orientations, and both cross every edge at the

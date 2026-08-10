@@ -11,9 +11,9 @@
  * work from this list — so a sixth mode would be an entry here and an icon.
  */
 
-export type EditorTab = 'create' | 'colour' | 'animate' | 'advanced' | 'code';
+export type EditorTab = 'create' | 'colour' | 'animate' | 'tile' | 'advanced' | 'code';
 
-export const EDITOR_TABS: readonly EditorTab[] = ['create', 'colour', 'animate', 'advanced', 'code'];
+export const EDITOR_TABS: readonly EditorTab[] = ['create', 'colour', 'animate', 'tile', 'advanced', 'code'];
 
 /**
  * The modes this artwork actually offers.
@@ -25,8 +25,18 @@ export const EDITOR_TABS: readonly EditorTab[] = ['create', 'colour', 'animate',
  * where its real parameters are. Every other mode works from the render options,
  * the palette and the source, which every artwork has.
  */
-export function tabsFor(hasCreate: boolean): readonly EditorTab[] {
-  return hasCreate ? EDITOR_TABS : EDITOR_TABS.filter((tab) => tab !== 'create');
+export function tabsFor(hasCreate: boolean, hasTile = false): readonly EditorTab[] {
+  return EDITOR_TABS.filter((tab) => {
+    if (tab === 'create') return hasCreate;
+    /*
+     * Tile is offered only where the artwork can actually answer the question it
+     * asks. A fractal has no repeat to find, and Wave Interference has none
+     * reachable from the numbers it exposes — a tab that could only ever say
+     * "no" is worse than no tab, because it invites the press.
+     */
+    if (tab === 'tile') return hasTile;
+    return true;
+  });
 }
 
 /** Where an artwork opens: its curated controls if it has any, its real ones if not. */
@@ -39,6 +49,7 @@ export const TAB_NAMES: Record<EditorTab, string> = {
   create: 'Create',
   colour: 'Colour',
   animate: 'Animate',
+  tile: 'Tile',
   advanced: 'Advanced',
   code: 'Code',
 };

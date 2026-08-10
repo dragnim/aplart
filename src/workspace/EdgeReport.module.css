@@ -1,0 +1,26 @@
+.report {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.reading {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+/* Stated in words as well; the colour is a second signal, never the only one. */
+.reading[data-verdict='mismatch'] {
+  color: var(--text-muted);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--text-muted);
+}

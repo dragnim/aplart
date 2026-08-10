@@ -1,0 +1,49 @@
+/*
+ * A square of the artwork repeated, with the centre join marked.
+ *
+ * Sized by the panel rather than by the artwork: the preview is for judging a
+ * join, not for reading detail, and a box that grew with the picture would push
+ * the controls beneath it off the panel.
+ */
+.frame {
+  position: relative;
+  inline-size: 100%;
+  max-inline-size: 18rem;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.canvas {
+  inline-size: 100%;
+  block-size: 100%;
+  display: block;
+}
+
+/*
+ * Where four copies meet. Two hairlines rather than a box, so the join itself is
+ * never covered by the thing pointing at it.
+ */
+.crosshair {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      to right,
+      transparent calc(50% - 0.5px),
+      var(--ui-accent-border) calc(50% - 0.5px),
+      var(--ui-accent-border) calc(50% + 0.5px),
+      transparent calc(50% + 0.5px)
+    ),
+    linear-gradient(
+      to bottom,
+      transparent calc(50% - 0.5px),
+      var(--ui-accent-border) calc(50% - 0.5px),
+      var(--ui-accent-border) calc(50% + 0.5px),
+      transparent calc(50% + 0.5px)
+    );
+  opacity: 0.55;
+}

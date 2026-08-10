@@ -9,13 +9,23 @@
  */
 
 import { TILE_COUNTS, TILE_SCALES, type TilingMode, type TilingView } from '@/renderer/tiling';
-import { describeEdge, edgeCheckCaveat, type EdgeCheck } from '@/renderer/edgeCheck';
+import { type EdgeCheck } from '@/renderer/edgeCheck';
+import { EdgeReport } from './EdgeReport';
 import styles from './TilingControls.module.css';
 
 interface Props {
   readonly tiling: TilingView;
   readonly edges: EdgeCheck | null;
   readonly onChange: (tiling: TilingView) => void;
+  /**
+   * Whether the artwork this repeats can itself tile.
+   *
+   * False for every artwork that shows these controls here, since an artwork
+   * that can tile owns them in its Tile tab instead. It is a prop rather than a
+   * constant so the sentence below states a fact about this artwork rather than
+   * a rule about where the panel happens to be.
+   */
+  readonly seamless: boolean;
 }
 
 const MODE_LABELS: Record<TilingMode, string> = {
@@ -24,12 +34,24 @@ const MODE_LABELS: Record<TilingMode, string> = {
   'mirror-repeat': 'Mirror repeat',
 };
 
-export function TilingControls({ tiling, edges, onChange }: Props) {
+export function TilingControls({ tiling, edges, onChange, seamless }: Props) {
   const repeating = tiling.mode !== 'single';
 
   return (
     <fieldset className={styles.group}>
       <legend className={styles.legend}>Tiling</legend>
+
+      {/*
+        Said plainly, because the control is genuinely useful here and the thing
+        it does not do is the thing somebody might hope for. An artwork that can
+        actually tile owns these controls in its own Tile tab, where the answer
+        is the point rather than a caveat.
+      */}
+      {!seamless && (
+        <p className={styles.note}>
+          Repeating changes the composition; it does not make this artwork seamless.
+        </p>
+      )}
 
       <div className={styles.field}>
         <span className={styles.label} id="tiling-view-label">
@@ -153,14 +175,7 @@ export function TilingControls({ tiling, edges, onChange }: Props) {
       */}
       {edges !== null && (
         <div className={styles.field}>
-          <span className={styles.label}>Edge check</span>
-          <p className={styles.reading} data-verdict={edges.horizontal.verdict}>
-            {describeEdge('horizontal', edges.horizontal)}
-          </p>
-          <p className={styles.reading} data-verdict={edges.vertical.verdict}>
-            {describeEdge('vertical', edges.vertical)}
-          </p>
-          <p className={styles.note}>{edgeCheckCaveat(edges.basis)}</p>
+          <EdgeReport edges={edges} />
         </div>
       )}
     </fieldset>

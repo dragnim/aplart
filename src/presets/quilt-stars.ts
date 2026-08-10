@@ -1,10 +1,25 @@
 import source from './apl/quilt-stars.apl?raw';
 import { artworkSource } from './artworkSource';
 import { tilePeriodRule } from './createQuality';
+import { type TileCapability } from './tileability';
 import { type ArtworkPreset } from './schema';
 
 const BLOCK = { min: 12, max: 36, step: 6 };
 const DETAIL = { min: 48, max: 120 };
+
+/**
+ * How this artwork repeats.
+ *
+ * Every block holds one whole star, so the quilt repeats every block.
+ */
+const TILING: TileCapability = {
+  kind: 'periodic',
+  sizeVariable: 'size',
+  period: (value) => value('block') ?? 0,
+  sizeRange: DETAIL,
+  periodVariable: 'block',
+  periodRange: BLOCK,
+};
 
 /**
  * Quilt Stars.
@@ -83,6 +98,7 @@ export const quiltStars: ArtworkPreset = {
   renderMode: 'continuous',
   // A seamless surface: it fills a Focus window and runs off the edges.
   focusFit: 'cover',
+  tiling: TILING,
 
   /*
    * Shape is the control worth meeting first: one slider takes the artwork from

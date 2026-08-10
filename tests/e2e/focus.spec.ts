@@ -70,7 +70,9 @@ async function settled(page: Page): Promise<string> {
 /** Waits for the artwork to have taken over the window. */
 async function fillsTheWindow(page: Page, viewport: { height: number }) {
   await expect
-    .poll(async () => (await page.locator('canvas').boundingBox())?.height ?? 0, { timeout: 10_000 })
+    .poll(async () => (await page.getByRole('img', { name: /grid/ }).boundingBox())?.height ?? 0, {
+      timeout: 10_000,
+    })
     .toBeGreaterThan(viewport.height * 0.9);
 }
 
@@ -119,14 +121,14 @@ test.describe('Focus mode', () => {
     await open(page, 'modular-bloom', 'Modular Bloom');
     await runAndWait(page);
 
-    const before = await page.locator('canvas').boundingBox();
+    const before = await page.getByRole('img', { name: /grid/ }).boundingBox();
     await enterFocus(page);
     await expect(page.getByRole('button', { name: 'Exit focus' })).toBeVisible();
 
     // The whole point of the mode: nearly the full height of the window.
     await fillsTheWindow(page, WIDE);
 
-    const after = await page.locator('canvas').boundingBox();
+    const after = await page.getByRole('img', { name: /grid/ }).boundingBox();
     expect(before).not.toBeNull();
     expect(after).not.toBeNull();
     expect((after as { height: number }).height).toBeGreaterThan((before as { height: number }).height);

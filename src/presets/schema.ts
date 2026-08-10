@@ -9,6 +9,7 @@
  */
 
 import { validateInstantPlay, type InstantPlayConfig } from './instantPlay';
+import { type TileCapability } from './tileability';
 
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced';
 
@@ -196,6 +197,14 @@ export interface ArtworkPreset {
   readonly valueNotes?: ValueNotes;
   /** Set by presets whose values come from a known range rather than an open one. */
   readonly valueRange?: DeclaredValueRange;
+  /**
+   * How this artwork repeats, when it does at all.
+   *
+   * Declaring it is what gives the artwork a Tile tab. It states the
+   * mathematics only — whether the numbers currently held actually tile is
+   * computed from the source, never assumed from this. See `tileability.ts`.
+   */
+  readonly tiling?: TileCapability;
   /** Set by presets that can say something proven about their repeated edges. */
   readonly edgeCompatibility?: EdgeCompatibility;
   readonly primitives: readonly PrimitiveReference[];

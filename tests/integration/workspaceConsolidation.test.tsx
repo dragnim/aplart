@@ -136,7 +136,9 @@ describe('which modes an artwork offers', () => {
   it('gives Create only to an artwork that has curated controls, and opens there', () => {
     open(modularBloom.id);
 
-    expect(offeredModes()).toEqual(['Create', 'Colour', 'Animate', 'Advanced', 'Code']);
+    // Tile sits between Animate and Advanced: it is a creative question about
+    // the artwork, not one of the exact numbers underneath it.
+    expect(offeredModes()).toEqual(['Create', 'Colour', 'Animate', 'Tile', 'Advanced', 'Code']);
     expect(selectedMode()).toBe('Create');
   });
 

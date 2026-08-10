@@ -167,12 +167,16 @@ test.describe('exporting a repeat', () => {
     await turnOnRepeatExport(page);
     const plain = await exportAt(page, '512 × 512');
 
-    // Both are overlays on the screen and neither belongs in a saved image.
-    await page.getByLabel(/Show seam guides/).check();
-    await page
-      .locator('canvas')
-      .first()
-      .click({ position: { x: 200, y: 200 } });
+    /*
+     * Both are overlays on the screen and neither belongs in a saved image.
+     *
+     * Matched by either wording. Tile and Advanced word the same setting
+     * differently on purpose — "Mark where the copies meet" reads better beside
+     * a verdict about joins — and which one a given artwork shows depends on
+     * whether it can tile, which is not what this test is about.
+     */
+    await page.getByLabel(/Mark where the copies meet|Show seam guides/).check();
+    await page.getByRole('img', { name: /grid/ }).click({ position: { x: 200, y: 200 } });
     const withOverlays = await exportAt(page, '512 × 512');
 
     expect(Buffer.compare(withOverlays, plain)).toBe(0);

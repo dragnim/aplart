@@ -13,7 +13,7 @@
 
 import { expect, type Locator, type Page } from '@playwright/test';
 
-export type Mode = 'Create' | 'Colour' | 'Animate' | 'Advanced' | 'Code';
+export type Mode = 'Create' | 'Colour' | 'Animate' | 'Tile' | 'Advanced' | 'Code';
 
 /**
  * Press a mode's tab. Idempotent: pressing the tab you are on changes nothing.
@@ -127,9 +127,37 @@ const PALETTE_NAMES = new Set([
  * palettes are chosen in Colour, and orientation, display and tiling in
  * Advanced.
  */
+/** The composition controls, which live in Tile for an artwork that can tile. */
+const TILING_NAMES = new Set([
+  'Single',
+  'Repeat',
+  'Mirror repeat',
+  '2 by 2',
+  '3 by 3',
+  '5 by 5',
+  '50%',
+  '75%',
+  '100%',
+  '150%',
+  '200%',
+]);
+
 export async function choice(page: Page, name: string): Promise<Locator> {
-  const panel = PALETTE_NAMES.has(name) ? await showMode(page, 'Colour') : await advanced(page);
-  return panel.getByRole('radio', { name, exact: true });
+  if (PALETTE_NAMES.has(name)) {
+    return (await showMode(page, 'Colour')).getByRole('radio', { name, exact: true });
+  }
+
+  /*
+   * Tiling moved. An artwork that can genuinely repeat owns these controls in
+   * its Tile tab; one that cannot keeps them in Advanced, where repeating is a
+   * composition rather than a claim. The helper asks which this artwork is
+   * rather than making every caller know.
+   */
+  if (TILING_NAMES.has(name) && (await page.getByRole('tab', { name: 'Tile' }).count()) > 0) {
+    return (await showMode(page, 'Tile')).getByRole('radio', { name, exact: true });
+  }
+
+  return (await advanced(page)).getByRole('radio', { name, exact: true });
 }
 
 /** Randomise, Undo and Reset, which sit beneath every mode. */

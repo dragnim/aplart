@@ -1,6 +1,7 @@
 import source from './apl/modular-bloom.apl?raw';
 import { artworkSource } from './artworkSource';
 import { gcd, nearestAccepted, type CreateQualityRule } from './createQuality';
+import { type TileCapability } from './tileability';
 import { type ArtworkPreset } from './schema';
 
 /**
@@ -78,6 +79,30 @@ export const modularBloomQuality: CreateQualityRule = (values, holding) => {
  * Verified against the live TryAPL service at every corner of its parameter
  * ranges; the slowest run measured 145 ms.
  */
+/**
+ * How this artwork repeats.
+ *
+ * A cell holds `(complexity × row × column) mod scale`. Moving a column along by
+ * `p` adds `complexity × row × p`, which vanishes for every row exactly when the
+ * scale divides `complexity × p` — so the pattern repeats every
+ * `scale ÷ gcd(complexity, scale)` cells. That is the same number as the count of
+ * distinct shades it draws, which is why a bloom that looks flat is also the one
+ * that tiles most easily.
+ */
+const TILING: TileCapability = {
+  kind: 'periodic',
+  sizeVariable: 'size',
+  period: (value) => {
+    const modulus = value('modulus');
+    const multiplier = value('multiplier');
+    if (modulus === undefined || multiplier === undefined || modulus <= 0) return undefined;
+    return modulus / gcd(multiplier, modulus);
+  },
+  sizeRange: { min: 16, max: 128 },
+  periodVariable: 'modulus',
+  periodRange: { min: 5, max: 24, step: 1 },
+};
+
 export const modularBloom: ArtworkPreset = {
   id: 'modular-bloom',
   title: 'Modular Bloom',
@@ -131,6 +156,7 @@ export const modularBloom: ArtworkPreset = {
   renderMode: 'continuous',
   // A seamless surface: it fills a Focus window and runs off the edges.
   focusFit: 'cover',
+  tiling: TILING,
 
   /*
    * The artwork somebody meets first.

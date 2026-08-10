@@ -1,10 +1,25 @@
 import source from './apl/glow-grid.apl?raw';
 import { artworkSource } from './artworkSource';
 import { tilePeriodRule } from './createQuality';
+import { type TileCapability } from './tileability';
 import { type ArtworkPreset } from './schema';
 
 const SPACING = { min: 9, max: 27, step: 3 };
 const DETAIL = { min: 54, max: 126 };
+
+/**
+ * How this artwork repeats.
+ *
+ * Rows step sideways in thirds of a spacing, so the lattice repeats every three rows of orbs.
+ */
+const TILING: TileCapability = {
+  kind: 'periodic',
+  sizeVariable: 'size',
+  period: (value) => 3 * (value('spacing') ?? 0),
+  sizeRange: DETAIL,
+  periodVariable: 'spacing',
+  periodRange: SPACING,
+};
 
 /**
  * Glow Grid.
@@ -75,6 +90,7 @@ export const glowGrid: ArtworkPreset = {
   renderMode: 'continuous',
   // A seamless surface: it fills a Focus window and runs off the edges.
   focusFit: 'cover',
+  tiling: TILING,
 
   /*
    * Two controls carry this artwork and they pull in opposite directions:

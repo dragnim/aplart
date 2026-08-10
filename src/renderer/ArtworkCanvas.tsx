@@ -61,6 +61,15 @@ interface Props {
    * Focus mode, since the ordinary workspace draws a square in a square frame.
    */
   readonly fit?: ArtworkFit;
+  /**
+   * Called after each successful paint of this canvas.
+   *
+   * A notification, carrying nothing. Its one consumer is the Tile preview,
+   * which draws the artwork for itself and needs only to be told when the
+   * palette animation's phase has moved — that phase is a ref, so no render
+   * happens and there is no other moment to observe.
+   */
+  readonly onPainted?: () => void;
   /** Dims the artwork while a new run is in flight, without removing it. */
   readonly busy: boolean;
   readonly canvasRef?: RefObject<HTMLCanvasElement | null>;
@@ -91,6 +100,7 @@ export function ArtworkCanvas({
   mode,
   options,
   fit = 'contain',
+  onPainted,
   busy,
   canvasRef,
   exploration,
@@ -146,6 +156,9 @@ export function ArtworkCanvas({
       // After the artwork, so the outline is not painted over. Repainted with it
       // on every resize, which is why it is inside `paint` rather than beside it.
       if (marked !== null) drawCellMarker(element, marked, matrix, drawn, width, height, ratio, fit);
+
+      // Painted, and only now.
+      onPainted?.();
     };
 
     paintRef.current = paint;
@@ -156,7 +169,7 @@ export function ArtworkCanvas({
     const observer = new ResizeObserver(paint);
     observer.observe(box);
     return () => observer.disconnect();
-  }, [matrix, stats, mode, options, canvas, marked, animation, escape, singleCopy, fit]);
+  }, [matrix, stats, mode, options, canvas, marked, animation, escape, singleCopy, fit, onPainted]);
 
   /*
    * The animation loop.

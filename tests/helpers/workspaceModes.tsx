@@ -16,7 +16,7 @@
 import { fireEvent, screen, within, type BoundFunctions, type queries } from '@testing-library/react';
 import { type UserEvent } from '@testing-library/user-event';
 
-export const MODES = ['Create', 'Colour', 'Animate', 'Advanced', 'Code'] as const;
+export const MODES = ['Create', 'Colour', 'Animate', 'Tile', 'Advanced', 'Code'] as const;
 
 export type Mode = (typeof MODES)[number];
 
@@ -118,6 +118,16 @@ export function selectedPalette(): string {
  */
 export function advanced(): BoundFunctions<typeof queries> {
   return within(showMode('Advanced'));
+}
+
+/**
+ * The Tile mode's panel, scoped.
+ *
+ * Where the repeat controls live for an artwork that can actually tile. An
+ * artwork that cannot keeps them in Advanced, so a test says which it means.
+ */
+export function tile(): BoundFunctions<typeof queries> {
+  return within(showMode('Tile'));
 }
 
 /** The Colour mode's panel, scoped. */

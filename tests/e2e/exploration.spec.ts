@@ -94,9 +94,21 @@ async function viewFromCode(page: Page): Promise<{ centreX: number; centreY: num
 /** A pixel or two of the plane, at the preset's starting span. */
 const PIXEL_TOLERANCE = 0.01;
 
+/**
+ * The artwork's own canvas.
+ *
+ * Named by its description rather than by its tag. A tile-capable artwork also
+ * renders the Tile preview's canvas — kept in the document while its panel is
+ * hidden, so that it has a size to draw into the moment the panel opens — and
+ * "the only canvas on the page" stopped being true the day Tile arrived.
+ */
+function artwork(page: Page) {
+  return page.getByRole('img', { name: /grid/ });
+}
+
 /** Drags between two points given as fractions of the canvas box. */
 async function dragRegion(page: Page, from: readonly [number, number], to: readonly [number, number]) {
-  const box = await page.locator('canvas').boundingBox();
+  const box = await artwork(page).boundingBox();
   if (box === null) throw new Error('the canvas is not on screen');
 
   const at = ([u, v]: readonly [number, number]) => ({
@@ -191,7 +203,7 @@ test.describe('exploring the Mandelbrot set', () => {
     await openMandelbrot(page);
     await runAndWait(page);
 
-    const box = await page.locator('canvas').boundingBox();
+    const box = await artwork(page).boundingBox();
     if (box === null) throw new Error('the canvas is not on screen');
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 
@@ -212,7 +224,7 @@ test.describe('exploring the Mandelbrot set', () => {
     await enterFocus(page);
     await page.getByRole('button', { name: 'Controls', exact: true }).click();
 
-    const box = await page.locator('canvas').boundingBox();
+    const box = await artwork(page).boundingBox();
     if (box === null) throw new Error('the canvas is not on screen');
     await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.3);
     await page.mouse.down();
@@ -241,7 +253,7 @@ test.describe('reading a value off the artwork', () => {
 
   /** Presses a point given as fractions of the canvas box. */
   async function pressAt(page: Page, u: number, v: number) {
-    const box = await page.locator('canvas').boundingBox();
+    const box = await artwork(page).boundingBox();
     if (box === null) throw new Error('the canvas is not on screen');
     await page.mouse.click(box.x + box.width * u, box.y + box.height * v);
   }
